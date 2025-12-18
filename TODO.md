@@ -33,7 +33,13 @@ Features and improvements planned for pdfpipe.
 - [x] Printer name configuration
 - [x] Pass-through printer flags (SumatraPDF args)
 - [x] Copies count
-- [ ] Abstract printer backend for alternative solutions (future)
+- [ ] Cross-platform printing backend:
+  - [x] SumatraPDF on Windows (current)
+  - [ ] `lpr` command on Linux/macOS
+  - [ ] Auto-detect platform and route to appropriate backend
+  - [ ] Expose platform-specific printer settings in config YAML
+  - [ ] Common settings: printer name, copies, paper size
+  - [ ] Platform-specific args passed through to backend
 
 ## Workflow Options
 - [x] Cleanup source files after successful processing
@@ -58,7 +64,6 @@ Features and improvements planned for pdfpipe.
 - [ ] Publish to PyPI
 
 ## Future Considerations
-- [ ] Alternative printer backends (CUPS, direct Windows API, etc.)
 - [ ] GUI configuration editor
 - [ ] Watch mode for automatic processing of new files
 - [ ] Config inheritance/imports (extend from base configs)
