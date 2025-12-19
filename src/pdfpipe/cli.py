@@ -7,17 +7,57 @@ from pathlib import Path
 from pdfpipe import __version__
 
 
-def list_printers() -> list[str]:
-    """List available printers on the system."""
+def show_version() -> None:
+    """Show version information including SumatraPDF status."""
+    from pdfpipe.printer import get_sumatra_status, SUMATRA_VERSION
+
+    print(f"pdfpipe {__version__}")
+
+    status = get_sumatra_status()
+    if status["installed"]:
+        print(f"SumatraPDF {SUMATRA_VERSION} installed at: {status['path']}")
+    else:
+        print("SumatraPDF: not installed (run 'pdfp install' to download)")
+
+
+def cmd_install(force: bool = False) -> int:
+    """Install SumatraPDF."""
+    from pdfpipe.printer import download_sumatra, PrinterError
+
     try:
-        import win32print
-        printers = win32print.EnumPrinters(
-            win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
-        )
-        return [printer[2] for printer in printers]
-    except ImportError:
-        print("Error: win32print not available. Printer listing only works on Windows.", file=sys.stderr)
-        return []
+        download_sumatra(force=force)
+        return 0
+    except PrinterError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_uninstall() -> int:
+    """Uninstall SumatraPDF."""
+    from pdfpipe.printer import remove_sumatra
+
+    if remove_sumatra():
+        return 0
+    else:
+        return 1
+
+
+def cmd_list_printers() -> int:
+    """List available printers."""
+    from pdfpipe.printer import list_printers, PrinterError
+
+    try:
+        printers = list_printers()
+        if not printers:
+            print("No printers found.")
+            return 1
+        print("Available printers:")
+        for i, printer in enumerate(printers, 1):
+            print(f"  {i}. {printer}")
+        return 0
+    except PrinterError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -28,6 +68,8 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  pdfp install                                  Download SumatraPDF for printing
+  pdfp uninstall                                Remove downloaded SumatraPDF
   pdfp -c config.yaml -i ./input -o ./output    Process PDFs with config
   pdfp -c config.yaml -i document.pdf           Process a single file
   pdfp -c config.yaml --validate                Validate config only
@@ -38,8 +80,8 @@ Examples:
 
     parser.add_argument(
         "-V", "--version",
-        action="version",
-        version=f"%(prog)s {__version__}",
+        action="store_true",
+        help="Show version information and exit",
     )
 
     parser.add_argument(
@@ -78,6 +120,20 @@ Examples:
         help="List available printers and exit",
     )
 
+    # Subcommands as positional argument
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=["install", "uninstall"],
+        help="Subcommand: install (download SumatraPDF) or uninstall (remove it)",
+    )
+
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force re-download even if already installed (used with 'install')",
+    )
+
     return parser
 
 
@@ -86,16 +142,20 @@ def main(args: list[str] | None = None) -> int:
     parser = create_parser()
     parsed = parser.parse_args(args)
 
+    # Handle --version
+    if parsed.version:
+        show_version()
+        return 0
+
+    # Handle subcommands
+    if parsed.command == "install":
+        return cmd_install(force=parsed.force)
+    elif parsed.command == "uninstall":
+        return cmd_uninstall()
+
     # Handle --list-printers
     if parsed.list_printers:
-        printers = list_printers()
-        if not printers:
-            print("No printers found.")
-            return 1
-        print("Available printers:")
-        for i, printer in enumerate(printers, 1):
-            print(f"  {i}. {printer}")
-        return 0
+        return cmd_list_printers()
 
     # Require config for other operations
     if not parsed.config:
