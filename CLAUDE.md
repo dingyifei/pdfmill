@@ -66,6 +66,7 @@ settings:
 input:
   path: ./input
   pattern: "*.pdf"            # Glob pattern for filenames
+  sort: name_asc              # Sort order: name_asc, name_desc, time_asc, time_desc
   filter:
     keywords: ["shipping"]    # Filter by text content (case-sensitive)
     match: "any"              # "any" (OR) or "all" (AND)
@@ -77,13 +78,26 @@ outputs:
     output_dir: ./output
     filename_prefix: ""
     filename_suffix: ""
+    sort: time_desc         # Override input.sort (error if both set)
     debug: false            # Save intermediate PDFs after each transform
     print:
       enabled: true
+      merge: false          # Merge all PDFs before printing as single job
+      # Single printer (legacy, still supported):
       printer: "Printer Name"
       copies: 1
-      merge: false          # Merge all PDFs before printing as single job
-      args: []              # Pass-through SumatraPDF args
+      args: []
+      # Or multi-printer targets:
+      targets:
+        fast:
+          printer: "HP LaserJet"
+          weight: 100       # Page distribution weight (ppm/ipm)
+          copies: 1
+          args: []
+        slow:
+          printer: "Brother"
+          weight: 50
+          copies: 1
 ```
 
 ## Units

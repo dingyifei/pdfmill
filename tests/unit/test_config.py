@@ -16,6 +16,7 @@ from pdfmill.config import (
     SizeTransform,
     OutputProfile,
     PrintConfig,
+    PrintTarget,
     Settings,
 )
 
@@ -188,9 +189,11 @@ class TestParseOutputProfile:
         assert profile.filename_suffix == "_suf"
         assert len(profile.transforms) == 1
         assert profile.print.enabled is True
-        assert profile.print.printer == "My Printer"
-        assert profile.print.copies == 2
-        assert profile.print.args == ["-silent"]
+        # Legacy printer config is converted to "default" target
+        assert "default" in profile.print.targets
+        assert profile.print.targets["default"].printer == "My Printer"
+        assert profile.print.targets["default"].copies == 2
+        assert profile.print.targets["default"].args == ["-silent"]
 
     def test_list_pages(self):
         profile = parse_output_profile("test", {"pages": [1, 3, 5]})
@@ -199,9 +202,8 @@ class TestParseOutputProfile:
     def test_print_defaults(self):
         profile = parse_output_profile("test", {"pages": "all", "print": {}})
         assert profile.print.enabled is False
-        assert profile.print.printer == ""
-        assert profile.print.copies == 1
-        assert profile.print.args == []
+        assert profile.print.targets == {}  # No targets when no printer specified
+        assert profile.print.merge is False
 
 
 class TestDataclasses:
@@ -222,9 +224,8 @@ class TestDataclasses:
     def test_print_config_defaults(self):
         pc = PrintConfig()
         assert pc.enabled is False
-        assert pc.printer == ""
-        assert pc.copies == 1
-        assert pc.args == []
+        assert pc.merge is False
+        assert pc.targets == {}
 
     def test_output_profile_pages_required(self):
         # pages is required, has no default
@@ -246,3 +247,91 @@ class TestDataclasses:
         assert st.width == ""
         assert st.height == ""
         assert st.fit == "contain"
+
+
+class TestPrintTargets:
+    """Test new multi-printer targets configuration."""
+
+    def test_parse_targets_config(self):
+        data = {
+            "pages": "all",
+            "print": {
+                "enabled": True,
+                "merge": True,
+                "targets": {
+                    "fast": {
+                        "printer": "HP LaserJet",
+                        "weight": 100,
+                        "copies": 2,
+                        "args": ["-silent"],
+                    },
+                    "slow": {
+                        "printer": "Brother",
+                        "weight": 50,
+                    },
+                },
+            },
+        }
+        profile = parse_output_profile("test", data)
+
+        assert profile.print.enabled is True
+        assert profile.print.merge is True
+        assert len(profile.print.targets) == 2
+        assert "fast" in profile.print.targets
+        assert "slow" in profile.print.targets
+        assert profile.print.targets["fast"].printer == "HP LaserJet"
+        assert profile.print.targets["fast"].weight == 100
+        assert profile.print.targets["fast"].copies == 2
+        assert profile.print.targets["fast"].args == ["-silent"]
+        assert profile.print.targets["slow"].printer == "Brother"
+        assert profile.print.targets["slow"].weight == 50
+        assert profile.print.targets["slow"].copies == 1  # default
+
+    def test_parse_sort_option(self):
+        data = {
+            "pages": "all",
+            "sort": "name_asc",
+        }
+        profile = parse_output_profile("test", data)
+        assert profile.sort == "name_asc"
+
+    def test_print_target_defaults(self):
+        target = PrintTarget(printer="Test")
+        assert target.weight == 1
+        assert target.copies == 1
+        assert target.args == []
+
+
+class TestInputSort:
+    """Test input sorting configuration."""
+
+    def test_input_config_with_sort(self, tmp_path):
+        config_content = """
+version: 1
+input:
+  path: ./input
+  sort: time_desc
+outputs:
+  test:
+    pages: all
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        config = load_config(config_file)
+        assert config.input.sort == "time_desc"
+
+    def test_input_config_sort_default(self, tmp_path):
+        config_content = """
+version: 1
+input:
+  path: ./input
+outputs:
+  test:
+    pages: all
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        config = load_config(config_file)
+        assert config.input.sort is None

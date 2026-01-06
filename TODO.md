@@ -33,6 +33,11 @@ Features and improvements planned for pdfpipe.
 - [x] Printer name configuration
 - [x] Pass-through printer flags (SumatraPDF args)
 - [x] Copies count
+- [x] Multi-printer distribution:
+  - [x] Named printer targets with individual settings
+  - [x] Weight-based page distribution (for load balancing by speed/ppm)
+  - [x] Copy distribution (different copy counts per target)
+  - [x] Backwards compatible with single `printer:` config
 - [ ] Cross-platform printing backend:
   - [x] SumatraPDF on Windows (current)
   - [ ] `lpr` command on Linux/macOS
@@ -40,6 +45,13 @@ Features and improvements planned for pdfpipe.
   - [ ] Expose platform-specific printer settings in config YAML
   - [ ] Common settings: printer name, copies, paper size
   - [ ] Platform-specific args passed through to backend
+
+## Input Processing
+- [x] Input file sorting:
+  - [x] Sort by name (ascending/descending)
+  - [x] Sort by modification time (ascending/descending)
+  - [x] Global sort in `input:` section
+  - [x] Per-profile sort override (error if both set)
 
 ## Workflow Options
 - [x] Cleanup source files after successful processing

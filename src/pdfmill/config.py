@@ -12,13 +12,20 @@ class ConfigError(Exception):
 
 
 @dataclass
+class PrintTarget:
+    """A single printer target with distribution settings."""
+    printer: str
+    weight: int = 1      # For page distribution (ppm/ipm)
+    copies: int = 1
+    args: list[str] = field(default_factory=list)
+
+
+@dataclass
 class PrintConfig:
     """Print configuration for an output profile."""
     enabled: bool = False
-    printer: str = ""
-    copies: int = 1
-    args: list[str] = field(default_factory=list)
     merge: bool = False  # Merge all PDFs before printing as single job
+    targets: dict[str, PrintTarget] = field(default_factory=dict)
 
 
 @dataclass
@@ -65,6 +72,7 @@ class OutputProfile:
     transforms: list[Transform] = field(default_factory=list)
     print: PrintConfig = field(default_factory=PrintConfig)
     debug: bool = False  # Output intermediate files after each transform
+    sort: str | None = None  # Override input.sort: name_asc, name_desc, time_asc, time_desc
 
 
 @dataclass
@@ -88,6 +96,7 @@ class InputConfig:
     path: Path = Path("./input")
     pattern: str = "*.pdf"
     filter: FilterConfig | None = None
+    sort: str | None = None  # name_asc, name_desc, time_asc, time_desc
 
 
 @dataclass
@@ -154,12 +163,30 @@ def parse_output_profile(name: str, data: dict[str, Any]) -> OutputProfile:
     print_config = PrintConfig()
     if "print" in data:
         p = data["print"]
+        targets = {}
+
+        if "targets" in p:
+            # New multi-target format
+            for target_name, t in p["targets"].items():
+                targets[target_name] = PrintTarget(
+                    printer=t.get("printer", ""),
+                    weight=t.get("weight", 1),
+                    copies=t.get("copies", 1),
+                    args=t.get("args", []),
+                )
+        elif p.get("printer"):
+            # Legacy single-printer format -> convert to target
+            targets["default"] = PrintTarget(
+                printer=p.get("printer", ""),
+                weight=1,
+                copies=p.get("copies", 1),
+                args=p.get("args", []),
+            )
+
         print_config = PrintConfig(
             enabled=p.get("enabled", False),
-            printer=p.get("printer", ""),
-            copies=p.get("copies", 1),
-            args=p.get("args", []),
             merge=p.get("merge", False),
+            targets=targets,
         )
 
     return OutputProfile(
@@ -170,6 +197,7 @@ def parse_output_profile(name: str, data: dict[str, Any]) -> OutputProfile:
         transforms=transforms,
         print=print_config,
         debug=data.get("debug", False),
+        sort=data.get("sort"),
     )
 
 
@@ -209,6 +237,7 @@ def load_config(config_path: Path) -> Config:
             path=Path(i.get("path", "./input")),
             pattern=i.get("pattern", "*.pdf"),
             filter=filter_config,
+            sort=i.get("sort"),
         )
 
     # Parse outputs

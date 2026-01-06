@@ -1,0 +1,68 @@
+# Example: Multi-printer distribution with sorting
+# Demonstrates load-balanced printing across multiple printers
+#
+# Use case: High-volume label printing where you want to distribute
+# pages across multiple printers based on their speed (ppm)
+#
+# Usage:
+#   pdfp -c configs/multi_printer.yaml -i ./input -o ./output
+
+version: 1
+
+settings:
+  on_error: continue
+  cleanup_output_after_print: true
+
+input:
+  path: ./input
+  pattern: "*.pdf"
+  sort: time_asc  # Process oldest files first (FIFO order)
+
+outputs:
+  # Example 1: Page distribution across two printers by speed
+  # Faster printer gets more pages, sequential assignment for stacking
+  distributed_labels:
+    pages: "all"
+    output_dir: ./output
+    filename_suffix: "_distributed"
+    print:
+      enabled: true
+      merge: true  # Required for page distribution
+      targets:
+        fast_printer:
+          printer: "HP LaserJet Pro"
+          weight: 100  # 100 ppm - gets ~67% of pages
+          copies: 1
+        slow_printer:
+          printer: "Brother HL-L2350"
+          weight: 50   # 50 ppm - gets ~33% of pages
+          copies: 1
+
+  # Example 2: Copy distribution (same doc to multiple printers)
+  # Useful for archive + customer copies
+  invoice_copies:
+    pages: "1"  # First page only
+    output_dir: ./output
+    filename_suffix: "_invoice"
+    print:
+      enabled: true
+      merge: false  # Each file sent to all targets
+      targets:
+        archive:
+          printer: "Archive Printer"
+          copies: 2   # Keep 2 copies for records
+        customer:
+          printer: "Front Desk Printer"
+          copies: 1   # 1 copy for customer
+
+  # Example 3: Per-profile sorting (overrides input.sort)
+  # Sort by filename for this specific profile
+  sorted_by_name:
+    pages: "last"
+    sort: name_asc  # Override: alphabetical order
+    output_dir: ./output
+    filename_suffix: "_sorted"
+    print:
+      enabled: true
+      printer: "Label Printer"
+      merge: true

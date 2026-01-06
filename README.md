@@ -4,7 +4,7 @@
 
 A configurable PDF processing pipeline for splitting, transforming, and printing PDFs.
 
-Currently supports only windows
+Currently, supports only windows
 
 ## Features
 
@@ -14,7 +14,9 @@ Currently supports only windows
 - **Multi-Output**: Split one PDF into multiple outputs with different settings
 - **Batch Processing**: Process single files or entire directories
 - **Input Filtering**: Filter PDFs by filename pattern or text content keywords
+- **Input Sorting**: Sort files by name or timestamp before processing
 - **Printing**: Send outputs to different printers with custom settings
+- **Multi-Printer Distribution**: Split pages across multiple printers by speed/weight
 - **Dry Run**: Preview what will happen before processing
 
 ## Installation
@@ -82,14 +84,15 @@ outputs:
       printer: "Label Printer"
 ```
 
-### Input Filtering
+### Input Filtering and Sorting
 
-Filter which PDFs to process by filename pattern or text content:
+Filter which PDFs to process by filename pattern or text content, and control processing order:
 
 ```yaml
 input:
   path: ./input
   pattern: "shipping_*.pdf"  # glob pattern for filenames
+  sort: name_asc             # sort files before processing
   filter:
     keywords: ["shipping", "label"]  # text content keywords
     match: "any"  # "any" = OR logic, "all" = AND logic
@@ -98,8 +101,11 @@ input:
 | Option | Description |
 |--------|-------------|
 | `pattern` | Glob pattern for filename matching (default: `*.pdf`) |
+| `sort` | Sort order: `name_asc`, `name_desc`, `time_asc`, `time_desc` |
 | `filter.keywords` | List of keywords to search in PDF text content |
 | `filter.match` | `"any"` matches if any keyword found, `"all"` requires all keywords |
+
+Sorting can also be set per output profile using `sort:` at the profile level. If both input-level and profile-level sort are set, an error is raised.
 
 Keyword matching is case-sensitive. PDFs without searchable text won't match keyword filters.
 
@@ -171,6 +177,7 @@ This generates files showing each processing stage:
 
 ### Print Options
 
+**Single printer (simple):**
 ```yaml
 print:
   enabled: true
@@ -182,12 +189,45 @@ print:
 
 When `merge: true` is set, all output files for that profile are combined into a single PDF before being sent to the printer. This is useful for batch printing where you want all pages in one print job.
 
+**Multi-printer distribution:**
+```yaml
+print:
+  enabled: true
+  merge: true
+  targets:
+    fast_printer:
+      printer: "HP LaserJet"
+      weight: 100    # higher = more pages (e.g., printer's ppm)
+      copies: 1
+    slow_printer:
+      printer: "Brother"
+      weight: 50
+      copies: 1
+```
+
+When multiple targets are configured with `merge: true`:
+- Pages are distributed across printers based on weight ratio
+- Higher-weight printers get the first pages (for proper stacking order)
+- Example: 10 pages with weights 100:50 → fast gets pages 1-7, slow gets 8-10
+
+When `merge: false` with multiple targets:
+- Each file is sent to all targets (copy distribution)
+- Each target uses its own `copies` count
+
+| Target Option | Description |
+|---------------|-------------|
+| `printer` | Printer name (required) |
+| `weight` | Page distribution weight (default: 1) |
+| `copies` | Number of copies (default: 1) |
+| `args` | Pass-through SumatraPDF arguments |
+
 ## Example Configs
 
 See the `configs/` directory for ready-to-use examples:
 
 - `label_packing.yaml` - Split PDFs into packing sheet + shipping label
 - `six_page.yaml` - Process 6-page PDFs (remove pages 1-2, rotate pages 4-5)
+- `multi_printer.yaml` - Multi-printer distribution with sorting
 
 ## Requirements
 

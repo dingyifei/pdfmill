@@ -21,6 +21,7 @@ from pdfmill.config import (
     SizeTransform,
     Settings,
     PrintConfig,
+    PrintTarget,
 )
 
 
@@ -344,7 +345,10 @@ class TestProcess:
         config = Config(outputs={
             "label": OutputProfile(
                 pages="last",
-                print=PrintConfig(enabled=True, printer="Test Printer"),
+                print=PrintConfig(
+                    enabled=True,
+                    targets={"default": PrintTarget(printer="Test Printer")}
+                ),
             )
         })
         output_dir = temp_dir / "output"
@@ -362,7 +366,10 @@ class TestProcess:
             outputs={
                 "label": OutputProfile(
                     pages="last",
-                    print=PrintConfig(enabled=True, printer="Fake Printer"),
+                    print=PrintConfig(
+                        enabled=True,
+                        targets={"default": PrintTarget(printer="Fake Printer")}
+                    ),
                 )
             }
         )
@@ -416,7 +423,10 @@ class TestCleanup:
             outputs={
                 "label": OutputProfile(
                     pages="all",
-                    print=PrintConfig(enabled=True, printer="Test"),
+                    print=PrintConfig(
+                        enabled=True,
+                        targets={"default": PrintTarget(printer="Test")}
+                    ),
                 )
             }
         )
@@ -428,3 +438,211 @@ class TestCleanup:
         # Output should be cleaned up
         outputs = list(output_dir.glob("*.pdf"))
         assert len(outputs) == 0
+
+
+class TestSortFiles:
+    """Test file sorting functionality."""
+
+    def test_sort_name_asc(self, temp_dir):
+        from pdfmill.processor import sort_files
+        from pypdf import PdfWriter
+
+        # Create files with specific names
+        for name in ["charlie.pdf", "alpha.pdf", "bravo.pdf"]:
+            pdf = temp_dir / name
+            writer = PdfWriter()
+            writer.add_blank_page(612, 792)
+            with open(pdf, "wb") as f:
+                writer.write(f)
+
+        files = list(temp_dir.glob("*.pdf"))
+        sorted_files = sort_files(files, "name_asc")
+
+        assert [f.name for f in sorted_files] == ["alpha.pdf", "bravo.pdf", "charlie.pdf"]
+
+    def test_sort_name_desc(self, temp_dir):
+        from pdfmill.processor import sort_files
+        from pypdf import PdfWriter
+
+        for name in ["alpha.pdf", "charlie.pdf", "bravo.pdf"]:
+            pdf = temp_dir / name
+            writer = PdfWriter()
+            writer.add_blank_page(612, 792)
+            with open(pdf, "wb") as f:
+                writer.write(f)
+
+        files = list(temp_dir.glob("*.pdf"))
+        sorted_files = sort_files(files, "name_desc")
+
+        assert [f.name for f in sorted_files] == ["charlie.pdf", "bravo.pdf", "alpha.pdf"]
+
+    def test_sort_time_asc(self, temp_dir):
+        from pdfmill.processor import sort_files
+        from pypdf import PdfWriter
+        import time
+        import os
+
+        # Create files with different mtimes
+        for i, name in enumerate(["first.pdf", "second.pdf", "third.pdf"]):
+            pdf = temp_dir / name
+            writer = PdfWriter()
+            writer.add_blank_page(612, 792)
+            with open(pdf, "wb") as f:
+                writer.write(f)
+            # Set modification time (older first)
+            os.utime(pdf, (1000000 + i * 1000, 1000000 + i * 1000))
+
+        files = list(temp_dir.glob("*.pdf"))
+        sorted_files = sort_files(files, "time_asc")
+
+        assert [f.name for f in sorted_files] == ["first.pdf", "second.pdf", "third.pdf"]
+
+    def test_sort_invalid_option_raises(self, temp_dir):
+        from pdfmill.processor import sort_files
+        from pdfmill.config import ConfigError
+
+        with pytest.raises(ConfigError, match="Invalid sort option"):
+            sort_files([], "invalid_sort")
+
+
+class TestSplitPagesByWeight:
+    """Test page splitting across printer targets."""
+
+    def test_split_two_printers_equal_weight(self, temp_dir):
+        from pdfmill.processor import split_pages_by_weight
+        from pypdf import PdfWriter, PdfReader
+
+        # Create 10-page PDF
+        pdf_path = temp_dir / "source.pdf"
+        writer = PdfWriter()
+        for _ in range(10):
+            writer.add_blank_page(612, 792)
+        with open(pdf_path, "wb") as f:
+            writer.write(f)
+
+        targets = {
+            "printer_a": PrintTarget(printer="A", weight=50),
+            "printer_b": PrintTarget(printer="B", weight=50),
+        }
+
+        result = split_pages_by_weight(pdf_path, targets, temp_dir, "test")
+
+        assert len(result) == 2
+        # Each should get 5 pages
+        reader_a = PdfReader(str(result["printer_a"]))
+        reader_b = PdfReader(str(result["printer_b"]))
+        assert len(reader_a.pages) == 5
+        assert len(reader_b.pages) == 5
+
+    def test_split_unequal_weight(self, temp_dir):
+        from pdfmill.processor import split_pages_by_weight
+        from pypdf import PdfWriter, PdfReader
+
+        # Create 10-page PDF
+        pdf_path = temp_dir / "source.pdf"
+        writer = PdfWriter()
+        for _ in range(10):
+            writer.add_blank_page(612, 792)
+        with open(pdf_path, "wb") as f:
+            writer.write(f)
+
+        targets = {
+            "fast": PrintTarget(printer="Fast", weight=100),
+            "slow": PrintTarget(printer="Slow", weight=50),
+        }
+
+        result = split_pages_by_weight(pdf_path, targets, temp_dir, "test")
+
+        # Fast (100/150 = 67%) gets ~7 pages, slow gets the rest
+        reader_fast = PdfReader(str(result["fast"]))
+        reader_slow = PdfReader(str(result["slow"]))
+        assert len(reader_fast.pages) == 7
+        assert len(reader_slow.pages) == 3
+
+    def test_split_zero_weight_skipped(self, temp_dir):
+        from pdfmill.processor import split_pages_by_weight
+        from pypdf import PdfWriter
+
+        pdf_path = temp_dir / "source.pdf"
+        writer = PdfWriter()
+        for _ in range(10):
+            writer.add_blank_page(612, 792)
+        with open(pdf_path, "wb") as f:
+            writer.write(f)
+
+        targets = {
+            "active": PrintTarget(printer="Active", weight=100),
+            "inactive": PrintTarget(printer="Inactive", weight=0),
+        }
+
+        result = split_pages_by_weight(pdf_path, targets, temp_dir, "test")
+
+        assert "active" in result
+        assert "inactive" not in result
+
+    def test_split_single_page(self, temp_dir):
+        from pdfmill.processor import split_pages_by_weight
+        from pypdf import PdfWriter, PdfReader
+
+        pdf_path = temp_dir / "source.pdf"
+        writer = PdfWriter()
+        writer.add_blank_page(612, 792)
+        with open(pdf_path, "wb") as f:
+            writer.write(f)
+
+        targets = {
+            "fast": PrintTarget(printer="Fast", weight=100),
+            "slow": PrintTarget(printer="Slow", weight=50),
+        }
+
+        result = split_pages_by_weight(pdf_path, targets, temp_dir, "test")
+
+        # Single page goes to highest weight
+        assert "fast" in result
+        reader = PdfReader(str(result["fast"]))
+        assert len(reader.pages) == 1
+
+
+class TestMultiPrinterIntegration:
+    """Integration tests for multi-printer distribution."""
+
+    def test_multi_target_copy_distribution(self, temp_multi_page_pdf, temp_dir):
+        """Test that each target receives copies."""
+        config = Config(outputs={
+            "label": OutputProfile(
+                pages="last",
+                print=PrintConfig(
+                    enabled=True,
+                    targets={
+                        "archive": PrintTarget(printer="Archive", copies=2),
+                        "customer": PrintTarget(printer="Customer", copies=1),
+                    }
+                ),
+            )
+        })
+        output_dir = temp_dir / "output"
+
+        with patch("pdfmill.processor.print_pdf") as mock_print:
+            mock_print.return_value = True
+            process(config, temp_multi_page_pdf, output_dir)
+
+            # Should be called twice (once per target)
+            assert mock_print.call_count == 2
+
+    def test_sort_conflict_raises_error(self, temp_multi_page_pdf, temp_dir):
+        """Test that having both input.sort and profile.sort raises error."""
+        from pdfmill.config import InputConfig, ConfigError
+
+        config = Config(
+            input=InputConfig(sort="name_asc"),
+            outputs={
+                "label": OutputProfile(
+                    pages="all",
+                    sort="time_desc",  # Conflicts with input.sort
+                )
+            }
+        )
+        output_dir = temp_dir / "output"
+
+        with pytest.raises(ConfigError, match="Sort specified in both"):
+            process(config, temp_multi_page_pdf, output_dir)
