@@ -23,11 +23,11 @@ Currently, supports only windows
 
 ```sh
 # Clone and install in development mode
-git clone https://github.com/your-repo/pdfmill.git
+git clone https://github.com/dingyifei/pdfmill.git
 cd pdfmill
 pip install -e .
 
-# SumatraPDF.exe will be automatically installed
+# SumatraPDF.exe will be automatically downloaded on first use
 ```
 
 ## Quick Start
