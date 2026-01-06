@@ -1,6 +1,8 @@
 # pdfpipe
 
-A configurable PDF processing pipeline for splitting, transforming, and printing PDFs. Originally designed for PrintAThing.com shipping labels, but flexible enough for any PDF batch processing workflow.
+A configurable PDF processing pipeline for splitting, transforming, and printing PDFs.
+
+Currently supports only windows
 
 ## Features
 
@@ -9,6 +11,7 @@ A configurable PDF processing pipeline for splitting, transforming, and printing
 - **Transformations**: Rotate, crop, and resize pages with precise control
 - **Multi-Output**: Split one PDF into multiple outputs with different settings
 - **Batch Processing**: Process single files or entire directories
+- **Input Filtering**: Filter PDFs by filename pattern or text content keywords
 - **Printing**: Send outputs to different printers with custom settings
 - **Dry Run**: Preview what will happen before processing
 
@@ -20,10 +23,8 @@ git clone https://github.com/your-repo/pdfpipe.git
 cd pdfpipe
 pip install -e .
 
-# Place SumatraPDF.exe in the project directory (required for printing)
+# SumatraPDF.exe will be automatically installed
 ```
-
-Download SumatraPDF: [sumatrapdfreader.org](https://www.sumatrapdfreader.org/free-pdf-reader.html)
 
 ## Quick Start
 
@@ -78,6 +79,27 @@ outputs:
       enabled: true
       printer: "Label Printer"
 ```
+
+### Input Filtering
+
+Filter which PDFs to process by filename pattern or text content:
+
+```yaml
+input:
+  path: ./input
+  pattern: "shipping_*.pdf"  # glob pattern for filenames
+  filter:
+    keywords: ["shipping", "label"]  # text content keywords
+    match: "any"  # "any" = OR logic, "all" = AND logic
+```
+
+| Option | Description |
+|--------|-------------|
+| `pattern` | Glob pattern for filename matching (default: `*.pdf`) |
+| `filter.keywords` | List of keywords to search in PDF text content |
+| `filter.match` | `"any"` matches if any keyword found, `"all"` requires all keywords |
+
+Keyword matching is case-sensitive. PDFs without searchable text won't match keyword filters.
 
 ### Page Selection Syntax
 
@@ -168,8 +190,7 @@ See the `configs/` directory for ready-to-use examples:
 ## Requirements
 
 - Python 3.10+
-- Windows (for printing functionality)
-- SumatraPDF (for printing)
+- Windows 10 or newer
 
 ## License
 

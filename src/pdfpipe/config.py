@@ -76,10 +76,18 @@ class Settings:
 
 
 @dataclass
+class FilterConfig:
+    """Keyword filter configuration for input files."""
+    keywords: list[str] = field(default_factory=list)
+    match: str = "any"  # "any" (OR) or "all" (AND)
+
+
+@dataclass
 class InputConfig:
     """Input configuration."""
     path: Path = Path("./input")
     pattern: str = "*.pdf"
+    filter: FilterConfig | None = None
 
 
 @dataclass
@@ -190,9 +198,17 @@ def load_config(config_path: Path) -> Config:
     input_config = InputConfig()
     if "input" in data:
         i = data["input"]
+        filter_config = None
+        if "filter" in i:
+            f = i["filter"]
+            filter_config = FilterConfig(
+                keywords=f.get("keywords", []),
+                match=f.get("match", "any"),
+            )
         input_config = InputConfig(
             path=Path(i.get("path", "./input")),
             pattern=i.get("pattern", "*.pdf"),
+            filter=filter_config,
         )
 
     # Parse outputs

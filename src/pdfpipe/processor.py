@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
-from pdfpipe.config import Config, OutputProfile, Transform
+from pdfpipe.config import Config, FilterConfig, OutputProfile, Transform
 from pdfpipe.selector import select_pages, PageSelectionError
 from pdfpipe.transforms import rotate_page, crop_page, resize_page, TransformError
 from pdfpipe.printer import print_pdf, PrinterError
@@ -13,6 +13,43 @@ from pdfpipe.printer import print_pdf, PrinterError
 
 class ProcessingError(Exception):
     """Raised when PDF processing fails."""
+
+
+def extract_pdf_text(pdf_path: Path) -> str:
+    """Extract all text content from a PDF.
+
+    Args:
+        pdf_path: Path to the PDF file
+
+    Returns:
+        Concatenated text from all pages
+    """
+    reader = PdfReader(str(pdf_path))
+    text_parts = []
+    for page in reader.pages:
+        text_parts.append(page.extract_text() or "")
+    return "\n".join(text_parts)
+
+
+def matches_filter(pdf_path: Path, filter_config: FilterConfig) -> bool:
+    """Check if a PDF matches the keyword filter.
+
+    Args:
+        pdf_path: Path to the PDF file
+        filter_config: Filter configuration with keywords and match mode
+
+    Returns:
+        True if PDF matches the filter criteria
+    """
+    if not filter_config.keywords:
+        return True  # No keywords = match all
+
+    text = extract_pdf_text(pdf_path)
+
+    if filter_config.match == "all":
+        return all(kw in text for kw in filter_config.keywords)
+    else:  # "any"
+        return any(kw in text for kw in filter_config.keywords)
 
 
 def get_input_files(input_path: Path, pattern: str = "*.pdf") -> list[Path]:
@@ -288,6 +325,17 @@ def process(
     if not input_files:
         print(f"No PDF files found in: {input_path}")
         return
+
+    # Apply keyword filter if configured
+    if config.input.filter and config.input.filter.keywords:
+        total_before = len(input_files)
+        input_files = [f for f in input_files if matches_filter(f, config.input.filter)]
+        filtered_count = total_before - len(input_files)
+        if filtered_count > 0:
+            print(f"Filtered out {filtered_count} file(s) by keyword filter")
+        if not input_files:
+            print("No PDF files matched the keyword filter")
+            return
 
     print(f"Found {len(input_files)} PDF file(s) to process")
 

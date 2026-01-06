@@ -102,23 +102,36 @@ class TestIsLandscape:
 
 
 class TestRotatePage:
-    """Test page rotation."""
+    """Test page rotation.
+
+    Note: rotate_page now performs real geometric rotation using
+    add_transformation() instead of just setting the /Rotate flag.
+    """
 
     def test_rotate_90(self, mock_page):
         rotate_page(mock_page, 90)
-        mock_page.rotate.assert_called_once_with(90)
+        mock_page.add_transformation.assert_called_once()
+        # Mediabox should be updated to swapped dimensions (portrait -> landscape)
+        assert mock_page.mediabox.lower_left == (0, 0)
+        assert mock_page.mediabox.upper_right == (792.0, 612.0)
 
     def test_rotate_180(self, mock_page):
         rotate_page(mock_page, 180)
-        mock_page.rotate.assert_called_once_with(180)
+        mock_page.add_transformation.assert_called_once()
+        # Mediabox dimensions stay the same for 180° rotation
+        assert mock_page.mediabox.lower_left == (0, 0)
+        assert mock_page.mediabox.upper_right == (612.0, 792.0)
 
     def test_rotate_270(self, mock_page):
         rotate_page(mock_page, 270)
-        mock_page.rotate.assert_called_once_with(270)
+        mock_page.add_transformation.assert_called_once()
+        # Mediabox should be updated to swapped dimensions
+        assert mock_page.mediabox.lower_left == (0, 0)
+        assert mock_page.mediabox.upper_right == (792.0, 612.0)
 
     def test_rotate_0_no_call(self, mock_page):
         rotate_page(mock_page, 0)
-        mock_page.rotate.assert_not_called()
+        mock_page.add_transformation.assert_not_called()
 
     def test_rotate_invalid_angle_raises(self, mock_page):
         with pytest.raises(TransformError, match="must be 0, 90, 180, or 270"):
@@ -126,19 +139,19 @@ class TestRotatePage:
 
     def test_rotate_to_landscape_from_portrait(self, mock_page):
         rotate_page(mock_page, "landscape")
-        mock_page.rotate.assert_called_once_with(90)
+        mock_page.add_transformation.assert_called_once()
 
     def test_rotate_to_landscape_already_landscape(self, mock_landscape_page):
         rotate_page(mock_landscape_page, "landscape")
-        mock_landscape_page.rotate.assert_not_called()
+        mock_landscape_page.add_transformation.assert_not_called()
 
     def test_rotate_to_portrait_from_landscape(self, mock_landscape_page):
         rotate_page(mock_landscape_page, "portrait")
-        mock_landscape_page.rotate.assert_called_once_with(90)
+        mock_landscape_page.add_transformation.assert_called_once()
 
     def test_rotate_to_portrait_already_portrait(self, mock_page):
         rotate_page(mock_page, "portrait")
-        mock_page.rotate.assert_not_called()
+        mock_page.add_transformation.assert_not_called()
 
     def test_auto_requires_pdf_path(self, mock_page):
         with pytest.raises(TransformError, match="pdf_path and page_num are required"):
@@ -151,12 +164,12 @@ class TestRotatePage:
     def test_auto_with_ocr_no_rotation_needed(self, mock_page):
         with patch("pdfpipe.transforms.detect_page_orientation", return_value=0):
             rotate_page(mock_page, "auto", pdf_path="test.pdf", page_num=0)
-            mock_page.rotate.assert_not_called()
+            mock_page.add_transformation.assert_not_called()
 
     def test_auto_with_ocr_rotation_detected(self, mock_page):
         with patch("pdfpipe.transforms.detect_page_orientation", return_value=90):
             rotate_page(mock_page, "auto", pdf_path="test.pdf", page_num=0)
-            mock_page.rotate.assert_called_once_with(90)
+            mock_page.add_transformation.assert_called_once()
 
     def test_unknown_orientation_raises(self, mock_page):
         with pytest.raises(TransformError, match="Unknown rotation"):

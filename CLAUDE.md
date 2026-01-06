@@ -63,6 +63,13 @@ settings:
   cleanup_source: false
   cleanup_output_after_print: false
 
+input:
+  path: ./input
+  pattern: "*.pdf"            # Glob pattern for filenames
+  filter:
+    keywords: ["shipping"]    # Filter by text content (case-sensitive)
+    match: "any"              # "any" (OR) or "all" (AND)
+
 outputs:
   profile_name:
     pages: "last"           # Page selection spec
