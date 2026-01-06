@@ -124,8 +124,8 @@ Examples:
     parser.add_argument(
         "command",
         nargs="?",
-        choices=["install", "uninstall"],
-        help="Subcommand: install (download SumatraPDF) or uninstall (remove it)",
+        choices=["install", "uninstall", "gui"],
+        help="Subcommand: install (download SumatraPDF), uninstall (remove it), or gui (launch config editor)",
     )
 
     parser.add_argument(
@@ -152,6 +152,9 @@ def main(args: list[str] | None = None) -> int:
         return cmd_install(force=parsed.force)
     elif parsed.command == "uninstall":
         return cmd_uninstall()
+    elif parsed.command == "gui":
+        from pdfmill.gui import launch_gui
+        return launch_gui()
 
     # Handle --list-printers
     if parsed.list_printers:
