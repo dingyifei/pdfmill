@@ -130,6 +130,10 @@ def rotate_page(
     """
     Rotate a page by the specified angle or to a target orientation.
 
+    This performs a "real" rotation using coordinate transformations,
+    not just the /Rotate flag. This ensures subsequent transforms
+    (crop, resize) work in the rotated coordinate space.
+
     Args:
         page: The page to rotate
         angle: Rotation angle (0, 90, 180, 270) or orientation
@@ -143,45 +147,92 @@ def rotate_page(
     Raises:
         TransformError: If angle is invalid or auto mode requirements not met
     """
+    # Determine the actual rotation angle
+    actual_angle = 0
+
     if isinstance(angle, str):
         angle_lower = angle.lower()
         if angle_lower == "landscape":
             if not is_landscape(page):
-                page.rotate(90)
+                actual_angle = 90
         elif angle_lower == "portrait":
             if is_landscape(page):
-                page.rotate(90)
+                actual_angle = 90
         elif angle_lower == "auto":
             if pdf_path is None or page_num is None:
                 raise TransformError(
                     "pdf_path and page_num are required for auto rotation"
                 )
-            detected_angle = detect_page_orientation(pdf_path, page_num)
-            if detected_angle != 0:
-                page.rotate(detected_angle)
+            actual_angle = detect_page_orientation(pdf_path, page_num)
         else:
             raise TransformError(f"Unknown rotation orientation: {angle}")
     else:
         if angle not in (0, 90, 180, 270):
             raise TransformError(f"Rotation angle must be 0, 90, 180, or 270, got {angle}")
-        if angle != 0:
-            page.rotate(angle)
+        actual_angle = angle
+
+    if actual_angle == 0:
+        return page
+
+    # Get current dimensions
+    width, height = get_page_dimensions(page)
+
+    # Clear any existing rotation flag since we're doing a real rotation
+    if "/Rotate" in page:
+        del page["/Rotate"]
+
+    # Calculate translation needed to keep content in positive quadrant
+    # after rotation (rotation is counter-clockwise around origin)
+    if actual_angle == 90:
+        # 90° CCW: (x,y) -> (-y, x), need to translate by (height, 0)
+        tx, ty = height, 0
+        new_width, new_height = height, width
+    elif actual_angle == 180:
+        # 180°: (x,y) -> (-x, -y), need to translate by (width, height)
+        tx, ty = width, height
+        new_width, new_height = width, height
+    elif actual_angle == 270:
+        # 270° CCW: (x,y) -> (y, -x), need to translate by (0, width)
+        tx, ty = 0, width
+        new_width, new_height = height, width
+
+    # Apply rotation then translation to keep content visible
+    transform = Transformation().rotate(actual_angle).translate(tx=tx, ty=ty)
+    page.add_transformation(transform)
+
+    # Update mediabox to reflect new dimensions
+    page.mediabox.lower_left = (0, 0)
+    page.mediabox.upper_right = (new_width, new_height)
 
     return page
 
 
+def _parse_coordinate(value: float | str) -> float:
+    """Parse a coordinate value to points.
+
+    Args:
+        value: Either a float (already in points) or a string with unit (e.g., "100mm")
+
+    Returns:
+        Value in points
+    """
+    if isinstance(value, str):
+        return parse_dimension(value)
+    return float(value)
+
+
 def crop_page(
     page: PageObject,
-    lower_left: tuple[float, float],
-    upper_right: tuple[float, float],
+    lower_left: tuple[float | str, float | str],
+    upper_right: tuple[float | str, float | str],
 ) -> PageObject:
     """
     Crop a page to the specified coordinates.
 
     Args:
         page: The page to crop
-        lower_left: (x, y) coordinates of lower-left corner in points
-        upper_right: (x, y) coordinates of upper-right corner in points
+        lower_left: (x, y) coordinates of lower-left corner (points or strings like "100mm")
+        upper_right: (x, y) coordinates of upper-right corner (points or strings like "100mm")
 
     Returns:
         The cropped page (mutates in place and returns)
@@ -189,17 +240,23 @@ def crop_page(
     Raises:
         TransformError: If coordinates are invalid
     """
-    if lower_left[0] >= upper_right[0]:
+    # Parse coordinates to points
+    ll_x = _parse_coordinate(lower_left[0])
+    ll_y = _parse_coordinate(lower_left[1])
+    ur_x = _parse_coordinate(upper_right[0])
+    ur_y = _parse_coordinate(upper_right[1])
+
+    if ll_x >= ur_x:
         raise TransformError(
-            f"Invalid crop: left ({lower_left[0]}) must be less than right ({upper_right[0]})"
+            f"Invalid crop: left ({ll_x}) must be less than right ({ur_x})"
         )
-    if lower_left[1] >= upper_right[1]:
+    if ll_y >= ur_y:
         raise TransformError(
-            f"Invalid crop: bottom ({lower_left[1]}) must be less than top ({upper_right[1]})"
+            f"Invalid crop: bottom ({ll_y}) must be less than top ({ur_y})"
         )
 
-    page.mediabox.lower_left = lower_left
-    page.mediabox.upper_right = upper_right
+    page.mediabox.lower_left = (ll_x, ll_y)
+    page.mediabox.upper_right = (ur_x, ur_y)
     return page
 
 

@@ -45,12 +45,77 @@ def generate_output_filename(
     return f"{prefix}{stem}{suffix}_{profile_name}.pdf"
 
 
+def merge_pdfs(pdf_paths: list[Path], output_path: Path) -> Path:
+    """
+    Merge multiple PDFs into a single file.
+
+    Args:
+        pdf_paths: List of PDF files to merge (in order)
+        output_path: Path for the merged output file
+
+    Returns:
+        Path to the merged PDF
+    """
+    writer = PdfWriter()
+
+    for pdf_path in pdf_paths:
+        reader = PdfReader(str(pdf_path))
+        for page in reader.pages:
+            writer.add_page(page)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "wb") as f:
+        writer.write(f)
+
+    return output_path
+
+
+def _get_transform_description(transform: Transform) -> str:
+    """Get a short description of a transform for debug filenames."""
+    if transform.type == "rotate" and transform.rotate:
+        angle = transform.rotate.angle
+        return f"rotate{angle}"
+    elif transform.type == "crop" and transform.crop:
+        return "crop"
+    elif transform.type == "size" and transform.size:
+        size = transform.size
+        return f"size_{size.fit}"
+    return transform.type
+
+
+def _save_debug_pdf(
+    pages: list,
+    output_dir: Path,
+    source_name: str,
+    profile_name: str,
+    step_num: int,
+    step_desc: str,
+) -> None:
+    """Save intermediate PDF for debugging."""
+    debug_filename = f"{Path(source_name).stem}_{profile_name}_step{step_num}_{step_desc}.pdf"
+    debug_path = output_dir / debug_filename
+
+    writer = PdfWriter()
+    for page in pages:
+        writer.add_page(page)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    with open(debug_path, "wb") as f:
+        writer.write(f)
+
+    print(f"    [debug] Saved: {debug_path}")
+
+
 def apply_transforms(
     pages: list,
     transforms: list[Transform],
     dry_run: bool = False,
     pdf_path: Path | None = None,
     original_page_indices: list[int] | None = None,
+    debug: bool = False,
+    debug_output_dir: Path | None = None,
+    debug_source_name: str = "",
+    debug_profile_name: str = "",
 ) -> list:
     """
     Apply transformations to a list of pages.
@@ -61,11 +126,24 @@ def apply_transforms(
         dry_run: If True, only describe what would be done
         pdf_path: Path to source PDF (needed for auto rotation)
         original_page_indices: 0-indexed page numbers from source PDF (for auto rotation)
+        debug: If True, save intermediate PDFs after each transform
+        debug_output_dir: Directory for debug output files
+        debug_source_name: Source filename for debug output naming
+        debug_profile_name: Profile name for debug output naming
 
     Returns:
         Transformed pages
     """
-    for transform in transforms:
+    # Save initial state (after page selection) if debug enabled
+    if debug and not dry_run and debug_output_dir:
+        _save_debug_pdf(
+            pages, debug_output_dir, debug_source_name,
+            debug_profile_name, 0, "selected"
+        )
+
+    for step_num, transform in enumerate(transforms, start=1):
+        step_desc = _get_transform_description(transform)
+
         if transform.type == "rotate" and transform.rotate:
             rot = transform.rotate
             pages_to_rotate = rot.pages if rot.pages else list(range(len(pages)))
@@ -101,6 +179,13 @@ def apply_transforms(
                     print(f"    [dry-run] Resize page {i + 1} to {size.width} x {size.height} ({size.fit})")
                 else:
                     resize_page(page, size.width, size.height, size.fit)
+
+        # Save after each transform if debug enabled
+        if debug and not dry_run and debug_output_dir:
+            _save_debug_pdf(
+                pages, debug_output_dir, debug_source_name,
+                debug_profile_name, step_num, step_desc
+            )
 
     return pages
 
@@ -151,6 +236,10 @@ def process_single_pdf(
         dry_run,
         pdf_path=pdf_path,
         original_page_indices=page_indices,
+        debug=profile.debug,
+        debug_output_dir=output_dir,
+        debug_source_name=pdf_path.name,
+        debug_profile_name=profile_name,
     )
 
     # Generate output path
@@ -204,7 +293,8 @@ def process(
 
     success_count = 0
     fail_count = 0
-    output_files: list[tuple[Path, OutputProfile]] = []
+    # Track output files by profile name for merge support
+    output_files: list[tuple[Path, str, OutputProfile]] = []
 
     for pdf_path in input_files:
         print(f"\nProcessing: {pdf_path.name}")
@@ -223,7 +313,7 @@ def process(
                 )
 
                 if output_path:
-                    output_files.append((output_path, profile))
+                    output_files.append((output_path, profile_name, profile))
                 success_count += 1
 
             except (ProcessingError, TransformError) as e:
@@ -232,24 +322,61 @@ def process(
                 if config.settings.on_error == "stop":
                     raise
 
+    # Track merged files for cleanup (outside dry_run block for scope)
+    merged_files: list[Path] = []
+
     # Print outputs
     if not dry_run:
-        for output_path, profile in output_files:
-            if profile.print.enabled:
-                try:
-                    print(f"Printing {output_path.name} to {profile.print.printer}...")
+        # Group files by profile name for merge support
+        files_by_profile: dict[str, list[tuple[Path, OutputProfile]]] = {}
+        for output_path, profile_name, profile in output_files:
+            if profile_name not in files_by_profile:
+                files_by_profile[profile_name] = []
+            files_by_profile[profile_name].append((output_path, profile))
+
+        for profile_name, profile_files in files_by_profile.items():
+            if not profile_files:
+                continue
+
+            profile = profile_files[0][1]  # All files have same profile
+            if not profile.print.enabled:
+                continue
+
+            try:
+                if profile.print.merge and len(profile_files) > 1:
+                    # Merge all PDFs for this profile before printing
+                    pdf_paths = [pf[0] for pf in profile_files]
+                    merge_output_dir = output_dir if output_dir else profile.output_dir
+                    merged_path = merge_output_dir / f"merged_{profile_name}.pdf"
+
+                    print(f"Merging {len(pdf_paths)} files for profile '{profile_name}'...")
+                    merge_pdfs(pdf_paths, merged_path)
+                    merged_files.append(merged_path)
+
+                    print(f"Printing merged PDF to {profile.print.printer}...")
                     print_pdf(
-                        output_path,
+                        merged_path,
                         profile.print.printer,
                         profile.print.copies,
                         profile.print.args,
                         dry_run=dry_run,
                     )
-                except PrinterError as e:
-                    print(f"  Print error: {e}")
-                    fail_count += 1
-                    if config.settings.on_error == "stop":
-                        raise
+                else:
+                    # Print each file individually
+                    for output_path, _ in profile_files:
+                        print(f"Printing {output_path.name} to {profile.print.printer}...")
+                        print_pdf(
+                            output_path,
+                            profile.print.printer,
+                            profile.print.copies,
+                            profile.print.args,
+                            dry_run=dry_run,
+                        )
+            except PrinterError as e:
+                print(f"  Print error: {e}")
+                fail_count += 1
+                if config.settings.on_error == "stop":
+                    raise
 
     # Cleanup
     if not dry_run:
@@ -262,13 +389,21 @@ def process(
                     print(f"Failed to cleanup {pdf_path}: {e}")
 
         if config.settings.cleanup_output_after_print:
-            for output_path, profile in output_files:
+            for output_path, _, profile in output_files:
                 if profile.print.enabled:
                     try:
                         os.remove(output_path)
                         print(f"Cleaned up output: {output_path}")
                     except OSError as e:
                         print(f"Failed to cleanup {output_path}: {e}")
+
+            # Also cleanup merged files
+            for merged_path in merged_files:
+                try:
+                    os.remove(merged_path)
+                    print(f"Cleaned up merged: {merged_path}")
+                except OSError as e:
+                    print(f"Failed to cleanup {merged_path}: {e}")
 
     # Summary
     print(f"\nProcessing complete: {success_count} succeeded, {fail_count} failed")

@@ -104,10 +104,13 @@ transforms:
   # Or rotate to orientation
   - rotate: landscape  # landscape, portrait
 
-  # Crop to coordinates (in points, 72 per inch)
+  # Crop to coordinates (supports units: mm, in, pt, cm)
   - crop:
-      lower_left: [0, 0]
+      lower_left: [0, 0]           # raw points (72 per inch)
       upper_right: [288, 432]
+  - crop:
+      lower_left: ["10mm", "20mm"]  # with units
+      upper_right: ["100mm", "150mm"]
 
   # Resize with units
   - size:
@@ -115,6 +118,45 @@ transforms:
       height: 150mm
       fit: contain   # contain, cover, stretch
 ```
+
+### Debug Mode
+
+Enable `debug: true` on an output profile to save intermediate PDFs after each transform step:
+
+```yaml
+outputs:
+  label:
+    debug: true  # saves intermediate files
+    pages: "last"
+    transforms:
+      - rotate: 90
+      - crop:
+          lower_left: ["33mm", "91mm"]
+          upper_right: ["180mm", "192mm"]
+    output_dir: ./output
+```
+
+This generates files showing each processing stage:
+```
+./output/
+├── myfile_label_step0_selected.pdf   # after page selection
+├── myfile_label_step1_rotate90.pdf   # after rotation
+├── myfile_label_step2_crop.pdf       # after crop
+└── myfile_label.pdf                  # final output
+```
+
+### Print Options
+
+```yaml
+print:
+  enabled: true
+  printer: "Printer Name"
+  copies: 1
+  merge: true   # merge all PDFs before printing as single job
+  args: []      # pass-through SumatraPDF arguments
+```
+
+When `merge: true` is set, all output files for that profile are combined into a single PDF before being sent to the printer. This is useful for batch printing where you want all pages in one print job.
 
 ## Example Configs
 

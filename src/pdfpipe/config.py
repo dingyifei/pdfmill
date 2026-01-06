@@ -18,13 +18,17 @@ class PrintConfig:
     printer: str = ""
     copies: int = 1
     args: list[str] = field(default_factory=list)
+    merge: bool = False  # Merge all PDFs before printing as single job
 
 
 @dataclass
 class CropTransform:
-    """Crop transformation configuration."""
-    lower_left: tuple[float, float] = (0, 0)
-    upper_right: tuple[float, float] = (612, 792)  # Default letter size
+    """Crop transformation configuration.
+
+    Coordinates can be floats (points) or strings with units (e.g., "100mm", "4in", "288pt").
+    """
+    lower_left: tuple[float | str, float | str] = (0, 0)
+    upper_right: tuple[float | str, float | str] = (612, 792)  # Default letter size
 
 
 @dataclass
@@ -60,6 +64,7 @@ class OutputProfile:
     filename_suffix: str = ""
     transforms: list[Transform] = field(default_factory=list)
     print: PrintConfig = field(default_factory=PrintConfig)
+    debug: bool = False  # Output intermediate files after each transform
 
 
 @dataclass
@@ -146,6 +151,7 @@ def parse_output_profile(name: str, data: dict[str, Any]) -> OutputProfile:
             printer=p.get("printer", ""),
             copies=p.get("copies", 1),
             args=p.get("args", []),
+            merge=p.get("merge", False),
         )
 
     return OutputProfile(
@@ -155,6 +161,7 @@ def parse_output_profile(name: str, data: dict[str, Any]) -> OutputProfile:
         filename_suffix=data.get("filename_suffix", ""),
         transforms=transforms,
         print=print_config,
+        debug=data.get("debug", False),
     )
 
 

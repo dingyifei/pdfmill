@@ -70,11 +70,29 @@ outputs:
     output_dir: ./output
     filename_prefix: ""
     filename_suffix: ""
+    debug: false            # Save intermediate PDFs after each transform
     print:
       enabled: true
       printer: "Printer Name"
       copies: 1
+      merge: false          # Merge all PDFs before printing as single job
       args: []              # Pass-through SumatraPDF args
+```
+
+## Units
+
+Crop and resize support unit strings: `mm`, `in`, `pt`, `cm` (72 pt = 1 inch)
+
+```yaml
+# Crop with units
+- crop:
+    lower_left: ["10mm", "20mm"]
+    upper_right: ["100mm", "150mm"]
+
+# Or raw points (backwards compatible)
+- crop:
+    lower_left: [72, 144]
+    upper_right: [288, 432]
 ```
 
 ## Key Constants

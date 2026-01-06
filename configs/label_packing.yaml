@@ -16,19 +16,22 @@ outputs:
     output_dir: ./output
     filename_suffix: "_1"
     print:
+      merge: true
       enabled: true
-      printer: "Canon G3060 series (Copy 1)"
+      printer: "Canon G3060"
 
   label:
     # Last page only, rotated and cropped for 4x6 label
     pages: "last"
+    debug: false
     transforms:
-      - rotate: 270
+      - rotate: 90
       - crop:
-          lower_left: [82, 260]
-          upper_right: [514, 548]
+          lower_left: ["90mm", "33mm"]
+          upper_right: ["190mm", "183mm"]
     output_dir: ./output
     filename_suffix: "_2"
     print:
+      merge: true
       enabled: true
-      printer: "BY-480BT_BTH"
+      printer: "PL80E"
