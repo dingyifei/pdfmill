@@ -22,10 +22,10 @@ Features and improvements planned for pdfpipe.
 - [x] Rotate by orientation (`portrait`, `landscape`)
 - [x] Crop (specify crop box coordinates in points)
 - [x] Target size enforcement with units (`100mm`, `4in`, `288pt`)
-- [ ] Size fit modes need refinement:
-  - [x] `contain` - scale uniformly to fit (basic)
-  - [ ] `cover` - scale uniformly to fill (needs testing)
-  - [ ] `stretch` - non-uniform scaling (needs proper implementation)
+- [x] Size fit modes:
+  - [x] `contain` - scale uniformly to fit
+  - [x] `cover` - scale uniformly to fill
+  - [x] `stretch` - non-uniform scaling
 - [x] Transforms apply in config order
 
 ## Printing

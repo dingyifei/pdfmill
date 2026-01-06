@@ -15,7 +15,7 @@ pip install -e .
 # Place SumatraPDF.exe in the repository root for printing
 ```
 
-**Dependencies**: PyPDF2, PyYAML, pywin32 (Windows only), SumatraPDF (portable exe)
+**Dependencies**: pypdf, PyYAML, pywin32 (Windows only), SumatraPDF (portable exe)
 
 ## Commands
 
@@ -50,7 +50,7 @@ src/pdfpipe/
 - **cli.py** - Parses args, dispatches to processor or utility commands
 - **config.py** - Loads YAML, validates structure, returns typed `Config` dataclass
 - **selector.py** - Converts page specs (`"last"`, `"1-3"`, `[-1]`) to 0-indexed page list
-- **transforms.py** - Applies rotate/crop/resize to PyPDF2 page objects
+- **transforms.py** - Applies rotate/crop/resize to pypdf page objects
 - **printer.py** - Finds SumatraPDF, sends print jobs with pass-through args
 - **processor.py** - Orchestrates: load config → get files → select pages → transform → write → print
 
