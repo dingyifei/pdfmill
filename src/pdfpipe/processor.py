@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from PyPDF2 import PdfReader, PdfWriter
+from pypdf import PdfReader, PdfWriter
 
 from pdfpipe.config import Config, OutputProfile, Transform
 from pdfpipe.selector import select_pages, PageSelectionError
@@ -49,14 +49,18 @@ def apply_transforms(
     pages: list,
     transforms: list[Transform],
     dry_run: bool = False,
+    pdf_path: Path | None = None,
+    original_page_indices: list[int] | None = None,
 ) -> list:
     """
     Apply transformations to a list of pages.
 
     Args:
-        pages: List of PyPDF2 PageObjects
+        pages: List of pypdf PageObjects
         transforms: List of transforms to apply
         dry_run: If True, only describe what would be done
+        pdf_path: Path to source PDF (needed for auto rotation)
+        original_page_indices: 0-indexed page numbers from source PDF (for auto rotation)
 
     Returns:
         Transformed pages
@@ -71,7 +75,16 @@ def apply_transforms(
                     if dry_run:
                         print(f"    [dry-run] Rotate page {idx + 1} by {rot.angle}")
                     else:
-                        rotate_page(pages[idx], rot.angle)
+                        # For auto rotation, we need the original page number in the source PDF
+                        orig_page_num = None
+                        if original_page_indices and idx < len(original_page_indices):
+                            orig_page_num = original_page_indices[idx]
+                        rotate_page(
+                            pages[idx],
+                            rot.angle,
+                            pdf_path=str(pdf_path) if pdf_path else None,
+                            page_num=orig_page_num,
+                        )
 
         elif transform.type == "crop" and transform.crop:
             crop = transform.crop
@@ -131,8 +144,14 @@ def process_single_pdf(
     # Extract pages
     pages = [reader.pages[i] for i in page_indices]
 
-    # Apply transforms
-    pages = apply_transforms(pages, profile.transforms, dry_run)
+    # Apply transforms (pass pdf_path and original indices for auto rotation)
+    pages = apply_transforms(
+        pages,
+        profile.transforms,
+        dry_run,
+        pdf_path=pdf_path,
+        original_page_indices=page_indices,
+    )
 
     # Generate output path
     output_filename = generate_output_filename(

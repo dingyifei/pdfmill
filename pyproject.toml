@@ -26,7 +26,7 @@ classifiers = [
     "Topic :: Printing",
 ]
 dependencies = [
-    "pypdf2>=3.0",
+    "pypdf>=4.0",
     "pyyaml>=6.0",
     "pywin32>=307; sys_platform == 'win32'",
 ]
@@ -36,9 +36,40 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
 ]
+ocr = [
+    "pymupdf>=1.23.0",
+    "pytesseract>=0.3.10",
+    "Pillow>=10.0.0",
+]
 
 [project.scripts]
 pdfp = "pdfpipe.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pdfpipe"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = ["-v", "--tb=short", "-ra"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "windows: marks tests that only run on Windows",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["src/pdfpipe"]
+branch = true
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
+fail_under = 80
