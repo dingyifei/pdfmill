@@ -1,4 +1,4 @@
-"""Configuration loading and validation for pdfpipe."""
+"""Configuration loading and validation for pdfmill."""
 
 from dataclasses import dataclass, field
 from pathlib import Path

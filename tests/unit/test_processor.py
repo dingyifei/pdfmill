@@ -1,10 +1,10 @@
-"""Tests for pdfpipe.processor module."""
+"""Tests for pdfmill.processor module."""
 
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from pdfpipe.processor import (
+from pdfmill.processor import (
     get_input_files,
     generate_output_filename,
     apply_transforms,
@@ -12,7 +12,7 @@ from pdfpipe.processor import (
     process,
     ProcessingError,
 )
-from pdfpipe.config import (
+from pdfmill.config import (
     Config,
     OutputProfile,
     Transform,
@@ -101,7 +101,7 @@ class TestApplyTransforms:
         pages = [MagicMock(), MagicMock()]
         transforms = [Transform(type="rotate", rotate=RotateTransform(angle=90))]
 
-        with patch("pdfpipe.processor.rotate_page") as mock_rotate:
+        with patch("pdfmill.processor.rotate_page") as mock_rotate:
             apply_transforms(pages, transforms)
             assert mock_rotate.call_count == 2
 
@@ -109,7 +109,7 @@ class TestApplyTransforms:
         pages = [MagicMock(), MagicMock(), MagicMock()]
         transforms = [Transform(type="rotate", rotate=RotateTransform(angle=90, pages=[0, 2]))]
 
-        with patch("pdfpipe.processor.rotate_page") as mock_rotate:
+        with patch("pdfmill.processor.rotate_page") as mock_rotate:
             apply_transforms(pages, transforms)
             assert mock_rotate.call_count == 2
 
@@ -117,7 +117,7 @@ class TestApplyTransforms:
         pages = [MagicMock(), MagicMock()]
         transforms = [Transform(type="crop", crop=CropTransform(lower_left=(10, 20), upper_right=(100, 200)))]
 
-        with patch("pdfpipe.processor.crop_page") as mock_crop:
+        with patch("pdfmill.processor.crop_page") as mock_crop:
             apply_transforms(pages, transforms)
             assert mock_crop.call_count == 2
 
@@ -125,7 +125,7 @@ class TestApplyTransforms:
         pages = [MagicMock()]
         transforms = [Transform(type="size", size=SizeTransform(width="4in", height="6in", fit="contain"))]
 
-        with patch("pdfpipe.processor.resize_page") as mock_resize:
+        with patch("pdfmill.processor.resize_page") as mock_resize:
             apply_transforms(pages, transforms)
             mock_resize.assert_called_once()
 
@@ -133,7 +133,7 @@ class TestApplyTransforms:
         pages = [MagicMock()]
         transforms = [Transform(type="rotate", rotate=RotateTransform(angle=90))]
 
-        with patch("pdfpipe.processor.rotate_page") as mock_rotate:
+        with patch("pdfmill.processor.rotate_page") as mock_rotate:
             apply_transforms(pages, transforms, dry_run=True)
             mock_rotate.assert_not_called()
 
@@ -147,8 +147,8 @@ class TestApplyTransforms:
             Transform(type="crop", crop=CropTransform()),
         ]
 
-        with patch("pdfpipe.processor.rotate_page") as mock_rotate:
-            with patch("pdfpipe.processor.crop_page") as mock_crop:
+        with patch("pdfmill.processor.rotate_page") as mock_rotate:
+            with patch("pdfmill.processor.crop_page") as mock_crop:
                 apply_transforms(pages, transforms)
                 mock_rotate.assert_called_once()
                 mock_crop.assert_called_once()
@@ -349,13 +349,13 @@ class TestProcess:
         })
         output_dir = temp_dir / "output"
 
-        with patch("pdfpipe.processor.print_pdf") as mock_print:
+        with patch("pdfmill.processor.print_pdf") as mock_print:
             mock_print.return_value = True
             process(config, temp_multi_page_pdf, output_dir)
             mock_print.assert_called_once()
 
     def test_print_error_continues(self, temp_multi_page_pdf, temp_dir, capsys):
-        from pdfpipe.printer import PrinterError
+        from pdfmill.printer import PrinterError
 
         config = Config(
             settings=Settings(on_error="continue"),
@@ -368,7 +368,7 @@ class TestProcess:
         )
         output_dir = temp_dir / "output"
 
-        with patch("pdfpipe.processor.print_pdf") as mock_print:
+        with patch("pdfmill.processor.print_pdf") as mock_print:
             mock_print.side_effect = PrinterError("Print failed")
             process(config, temp_multi_page_pdf, output_dir)
 
@@ -421,7 +421,7 @@ class TestCleanup:
             }
         )
 
-        with patch("pdfpipe.processor.print_pdf") as mock_print:
+        with patch("pdfmill.processor.print_pdf") as mock_print:
             mock_print.return_value = True
             process(config, source_pdf, output_dir)
 

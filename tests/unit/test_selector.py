@@ -1,8 +1,8 @@
-"""Tests for pdfpipe.selector module."""
+"""Tests for pdfmill.selector module."""
 
 import pytest
 
-from pdfpipe.selector import select_pages, _select_from_list, PageSelectionError
+from pdfmill.selector import select_pages, _select_from_list, PageSelectionError
 
 
 class TestSelectPagesKeywords:

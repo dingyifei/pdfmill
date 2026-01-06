@@ -12,9 +12,11 @@ You want to:
 
 ## Prerequisites
 
-1. Install pdfpipe:
+1. Install pdfmill:
    ```sh
-   pip install -e .
+   pip install pdfmill
+   # Or for development:
+   # pip install -e .
    ```
 
 2. Have a sample PDF ready. Place `example.pdf` in your working directory. This PDF should have:

@@ -1,10 +1,10 @@
-"""Tests for pdfpipe.cli module."""
+"""Tests for pdfmill.cli module."""
 
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from pdfpipe.cli import main, create_parser, show_version, cmd_install, cmd_uninstall, cmd_list_printers
+from pdfmill.cli import main, create_parser, show_version, cmd_install, cmd_uninstall, cmd_list_printers
 
 
 class TestCreateParser:
@@ -81,15 +81,15 @@ class TestShowVersion:
     """Test version display."""
 
     def test_shows_version(self, capsys):
-        with patch("pdfpipe.printer.get_sumatra_status") as mock_status:
+        with patch("pdfmill.printer.get_sumatra_status") as mock_status:
             mock_status.return_value = {"installed": False, "path": None, "version": None}
             show_version()
 
         captured = capsys.readouterr()
-        assert "pdfpipe" in captured.out
+        assert "pdfmill" in captured.out
 
     def test_shows_sumatra_installed(self, capsys):
-        with patch("pdfpipe.printer.get_sumatra_status") as mock_status:
+        with patch("pdfmill.printer.get_sumatra_status") as mock_status:
             mock_status.return_value = {
                 "installed": True,
                 "path": "/path/to/SumatraPDF.exe",
@@ -102,7 +102,7 @@ class TestShowVersion:
         assert "3.5.2" in captured.out
 
     def test_shows_sumatra_not_installed(self, capsys):
-        with patch("pdfpipe.printer.get_sumatra_status") as mock_status:
+        with patch("pdfmill.printer.get_sumatra_status") as mock_status:
             mock_status.return_value = {"installed": False, "path": None, "version": None}
             show_version()
 
@@ -114,14 +114,14 @@ class TestCmdInstall:
     """Test install command."""
 
     def test_install_success(self):
-        with patch("pdfpipe.printer.download_sumatra") as mock_download:
+        with patch("pdfmill.printer.download_sumatra") as mock_download:
             mock_download.return_value = Path("SumatraPDF.exe")
             result = cmd_install()
 
         assert result == 0
 
     def test_install_with_force(self):
-        with patch("pdfpipe.printer.download_sumatra") as mock_download:
+        with patch("pdfmill.printer.download_sumatra") as mock_download:
             mock_download.return_value = Path("SumatraPDF.exe")
             result = cmd_install(force=True)
 
@@ -129,9 +129,9 @@ class TestCmdInstall:
         assert result == 0
 
     def test_install_error(self):
-        from pdfpipe.printer import PrinterError
+        from pdfmill.printer import PrinterError
 
-        with patch("pdfpipe.printer.download_sumatra") as mock_download:
+        with patch("pdfmill.printer.download_sumatra") as mock_download:
             mock_download.side_effect = PrinterError("Download failed")
             result = cmd_install()
 
@@ -142,14 +142,14 @@ class TestCmdUninstall:
     """Test uninstall command."""
 
     def test_uninstall_success(self):
-        with patch("pdfpipe.printer.remove_sumatra") as mock_remove:
+        with patch("pdfmill.printer.remove_sumatra") as mock_remove:
             mock_remove.return_value = True
             result = cmd_uninstall()
 
         assert result == 0
 
     def test_uninstall_not_found(self):
-        with patch("pdfpipe.printer.remove_sumatra") as mock_remove:
+        with patch("pdfmill.printer.remove_sumatra") as mock_remove:
             mock_remove.return_value = False
             result = cmd_uninstall()
 
@@ -160,7 +160,7 @@ class TestCmdListPrinters:
     """Test list printers command."""
 
     def test_list_printers_success(self, capsys):
-        with patch("pdfpipe.printer.list_printers") as mock_list:
+        with patch("pdfmill.printer.list_printers") as mock_list:
             mock_list.return_value = ["Printer 1", "Printer 2"]
             result = cmd_list_printers()
 
@@ -170,7 +170,7 @@ class TestCmdListPrinters:
         assert "Printer 2" in captured.out
 
     def test_list_printers_empty(self, capsys):
-        with patch("pdfpipe.printer.list_printers") as mock_list:
+        with patch("pdfmill.printer.list_printers") as mock_list:
             mock_list.return_value = []
             result = cmd_list_printers()
 
@@ -179,9 +179,9 @@ class TestCmdListPrinters:
         assert "No printers found" in captured.out
 
     def test_list_printers_error(self, capsys):
-        from pdfpipe.printer import PrinterError
+        from pdfmill.printer import PrinterError
 
-        with patch("pdfpipe.printer.list_printers") as mock_list:
+        with patch("pdfmill.printer.list_printers") as mock_list:
             mock_list.side_effect = PrinterError("win32print not available")
             result = cmd_list_printers()
 
@@ -192,34 +192,34 @@ class TestMain:
     """Test main CLI entry point."""
 
     def test_version_returns_0(self):
-        with patch("pdfpipe.cli.show_version") as mock_show:
+        with patch("pdfmill.cli.show_version") as mock_show:
             result = main(["--version"])
 
         assert result == 0
         mock_show.assert_called_once()
 
     def test_list_printers_returns_result(self):
-        with patch("pdfpipe.cli.cmd_list_printers", return_value=0) as mock_cmd:
+        with patch("pdfmill.cli.cmd_list_printers", return_value=0) as mock_cmd:
             result = main(["--list-printers"])
 
         assert result == 0
         mock_cmd.assert_called_once()
 
     def test_install_command(self):
-        with patch("pdfpipe.cli.cmd_install", return_value=0) as mock_cmd:
+        with patch("pdfmill.cli.cmd_install", return_value=0) as mock_cmd:
             result = main(["install"])
 
         assert result == 0
         mock_cmd.assert_called_once_with(force=False)
 
     def test_install_force(self):
-        with patch("pdfpipe.cli.cmd_install", return_value=0) as mock_cmd:
+        with patch("pdfmill.cli.cmd_install", return_value=0) as mock_cmd:
             result = main(["install", "--force"])
 
         mock_cmd.assert_called_once_with(force=True)
 
     def test_uninstall_command(self):
-        with patch("pdfpipe.cli.cmd_uninstall", return_value=0) as mock_cmd:
+        with patch("pdfmill.cli.cmd_uninstall", return_value=0) as mock_cmd:
             result = main(["uninstall"])
 
         mock_cmd.assert_called_once()
@@ -261,7 +261,7 @@ class TestMain:
         assert "input" in captured.err.lower()
 
     def test_full_process(self, temp_config_file, temp_pdf, temp_dir):
-        with patch("pdfpipe.processor.process") as mock_process:
+        with patch("pdfmill.processor.process") as mock_process:
             result = main([
                 "--config", str(temp_config_file),
                 "--input", str(temp_pdf),
@@ -272,7 +272,7 @@ class TestMain:
         mock_process.assert_called_once()
 
     def test_dry_run_passed(self, temp_config_file, temp_pdf, temp_dir):
-        with patch("pdfpipe.processor.process") as mock_process:
+        with patch("pdfmill.processor.process") as mock_process:
             main([
                 "--config", str(temp_config_file),
                 "--input", str(temp_pdf),
@@ -286,7 +286,7 @@ class TestMain:
     def test_output_dir_passed(self, temp_config_file, temp_pdf, temp_dir):
         output_dir = temp_dir / "custom_output"
 
-        with patch("pdfpipe.processor.process") as mock_process:
+        with patch("pdfmill.processor.process") as mock_process:
             main([
                 "--config", str(temp_config_file),
                 "--input", str(temp_pdf),
@@ -297,7 +297,7 @@ class TestMain:
         assert call_kwargs["output_dir"] == output_dir
 
     def test_process_error_returns_1(self, temp_config_file, temp_pdf, temp_dir):
-        with patch("pdfpipe.processor.process") as mock_process:
+        with patch("pdfmill.processor.process") as mock_process:
             mock_process.side_effect = Exception("Processing failed")
             result = main([
                 "--config", str(temp_config_file),

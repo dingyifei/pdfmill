@@ -1,11 +1,11 @@
-"""Tests for pdfpipe.printer module."""
+"""Tests for pdfmill.printer module."""
 
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import sys
 
-from pdfpipe.printer import (
+from pdfmill.printer import (
     get_architecture,
     get_cache_dir,
     get_sumatra_cache_path,
@@ -61,41 +61,41 @@ class TestGetCacheDir:
         with patch("sys.platform", "win32"):
             with patch.dict("os.environ", {"LOCALAPPDATA": str(temp_dir)}):
                 cache_dir = get_cache_dir()
-                assert "pdfpipe" in str(cache_dir)
+                assert "pdfmill" in str(cache_dir)
 
     def test_linux_xdg_cache(self, temp_dir):
         with patch("sys.platform", "linux"):
             with patch.dict("os.environ", {"XDG_CACHE_HOME": str(temp_dir)}):
                 cache_dir = get_cache_dir()
-                assert "pdfpipe" in str(cache_dir)
+                assert "pdfmill" in str(cache_dir)
 
 
 class TestGetSumatraCachePath:
     """Test SumatraPDF cache path."""
 
     def test_returns_path_with_exe(self):
-        with patch("pdfpipe.printer.get_cache_dir") as mock_cache:
-            mock_cache.return_value = Path("/cache/pdfpipe")
+        with patch("pdfmill.printer.get_cache_dir") as mock_cache:
+            mock_cache.return_value = Path("/cache/pdfmill")
             path = get_sumatra_cache_path()
-            assert path == Path("/cache/pdfpipe/SumatraPDF.exe")
+            assert path == Path("/cache/pdfmill/SumatraPDF.exe")
 
 
 class TestGetSumatraDownloadUrl:
     """Test download URL generation."""
 
     def test_x64_url(self):
-        with patch("pdfpipe.printer.get_architecture", return_value="x64"):
+        with patch("pdfmill.printer.get_architecture", return_value="x64"):
             url = get_sumatra_download_url()
             assert SUMATRA_VERSION in url
             assert "64" in url
 
     def test_arm64_url(self):
-        with patch("pdfpipe.printer.get_architecture", return_value="arm64"):
+        with patch("pdfmill.printer.get_architecture", return_value="arm64"):
             url = get_sumatra_download_url()
             assert "arm64" in url
 
     def test_x86_url(self):
-        with patch("pdfpipe.printer.get_architecture", return_value="x86"):
+        with patch("pdfmill.printer.get_architecture", return_value="x86"):
             url = get_sumatra_download_url()
             assert url == SUMATRA_URLS["x86"]
 
@@ -113,7 +113,7 @@ class TestDownloadSumatra:
         existing.touch()
 
         with patch("sys.platform", "win32"):
-            with patch("pdfpipe.printer.get_sumatra_cache_path", return_value=existing):
+            with patch("pdfmill.printer.get_sumatra_cache_path", return_value=existing):
                 result = download_sumatra(force=False)
                 assert result == existing
 
@@ -122,7 +122,7 @@ class TestDownloadSumatra:
         existing.touch()
 
         with patch("sys.platform", "win32"):
-            with patch("pdfpipe.printer.get_sumatra_cache_path", return_value=existing):
+            with patch("pdfmill.printer.get_sumatra_cache_path", return_value=existing):
                 with patch("urllib.request.urlretrieve") as mock_download:
                     result = download_sumatra(force=True)
                     mock_download.assert_called_once()
@@ -135,8 +135,8 @@ class TestRemoveSumatra:
         existing = temp_dir / "SumatraPDF.exe"
         existing.touch()
 
-        with patch("pdfpipe.printer.get_sumatra_cache_path", return_value=existing):
-            with patch("pdfpipe.printer.get_cache_dir", return_value=temp_dir):
+        with patch("pdfmill.printer.get_sumatra_cache_path", return_value=existing):
+            with patch("pdfmill.printer.get_cache_dir", return_value=temp_dir):
                 result = remove_sumatra()
                 assert result is True
                 assert not existing.exists()
@@ -144,7 +144,7 @@ class TestRemoveSumatra:
     def test_not_found_returns_false(self, temp_dir):
         nonexistent = temp_dir / "SumatraPDF.exe"
 
-        with patch("pdfpipe.printer.get_sumatra_cache_path", return_value=nonexistent):
+        with patch("pdfmill.printer.get_sumatra_cache_path", return_value=nonexistent):
             result = remove_sumatra()
             assert result is False
 
@@ -156,14 +156,14 @@ class TestGetSumatraStatus:
         exe_path = temp_dir / "SumatraPDF.exe"
         exe_path.touch()
 
-        with patch("pdfpipe.printer.find_sumatra_pdf", return_value=exe_path):
+        with patch("pdfmill.printer.find_sumatra_pdf", return_value=exe_path):
             status = get_sumatra_status()
             assert status["installed"] is True
             assert status["path"] == str(exe_path)
             assert status["version"] == SUMATRA_VERSION
 
     def test_not_installed(self):
-        with patch("pdfpipe.printer.find_sumatra_pdf", return_value=None):
+        with patch("pdfmill.printer.find_sumatra_pdf", return_value=None):
             status = get_sumatra_status()
             assert status["installed"] is False
             assert status["path"] is None
@@ -211,7 +211,7 @@ class TestFindSumatraPdf:
         nonexistent = temp_dir / "nonexistent.exe"
 
         with patch.dict("os.environ", {"PDFPIPE_SUMATRA_PATH": str(nonexistent)}):
-            with patch("pdfpipe.printer.get_sumatra_cache_path") as mock_cache:
+            with patch("pdfmill.printer.get_sumatra_cache_path") as mock_cache:
                 mock_cache.return_value = temp_dir / "cached.exe"
                 result = find_sumatra_pdf(auto_download=False)
                 assert result is None
@@ -230,14 +230,14 @@ class TestFindSumatraPdf:
         cache_path.touch()
 
         with patch.dict("os.environ", {"PDFPIPE_SUMATRA_PATH": ""}):
-            with patch("pdfpipe.printer.get_sumatra_cache_path", return_value=cache_path):
+            with patch("pdfmill.printer.get_sumatra_cache_path", return_value=cache_path):
                 with patch("pathlib.Path.cwd", return_value=Path("/nonexistent")):
                     result = find_sumatra_pdf(auto_download=False)
                     assert result == cache_path
 
     def test_not_found_no_auto_download(self, temp_dir):
         with patch.dict("os.environ", {"PDFPIPE_SUMATRA_PATH": "", "PATH": ""}):
-            with patch("pdfpipe.printer.get_sumatra_cache_path") as mock_cache:
+            with patch("pdfmill.printer.get_sumatra_cache_path") as mock_cache:
                 mock_cache.return_value = temp_dir / "nonexistent.exe"
                 with patch("pathlib.Path.cwd", return_value=temp_dir / "other"):
                     result = find_sumatra_pdf(auto_download=False)
@@ -248,7 +248,7 @@ class TestPrintPdf:
     """Test PDF printing."""
 
     def test_dry_run_no_subprocess(self, temp_pdf, mock_subprocess_run, capsys):
-        with patch("pdfpipe.printer.find_sumatra_pdf") as mock_find:
+        with patch("pdfmill.printer.find_sumatra_pdf") as mock_find:
             mock_find.return_value = Path("SumatraPDF.exe")
             result = print_pdf(temp_pdf, "Test Printer", dry_run=True)
 
@@ -264,12 +264,12 @@ class TestPrintPdf:
             print_pdf(nonexistent, "Printer")
 
     def test_sumatra_not_found_raises(self, temp_pdf):
-        with patch("pdfpipe.printer.find_sumatra_pdf", return_value=None):
+        with patch("pdfmill.printer.find_sumatra_pdf", return_value=None):
             with pytest.raises(PrinterError, match="SumatraPDF.exe not found"):
                 print_pdf(temp_pdf, "Printer")
 
     def test_success(self, temp_pdf, mock_subprocess_run):
-        with patch("pdfpipe.printer.find_sumatra_pdf") as mock_find:
+        with patch("pdfmill.printer.find_sumatra_pdf") as mock_find:
             mock_find.return_value = Path("SumatraPDF.exe")
             result = print_pdf(temp_pdf, "Test Printer")
 
@@ -277,7 +277,7 @@ class TestPrintPdf:
         mock_subprocess_run.assert_called_once()
 
     def test_with_copies(self, temp_pdf, mock_subprocess_run):
-        with patch("pdfpipe.printer.find_sumatra_pdf") as mock_find:
+        with patch("pdfmill.printer.find_sumatra_pdf") as mock_find:
             mock_find.return_value = Path("SumatraPDF.exe")
             print_pdf(temp_pdf, "Test Printer", copies=3)
 
@@ -286,7 +286,7 @@ class TestPrintPdf:
         assert "3x" in call_args
 
     def test_with_extra_args(self, temp_pdf, mock_subprocess_run):
-        with patch("pdfpipe.printer.find_sumatra_pdf") as mock_find:
+        with patch("pdfmill.printer.find_sumatra_pdf") as mock_find:
             mock_find.return_value = Path("SumatraPDF.exe")
             print_pdf(temp_pdf, "Test Printer", extra_args=["-silent", "-exit-on-print"])
 
@@ -306,7 +306,7 @@ class TestPrintPdf:
 
     def test_subprocess_failure_returns_false(self, temp_pdf):
         import subprocess
-        with patch("pdfpipe.printer.find_sumatra_pdf") as mock_find:
+        with patch("pdfmill.printer.find_sumatra_pdf") as mock_find:
             mock_find.return_value = Path("SumatraPDF.exe")
             with patch("subprocess.run") as mock_run:
                 mock_run.side_effect = subprocess.CalledProcessError(1, "cmd", stderr="error")

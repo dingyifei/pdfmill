@@ -1,14 +1,14 @@
-"""Main processing pipeline for pdfpipe."""
+"""Main processing pipeline for pdfmill."""
 
 import os
 from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
-from pdfpipe.config import Config, FilterConfig, OutputProfile, Transform
-from pdfpipe.selector import select_pages, PageSelectionError
-from pdfpipe.transforms import rotate_page, crop_page, resize_page, TransformError
-from pdfpipe.printer import print_pdf, PrinterError
+from pdfmill.config import Config, FilterConfig, OutputProfile, Transform
+from pdfmill.selector import select_pages, PageSelectionError
+from pdfmill.transforms import rotate_page, crop_page, resize_page, TransformError
+from pdfmill.printer import print_pdf, PrinterError
 
 
 class ProcessingError(Exception):

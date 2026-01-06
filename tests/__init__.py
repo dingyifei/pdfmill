@@ -1,1 +1,1 @@
-# pdfpipe tests
+# pdfmill tests

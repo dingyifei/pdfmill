@@ -1,1 +1,1 @@
-# Unit tests for pdfpipe
+# Unit tests for pdfmill

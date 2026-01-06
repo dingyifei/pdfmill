@@ -1,17 +1,17 @@
-"""Command-line interface for pdfpipe."""
+"""Command-line interface for pdfmill."""
 
 import argparse
 import sys
 from pathlib import Path
 
-from pdfpipe import __version__
+from pdfmill import __version__
 
 
 def show_version() -> None:
     """Show version information including SumatraPDF status."""
-    from pdfpipe.printer import get_sumatra_status, SUMATRA_VERSION
+    from pdfmill.printer import get_sumatra_status, SUMATRA_VERSION
 
-    print(f"pdfpipe {__version__}")
+    print(f"pdfmill {__version__}")
 
     status = get_sumatra_status()
     if status["installed"]:
@@ -22,7 +22,7 @@ def show_version() -> None:
 
 def cmd_install(force: bool = False) -> int:
     """Install SumatraPDF."""
-    from pdfpipe.printer import download_sumatra, PrinterError
+    from pdfmill.printer import download_sumatra, PrinterError
 
     try:
         download_sumatra(force=force)
@@ -34,7 +34,7 @@ def cmd_install(force: bool = False) -> int:
 
 def cmd_uninstall() -> int:
     """Uninstall SumatraPDF."""
-    from pdfpipe.printer import remove_sumatra
+    from pdfmill.printer import remove_sumatra
 
     if remove_sumatra():
         return 0
@@ -44,7 +44,7 @@ def cmd_uninstall() -> int:
 
 def cmd_list_printers() -> int:
     """List available printers."""
-    from pdfpipe.printer import list_printers, PrinterError
+    from pdfmill.printer import list_printers, PrinterError
 
     try:
         printers = list_printers()
@@ -164,7 +164,7 @@ def main(args: list[str] | None = None) -> int:
 
     # Handle --validate
     if parsed.validate:
-        from pdfpipe.config import load_config, ConfigError
+        from pdfmill.config import load_config, ConfigError
         try:
             config = load_config(parsed.config)
             print(f"Configuration is valid: {parsed.config}")
@@ -182,8 +182,8 @@ def main(args: list[str] | None = None) -> int:
         print("Error: --input is required for processing", file=sys.stderr)
         return 1
 
-    from pdfpipe.config import load_config, ConfigError
-    from pdfpipe.processor import process
+    from pdfmill.config import load_config, ConfigError
+    from pdfmill.processor import process
 
     try:
         config = load_config(parsed.config)

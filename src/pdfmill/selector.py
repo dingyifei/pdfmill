@@ -1,4 +1,4 @@
-"""Page selection logic for pdfpipe."""
+"""Page selection logic for pdfmill."""
 
 import re
 from typing import Sequence

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pdfpipe"
+name = "pdfmill"
 version = "0.1.0"
 description = "Configurable PDF processing pipeline for splitting, transforming, and printing PDFs"
 readme = "README.md"
@@ -43,10 +43,10 @@ ocr = [
 ]
 
 [project.scripts]
-pdfp = "pdfpipe.cli:main"
+pdfp = "pdfmill.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/pdfpipe"]
+packages = ["src/pdfmill"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -62,7 +62,7 @@ markers = [
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.coverage.run]
-source = ["src/pdfpipe"]
+source = ["src/pdfmill"]
 branch = true
 omit = ["*/tests/*"]
 

@@ -1,4 +1,4 @@
-"""Printer interface for pdfpipe using SumatraPDF."""
+"""Printer interface for pdfmill using SumatraPDF."""
 
 import os
 import platform
@@ -41,19 +41,19 @@ def get_architecture() -> str:
 
 def get_cache_dir() -> Path:
     """
-    Get the cache directory for pdfpipe.
+    Get the cache directory for pdfmill.
 
     Returns:
         Path to cache directory (created if doesn't exist)
     """
     if sys.platform == "win32":
-        # Windows: %LOCALAPPDATA%\pdfpipe
+        # Windows: %LOCALAPPDATA%\pdfmill
         base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
     else:
-        # Linux/Mac: ~/.cache/pdfpipe
+        # Linux/Mac: ~/.cache/pdfmill
         base = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
 
-    cache_dir = base / "pdfpipe"
+    cache_dir = base / "pdfmill"
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
 

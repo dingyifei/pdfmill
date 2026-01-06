@@ -1,9 +1,9 @@
-"""Tests for pdfpipe.transforms module."""
+"""Tests for pdfmill.transforms module."""
 
 import pytest
 from unittest.mock import MagicMock, patch
 
-from pdfpipe.transforms import (
+from pdfmill.transforms import (
     parse_dimension,
     get_page_dimensions,
     is_landscape,
@@ -162,12 +162,12 @@ class TestRotatePage:
             rotate_page(mock_page, "auto", pdf_path="test.pdf")
 
     def test_auto_with_ocr_no_rotation_needed(self, mock_page):
-        with patch("pdfpipe.transforms.detect_page_orientation", return_value=0):
+        with patch("pdfmill.transforms.detect_page_orientation", return_value=0):
             rotate_page(mock_page, "auto", pdf_path="test.pdf", page_num=0)
             mock_page.add_transformation.assert_not_called()
 
     def test_auto_with_ocr_rotation_detected(self, mock_page):
-        with patch("pdfpipe.transforms.detect_page_orientation", return_value=90):
+        with patch("pdfmill.transforms.detect_page_orientation", return_value=90):
             rotate_page(mock_page, "auto", pdf_path="test.pdf", page_num=0)
             mock_page.add_transformation.assert_called_once()
 
@@ -304,35 +304,35 @@ class TestDetectPageOrientation:
 
     def test_missing_pymupdf_raises(self):
         # Test that missing pymupdf is handled gracefully
-        with patch("pdfpipe.transforms.detect_page_orientation") as mock_detect:
+        with patch("pdfmill.transforms.detect_page_orientation") as mock_detect:
             mock_detect.side_effect = TransformError("pymupdf is required for auto rotation")
             with pytest.raises(TransformError, match="pymupdf is required"):
                 mock_detect("test.pdf", 0)
 
     def test_missing_tesseract_raises(self):
         # Test that missing Tesseract is handled gracefully
-        with patch("pdfpipe.transforms.detect_page_orientation") as mock_detect:
+        with patch("pdfmill.transforms.detect_page_orientation") as mock_detect:
             mock_detect.side_effect = TransformError("Tesseract OCR is not installed")
             with pytest.raises(TransformError, match="Tesseract"):
                 mock_detect("test.pdf", 0)
 
     def test_ocr_detection_failure_raises(self):
         # Test that OCR failures are wrapped in TransformError
-        with patch("pdfpipe.transforms.detect_page_orientation") as mock_detect:
+        with patch("pdfmill.transforms.detect_page_orientation") as mock_detect:
             mock_detect.side_effect = TransformError("OCR orientation detection failed: some error")
             with pytest.raises(TransformError, match="OCR orientation detection failed"):
                 mock_detect("test.pdf", 0)
 
     def test_successful_detection_returns_angle(self):
         # Test that successful detection returns the detected angle
-        with patch("pdfpipe.transforms.detect_page_orientation") as mock_detect:
+        with patch("pdfmill.transforms.detect_page_orientation") as mock_detect:
             mock_detect.return_value = 90
             result = mock_detect("test.pdf", 0)
             assert result == 90
 
     def test_no_rotation_needed_returns_zero(self):
         # Test that correctly oriented pages return 0
-        with patch("pdfpipe.transforms.detect_page_orientation") as mock_detect:
+        with patch("pdfmill.transforms.detect_page_orientation") as mock_detect:
             mock_detect.return_value = 0
             result = mock_detect("test.pdf", 0)
             assert result == 0

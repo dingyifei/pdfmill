@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`pdfpipe` - A pip-installable Python package for configurable PDF processing. Splits multi-page PDFs, applies transformations (rotate, crop, resize), and prints to different printers via SumatraPDF. Configured via YAML files.
+`pdfmill` - A pip-installable Python package for configurable PDF processing. Splits multi-page PDFs, applies transformations (rotate, crop, resize), and prints to different printers via SumatraPDF. Configured via YAML files.
 
 ## Setup
 

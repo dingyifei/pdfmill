@@ -1,4 +1,4 @@
-"""Shared fixtures for pdfpipe tests."""
+"""Shared fixtures for pdfmill tests."""
 
 import tempfile
 import shutil

@@ -1,4 +1,4 @@
-"""Integration tests for pdfpipe CLI."""
+"""Integration tests for pdfmill CLI."""
 
 import subprocess
 import sys
@@ -15,7 +15,7 @@ class TestCLIIntegration:
     def test_help_flag(self):
         """Test --help displays usage."""
         result = subprocess.run(
-            [sys.executable, "-m", "pdfpipe.cli", "--help"],
+            [sys.executable, "-m", "pdfmill.cli", "--help"],
             capture_output=True,
             text=True,
         )
@@ -25,12 +25,12 @@ class TestCLIIntegration:
     def test_version_flag(self):
         """Test --version displays version info."""
         result = subprocess.run(
-            [sys.executable, "-m", "pdfpipe.cli", "--version"],
+            [sys.executable, "-m", "pdfmill.cli", "--version"],
             capture_output=True,
             text=True,
         )
         assert result.returncode == 0
-        assert "pdfpipe" in result.stdout
+        assert "pdfmill" in result.stdout
 
     def test_validate_valid_config(self, temp_dir, minimal_config_dict):
         """Test --validate with valid config."""
@@ -39,7 +39,7 @@ class TestCLIIntegration:
             yaml.dump(minimal_config_dict, f)
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfpipe.cli",
+            [sys.executable, "-m", "pdfmill.cli",
              "--config", str(config_path), "--validate"],
             capture_output=True,
             text=True,
@@ -53,7 +53,7 @@ class TestCLIIntegration:
         config_path.write_text("version: 1\n# missing outputs")
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfpipe.cli",
+            [sys.executable, "-m", "pdfmill.cli",
              "--config", str(config_path), "--validate"],
             capture_output=True,
             text=True,
@@ -63,7 +63,7 @@ class TestCLIIntegration:
     def test_validate_missing_config(self, temp_dir):
         """Test --validate with non-existent config."""
         result = subprocess.run(
-            [sys.executable, "-m", "pdfpipe.cli",
+            [sys.executable, "-m", "pdfmill.cli",
              "--config", str(temp_dir / "nonexistent.yaml"), "--validate"],
             capture_output=True,
             text=True,
@@ -79,7 +79,7 @@ class TestCLIIntegration:
         output_dir = temp_dir / "output"
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfpipe.cli",
+            [sys.executable, "-m", "pdfmill.cli",
              "--config", str(config_path),
              "--input", str(temp_pdf),
              "--output", str(output_dir),
@@ -103,7 +103,7 @@ class TestCLIIntegration:
         output_dir = temp_dir / "output"
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfpipe.cli",
+            [sys.executable, "-m", "pdfmill.cli",
              "--config", str(config_path),
              "--input", str(temp_multi_page_pdf),
              "--output", str(output_dir)],
@@ -124,7 +124,7 @@ class TestCLIIntegration:
             yaml.dump(minimal_config_dict, f)
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfpipe.cli",
+            [sys.executable, "-m", "pdfmill.cli",
              "--config", str(config_path)],
             capture_output=True,
             text=True,
@@ -153,7 +153,7 @@ class TestCLIWithConfigProfiles:
         output_dir = temp_dir / "output"
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfpipe.cli",
+            [sys.executable, "-m", "pdfmill.cli",
              "--config", str(config_path),
              "--input", str(temp_multi_page_pdf),
              "--output", str(output_dir)],
@@ -185,7 +185,7 @@ class TestCLIWithConfigProfiles:
         output_dir = temp_dir / "output"
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfpipe.cli",
+            [sys.executable, "-m", "pdfmill.cli",
              "--config", str(config_path),
              "--input", str(temp_pdf),
              "--output", str(output_dir)],
@@ -206,7 +206,7 @@ class TestCLIPrinterCommands:
     def test_list_printers(self):
         """Test --list-printers command."""
         result = subprocess.run(
-            [sys.executable, "-m", "pdfpipe.cli", "--list-printers"],
+            [sys.executable, "-m", "pdfmill.cli", "--list-printers"],
             capture_output=True,
             text=True,
         )

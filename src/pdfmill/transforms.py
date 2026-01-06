@@ -1,4 +1,4 @@
-"""PDF transformation operations for pdfpipe."""
+"""PDF transformation operations for pdfmill."""
 
 import io
 import re

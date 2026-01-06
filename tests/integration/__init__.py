@@ -1,1 +1,1 @@
-# Integration tests for pdfpipe
+# Integration tests for pdfmill

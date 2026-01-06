@@ -1,4 +1,4 @@
-# pdfpipe
+# pdfmill
 
 [![Python package](https://github.com/dingyifei/PrintAThingPDF/actions/workflows/python-package.yml/badge.svg)](https://github.com/dingyifei/PrintAThingPDF/actions/workflows/python-package.yml)
 

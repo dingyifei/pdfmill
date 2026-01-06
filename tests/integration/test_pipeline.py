@@ -1,11 +1,11 @@
-"""Integration tests for pdfpipe pipeline processing."""
+"""Integration tests for pdfmill pipeline processing."""
 
 import pytest
 from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
-from pdfpipe.config import (
+from pdfmill.config import (
     load_config,
     Config,
     OutputProfile,
@@ -15,7 +15,7 @@ from pdfpipe.config import (
     SizeTransform,
     Settings,
 )
-from pdfpipe.processor import process, process_single_pdf
+from pdfmill.processor import process, process_single_pdf
 
 
 @pytest.mark.integration

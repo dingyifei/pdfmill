@@ -1,10 +1,10 @@
-"""Tests for pdfpipe.config module."""
+"""Tests for pdfmill.config module."""
 
 import pytest
 import yaml
 from pathlib import Path
 
-from pdfpipe.config import (
+from pdfmill.config import (
     load_config,
     parse_transform,
     parse_output_profile,
