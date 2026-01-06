@@ -43,7 +43,7 @@ ocr = [
 ]
 
 [project.scripts]
-pdfp = "pdfmill.cli:main"
+pdfm = "pdfmill.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pdfmill"]

@@ -20,7 +20,7 @@ class TestCLIIntegration:
             text=True,
         )
         assert result.returncode == 0
-        assert "pdfp" in result.stdout or "usage" in result.stdout.lower()
+        assert "pdfm" in result.stdout or "usage" in result.stdout.lower()
 
     def test_version_flag(self):
         """Test --version displays version info."""

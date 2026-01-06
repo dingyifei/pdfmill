@@ -21,22 +21,22 @@ pip install -e .
 
 ```sh
 # List available printers
-pdfp --list-printers
+pdfm --list-printers
 
 # Process PDFs with a config
-pdfp -c configs/label_packing.yaml -i ./input -o ./output
+pdfm -c configs/label_packing.yaml -i ./input -o ./output
 
 # Validate config only
-pdfp -c config.yaml --validate
+pdfm -c config.yaml --validate
 
 # Dry run (preview without processing)
-pdfp -c config.yaml -i ./input --dry-run
+pdfm -c config.yaml -i ./input --dry-run
 ```
 
 ## Architecture
 
 ```
-src/pdfpipe/
+src/pdfmill/
 ├── cli.py          # Entry point, argparse CLI
 ├── config.py       # YAML config loading, dataclass models
 ├── selector.py     # Page selection (patterns, ranges, indices)

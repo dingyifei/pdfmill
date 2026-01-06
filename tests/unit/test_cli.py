@@ -13,7 +13,7 @@ class TestCreateParser:
     def test_parser_creation(self):
         parser = create_parser()
         assert parser is not None
-        assert parser.prog == "pdfp"
+        assert parser.prog == "pdfm"
 
     def test_version_flag(self):
         parser = create_parser()
@@ -230,7 +230,7 @@ class TestMain:
         assert result == 1
         captured = capsys.readouterr()
         # Should print help
-        assert "pdfp" in captured.out or "usage" in captured.out.lower()
+        assert "pdfm" in captured.out or "usage" in captured.out.lower()
 
     def test_validate_valid_config(self, temp_config_file, capsys):
         result = main(["--config", str(temp_config_file), "--validate"])

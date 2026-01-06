@@ -17,7 +17,7 @@ def show_version() -> None:
     if status["installed"]:
         print(f"SumatraPDF {SUMATRA_VERSION} installed at: {status['path']}")
     else:
-        print("SumatraPDF: not installed (run 'pdfp install' to download)")
+        print("SumatraPDF: not installed (run 'pdfm install' to download)")
 
 
 def cmd_install(force: bool = False) -> int:
@@ -63,18 +63,18 @@ def cmd_list_printers() -> int:
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser."""
     parser = argparse.ArgumentParser(
-        prog="pdfp",
+        prog="pdfm",
         description="Configurable PDF processing pipeline for splitting, transforming, and printing PDFs.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  pdfp install                                  Download SumatraPDF for printing
-  pdfp uninstall                                Remove downloaded SumatraPDF
-  pdfp -c config.yaml -i ./input -o ./output    Process PDFs with config
-  pdfp -c config.yaml -i document.pdf           Process a single file
-  pdfp -c config.yaml --validate                Validate config only
-  pdfp -c config.yaml -i ./input --dry-run      Show what would happen
-  pdfp --list-printers                          List available printers
+  pdfm install                                  Download SumatraPDF for printing
+  pdfm uninstall                                Remove downloaded SumatraPDF
+  pdfm -c config.yaml -i ./input -o ./output    Process PDFs with config
+  pdfm -c config.yaml -i document.pdf           Process a single file
+  pdfm -c config.yaml --validate                Validate config only
+  pdfm -c config.yaml -i ./input --dry-run      Show what would happen
+  pdfm --list-printers                          List available printers
 """,
     )
 

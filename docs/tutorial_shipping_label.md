@@ -1,6 +1,6 @@
 # Tutorial: Shipping Label and Packing Slip Workflow
 
-This tutorial walks through setting up pdfpipe to split PDFs containing a label and some packing slips into separate outputs, then printing on two different printers.
+This tutorial walks through setting up pdfmill to split PDFs containing a label and some packing slips into separate outputs, then printing on two different printers.
 
 ## The Problem
 
@@ -25,7 +25,7 @@ You want to:
 
 3. Know your printer names:
    ```sh
-   pdfp --list-printers
+   pdfm --list-printers
    ```
 
 ## Step 1: Create a Debug Config
@@ -49,7 +49,7 @@ outputs:
 Run it:
 
 ```sh
-pdfp -c configs/debug_label.yaml -i example.pdf
+pdfm -c configs/debug_label.yaml -i example.pdf
 ```
 
 This creates:
@@ -64,13 +64,13 @@ This creates:
 
 Open `example_label_step1_rotate90.pdf` (the rotated page) and print it on regular paper.
 
-Now measure where the actual label content is located. pdfpipe uses a coordinate system where:
+Now measure where the actual label content is located. pdfmill uses a coordinate system where:
 - **Origin (0, 0) is the bottom-left corner**
 - **X increases to the right**
 - **Y increases upward**
 - **72 points = 1 inch = 25.4mm**
 
-pdfpipe supports any of these units (pt, in, mm, cm)
+pdfmill supports any of these units (pt, in, mm, cm)
 
 Using a ruler, measure from the bottom-left corner of the page:
 
@@ -155,19 +155,19 @@ outputs:
 Process a single PDF:
 
 ```sh
-pdfp -c configs/label_packing.yaml -i example.pdf
+pdfm -c configs/label_packing.yaml -i example.pdf
 ```
 
 Process a folder of PDFs:
 
 ```sh
-pdfp -c configs/label_packing.yaml -i ./input -o ./output
+pdfm -c configs/label_packing.yaml -i ./input -o ./output
 ```
 
 Dry run to preview without processing:
 
 ```sh
-pdfp -c configs/label_packing.yaml -i ./input --dry-run
+pdfm -c configs/label_packing.yaml -i ./input --dry-run
 ```
 
 Note: you can also define an input folder for every config and define individual output folder for each output.

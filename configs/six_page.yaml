@@ -2,7 +2,7 @@
 # Replicates the original pure_print_labels_and_packing_sheets.py workflow
 #
 # Usage:
-#   pdfp -c configs/six_page.yaml -i ./input -o ./output
+#   pdfm -c configs/six_page.yaml -i ./input -o ./output
 
 version: 1
 
