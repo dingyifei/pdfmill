@@ -3,7 +3,11 @@
     "allow": [
       "Bash(mkdir:*)",
       "Bash(pdfp:*)",
-      "Bash(pdfp --list-printers:*)"
+      "Bash(pdfp --list-printers:*)",
+      "WebSearch",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

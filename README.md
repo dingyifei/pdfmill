@@ -1,5 +1,7 @@
 # pdfpipe
 
+[![Python package](https://github.com/dingyifei/PrintAThingPDF/actions/workflows/python-package.yml/badge.svg)](https://github.com/dingyifei/PrintAThingPDF/actions/workflows/python-package.yml)
+
 A configurable PDF processing pipeline for splitting, transforming, and printing PDFs.
 
 Currently supports only windows

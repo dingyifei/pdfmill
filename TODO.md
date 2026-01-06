@@ -60,7 +60,7 @@ Features and improvements planned for pdfpipe.
 - [x] `pyproject.toml` with modern Python packaging
 - [x] Entry point for `pdfp` CLI command
 - [x] Type hints throughout
-- [ ] Unit tests
+- [x] Unit tests
 - [ ] Publish to PyPI
 
 ## Future Considerations
