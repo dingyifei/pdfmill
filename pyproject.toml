@@ -62,9 +62,9 @@ markers = [
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.coverage.run]
-source = ["src/pdfmill"]
+source = ["pdfmill"]
 branch = true
-omit = ["*/tests/*"]
+omit = ["*/tests/*", "*/gui.py"]
 
 [tool.coverage.report]
 exclude_lines = [
