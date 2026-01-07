@@ -3,6 +3,7 @@
 import ctypes
 import platform
 import queue
+import shlex
 import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
@@ -362,7 +363,7 @@ class PrintTargetDialog(tk.Toplevel):
             self.printer_var.set(target.printer)
             self.weight_var.set(target.weight)
             self.copies_var.set(target.copies)
-            self.args_var.set(", ".join(target.args))
+            self.args_var.set(shlex.join(target.args))
         elif len(printers) == 1:
             # New target with single printer: auto-select it
             self.printer_var.set(printers[0])
@@ -372,7 +373,7 @@ class PrintTargetDialog(tk.Toplevel):
         if not name:
             messagebox.showerror("Error", "Target name is required")
             return
-        args = [a.strip() for a in self.args_var.get().split(",") if a.strip()]
+        args = shlex.split(self.args_var.get())
         self.result_name = name
         self.result = PrintTarget(
             printer=self.printer_var.get(),
