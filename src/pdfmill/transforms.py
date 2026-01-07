@@ -229,6 +229,9 @@ def crop_page(
     """
     Crop a page to the specified coordinates.
 
+    Translates the content so the cropped region starts at origin (0, 0).
+    This ensures subsequent transforms (resize, etc.) work correctly.
+
     Args:
         page: The page to crop
         lower_left: (x, y) coordinates of lower-left corner (points or strings like "100mm")
@@ -255,8 +258,18 @@ def crop_page(
             f"Invalid crop: bottom ({ll_y}) must be less than top ({ur_y})"
         )
 
-    page.mediabox.lower_left = (ll_x, ll_y)
-    page.mediabox.upper_right = (ur_x, ur_y)
+    # Calculate cropped dimensions
+    crop_width = ur_x - ll_x
+    crop_height = ur_y - ll_y
+
+    # Translate content so cropped region moves to origin (0, 0)
+    # This ensures subsequent transforms work correctly
+    transform = Transformation().translate(tx=-ll_x, ty=-ll_y)
+    page.add_transformation(transform)
+
+    # Set mediabox to cropped size at origin
+    page.mediabox.lower_left = (0, 0)
+    page.mediabox.upper_right = (crop_width, crop_height)
     return page
 
 

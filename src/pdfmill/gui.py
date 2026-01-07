@@ -653,12 +653,15 @@ class OutputsFrame(ttk.Frame):
             self._refresh_list()
 
     def _on_select(self, event):
-        self._save_current()
         sel = self.profile_list.curselection()
-        if sel:
-            name = self.profile_list.get(sel[0])
-            self.current_profile = name
-            self.editor.load(name, self.profiles[name])
+        if not sel:
+            return
+        name = self.profile_list.get(sel[0])
+        if name == self.current_profile:
+            return
+        self._save_current()
+        self.current_profile = name
+        self.editor.load(name, self.profiles[name])
 
     def _add_profile(self):
         self._save_current()

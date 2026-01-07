@@ -1,37 +1,46 @@
-# Example: Split PDF into packing sheet + shipping label
-# Replicates the original print_labels_and_packing_sheets.py workflow
-#
-# Usage:
-#   pdfm -c configs/label_packing.yaml -i ./input -o ./output
-
 version: 1
-
 settings:
   on_error: continue
-
+  cleanup_source: false
+  cleanup_output_after_print: true
+input:
+  path: input
+  pattern: '*.pdf'
 outputs:
   packing_sheet:
-    # All pages except the last one
-    pages: "1--1"
-    output_dir: ./output
-    filename_suffix: "_1"
+    pages: 1--1
+    output_dir: output
+    filename_suffix: _1
     print:
-      merge: true
       enabled: true
-      printer: "Canon G3060"
-
+      merge: true
+      targets:
+        BrotherLaser:
+          printer: Brother HL-L2420DW Printer
+          weight: 1
+          copies: 1
   label:
-    # Last page only, rotated and cropped for 4x6 label
-    pages: "last"
-    debug: false
+    pages: last
+    output_dir: output
+    filename_suffix: _2
     transforms:
-      - rotate: 90
-      - crop:
-          lower_left: ["90mm", "33mm"]
-          upper_right: ["190mm", "183mm"]
-    output_dir: ./output
-    filename_suffix: "_2"
+    - rotate: 90
+    - crop:
+        lower_left:
+        - 90mm
+        - 33mm
+        upper_right:
+        - 190mm
+        - 183mm
+    - size:
+        width: 100mm
+        height: 150mm
+        fit: stretch
     print:
-      merge: true
       enabled: true
-      printer: "PL80E"
+      merge: true
+      targets:
+        default:
+          printer: PL80E
+          weight: 1
+          copies: 1
