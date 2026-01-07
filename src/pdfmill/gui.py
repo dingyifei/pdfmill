@@ -357,12 +357,15 @@ class PrintTargetDialog(tk.Toplevel):
         ttk.Button(btn_frame, text="OK", command=self._ok).pack(side="right", padx=5)
         ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(side="right")
 
-        # Load existing
+        # Load existing or set defaults
         if target:
             self.printer_var.set(target.printer)
             self.weight_var.set(target.weight)
             self.copies_var.set(target.copies)
             self.args_var.set(", ".join(target.args))
+        elif len(printers) == 1:
+            # New target with single printer: auto-select it
+            self.printer_var.set(printers[0])
 
     def _ok(self):
         name = self.name_var.get().strip()
@@ -544,7 +547,15 @@ class OutputProfileEditor(ttk.Frame):
 
     def _add_target(self):
         self._refresh_printers()
-        dlg = PrintTargetDialog(self, self.printers)
+        # Generate default name based on existing targets
+        if not self.print_targets:
+            default_name = "default"
+        else:
+            i = 2
+            while f"target_{i}" in self.print_targets:
+                i += 1
+            default_name = f"target_{i}"
+        dlg = PrintTargetDialog(self, self.printers, name=default_name)
         self.wait_window(dlg)
         if dlg.result and dlg.result_name:
             self.print_targets[dlg.result_name] = dlg.result
@@ -570,6 +581,12 @@ class OutputProfileEditor(ttk.Frame):
         if sel:
             name = list(self.print_targets.keys())[sel[0]]
             del self.print_targets[name]
+            # If only 1 target remains, rename it to "default"
+            if len(self.print_targets) == 1:
+                old_name = list(self.print_targets.keys())[0]
+                if old_name != "default":
+                    target = self.print_targets.pop(old_name)
+                    self.print_targets["default"] = target
             self._refresh_targets()
 
     def load(self, name: str, profile: OutputProfile):
