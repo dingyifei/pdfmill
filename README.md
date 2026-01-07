@@ -6,6 +6,8 @@ A configurable PDF processing pipeline for splitting, transforming, and printing
 
 Currently, supports only windows
 
+<img src="docs/resources/outputs.png" width="400">
+
 ## Features
 
 - **YAML Configuration**: Define processing pipelines in simple config files
