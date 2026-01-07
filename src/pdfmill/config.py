@@ -1,5 +1,6 @@
 """Configuration loading and validation for pdfmill."""
 
+import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,17 @@ import yaml
 
 class ConfigError(Exception):
     """Raised when configuration is invalid."""
+
+
+def _parse_args(args: list) -> list[str]:
+    """Parse args list, splitting any items that contain spaces."""
+    result = []
+    for arg in args:
+        if isinstance(arg, str) and ' ' in arg:
+            result.extend(shlex.split(arg))
+        else:
+            result.append(str(arg))
+    return result
 
 
 @dataclass
@@ -172,7 +184,7 @@ def parse_output_profile(name: str, data: dict[str, Any]) -> OutputProfile:
                     printer=t.get("printer", ""),
                     weight=t.get("weight", 1),
                     copies=t.get("copies", 1),
-                    args=t.get("args", []),
+                    args=_parse_args(t.get("args", [])),
                 )
         elif p.get("printer"):
             # Legacy single-printer format -> convert to target
@@ -180,7 +192,7 @@ def parse_output_profile(name: str, data: dict[str, Any]) -> OutputProfile:
                 printer=p.get("printer", ""),
                 weight=1,
                 copies=p.get("copies", 1),
-                args=p.get("args", []),
+                args=_parse_args(p.get("args", [])),
             )
 
         print_config = PrintConfig(
