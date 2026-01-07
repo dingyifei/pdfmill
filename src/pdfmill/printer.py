@@ -264,7 +264,7 @@ def print_pdf(
 
     if sumatra_path is None:
         raise PrinterError(
-            "SumatraPDF.exe not found. Run 'pdfp install' to download it, "
+            "SumatraPDF.exe not found. Run 'pdfm install' to download it, "
             "or set PDFPIPE_SUMATRA_PATH environment variable."
         )
 

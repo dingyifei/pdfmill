@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pdfmill"
-version = "0.1.1"
+version = "0.1.2"
 description = "Configurable PDF processing pipeline for splitting, transforming, and printing PDFs"
 readme = "README.md"
 license = "MIT"
@@ -43,7 +43,7 @@ ocr = [
 ]
 
 [project.scripts]
-pdfp = "pdfmill.cli:main"
+pdfm = "pdfmill.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pdfmill"]
@@ -62,9 +62,9 @@ markers = [
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.coverage.run]
-source = ["src/pdfmill"]
+source = ["pdfmill"]
 branch = true
-omit = ["*/tests/*"]
+omit = ["*/tests/*", "*/gui.py"]
 
 [tool.coverage.report]
 exclude_lines = [

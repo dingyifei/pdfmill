@@ -23,30 +23,30 @@ Currently, supports only windows
 
 ```sh
 # Clone and install in development mode
-git clone https://github.com/your-repo/pdfpipe.git
-cd pdfpipe
+git clone https://github.com/dingyifei/pdfmill.git
+cd pdfmill
 pip install -e .
 
-# SumatraPDF.exe will be automatically installed
+# SumatraPDF.exe will be automatically downloaded on first use
 ```
 
 ## Quick Start
 
 ```sh
 # List available printers
-pdfp --list-printers
+pdfm --list-printers
 
 # Process PDFs with a config file
-pdfp -c configs/label_packing.yaml -i ./input -o ./output
+pdfm -c configs/label_packing.yaml -i ./input -o ./output
 
 # Process a single file
-pdfp -c configs/label_packing.yaml -i document.pdf
+pdfm -c configs/label_packing.yaml -i document.pdf
 
 # Dry run (see what would happen)
-pdfp -c configs/label_packing.yaml -i ./input --dry-run
+pdfm -c configs/label_packing.yaml -i ./input --dry-run
 
 # Validate a config file
-pdfp -c configs/label_packing.yaml --validate
+pdfm -c configs/label_packing.yaml --validate
 ```
 
 ## Configuration

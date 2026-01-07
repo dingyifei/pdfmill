@@ -1,6 +1,6 @@
 # TODO
 
-Features and improvements planned for pdfpipe.
+Features and improvements planned for pdfmill.
 
 ## Core Processing
 - [x] YAML configuration file support
@@ -70,7 +70,7 @@ Features and improvements planned for pdfpipe.
 ## Package & Distribution
 - [x] Pip-installable package structure
 - [x] `pyproject.toml` with modern Python packaging
-- [x] Entry point for `pdfp` CLI command
+- [x] Entry point for `pdfm` CLI command
 - [x] Type hints throughout
 - [x] Unit tests
 - [ ] Publish to PyPI

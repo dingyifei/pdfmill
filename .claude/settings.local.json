@@ -2,8 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(mkdir:*)",
-      "Bash(pdfp:*)",
-      "Bash(pdfp --list-printers:*)",
+      "Bash(pdfm:*)",
+      "Bash(pdfm --list-printers:*)",
       "WebSearch",
       "Bash(pip install:*)",
       "Bash(python:*)",

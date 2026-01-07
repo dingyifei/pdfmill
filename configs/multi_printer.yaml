@@ -5,7 +5,7 @@
 # pages across multiple printers based on their speed (ppm)
 #
 # Usage:
-#   pdfp -c configs/multi_printer.yaml -i ./input -o ./output
+#   pdfm -c configs/multi_printer.yaml -i ./input -o ./output
 
 version: 1
 

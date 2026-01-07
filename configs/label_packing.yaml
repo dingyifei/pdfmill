@@ -2,7 +2,7 @@
 # Replicates the original print_labels_and_packing_sheets.py workflow
 #
 # Usage:
-#   pdfp -c configs/label_packing.yaml -i ./input -o ./output
+#   pdfm -c configs/label_packing.yaml -i ./input -o ./output
 
 version: 1
 
