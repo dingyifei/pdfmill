@@ -460,7 +460,6 @@ class OutputProfileEditor(ttk.Frame):
         row.pack(fill="x")
         ttk.Checkbutton(row, text="Enabled", variable=self.print_enabled_var).pack(side="left")
         ttk.Checkbutton(row, text="Merge PDFs before printing", variable=self.print_merge_var).pack(side="left", padx=10)
-        ttk.Button(row, text="Refresh Printers", command=self._refresh_printers).pack(side="right")
 
         row = ttk.Frame(pf)
         row.pack(fill="x", pady=2)
@@ -544,6 +543,7 @@ class OutputProfileEditor(ttk.Frame):
             self.target_list.insert(tk.END, f"{name}: {t.printer} (w={t.weight}, c={t.copies})")
 
     def _add_target(self):
+        self._refresh_printers()
         dlg = PrintTargetDialog(self, self.printers)
         self.wait_window(dlg)
         if dlg.result and dlg.result_name:
@@ -554,6 +554,7 @@ class OutputProfileEditor(ttk.Frame):
         sel = self.target_list.curselection()
         if not sel:
             return
+        self._refresh_printers()
         name = list(self.print_targets.keys())[sel[0]]
         target = self.print_targets[name]
         dlg = PrintTargetDialog(self, self.printers, name, target)
