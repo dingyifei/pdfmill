@@ -7,7 +7,7 @@ from pypdf import PdfReader, PdfWriter
 
 from pdfmill.config import Config, ConfigError, FilterConfig, OutputProfile, PrintTarget, Transform
 from pdfmill.selector import select_pages, PageSelectionError
-from pdfmill.transforms import rotate_page, crop_page, resize_page, TransformError
+from pdfmill.transforms import rotate_page, crop_page, resize_page, stamp_page, TransformError
 from pdfmill.printer import print_pdf, PrinterError
 
 
@@ -212,6 +212,8 @@ def _get_transform_description(transform: Transform) -> str:
     elif transform.type == "size" and transform.size:
         size = transform.size
         return f"size_{size.fit}"
+    elif transform.type == "stamp" and transform.stamp:
+        return "stamp"
     return transform.type
 
 
@@ -311,6 +313,27 @@ def apply_transforms(
                     print(f"    [dry-run] Resize page {i + 1} to {size.width} x {size.height} ({size.fit})")
                 else:
                     resize_page(page, size.width, size.height, size.fit)
+
+        elif transform.type == "stamp" and transform.stamp:
+            stamp = transform.stamp
+            total_pages = len(pages)
+            for i, page in enumerate(pages):
+                if dry_run:
+                    print(f"    [dry-run] Stamp page {i + 1}: '{stamp.text}' at {stamp.position}")
+                else:
+                    stamp_page(
+                        page,
+                        text=stamp.text,
+                        position=stamp.position,
+                        x=stamp.x,
+                        y=stamp.y,
+                        font_size=stamp.font_size,
+                        font_name=stamp.font_name,
+                        margin=stamp.margin,
+                        page_num=i + 1,
+                        total_pages=total_pages,
+                        datetime_format=stamp.datetime_format,
+                    )
 
         # Save after each transform if debug enabled
         if debug and not dry_run and debug_output_dir:

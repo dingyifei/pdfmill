@@ -2,9 +2,10 @@
 
 import io
 import re
+from datetime import datetime
 from typing import Literal
 
-from pypdf import PageObject, Transformation
+from pypdf import PageObject, PdfReader, Transformation
 
 
 class TransformError(Exception):
@@ -338,5 +339,200 @@ def resize_page(
         page.mediabox.upper_right = (target_width, target_height)
     else:
         raise TransformError(f"Unknown fit mode: {fit}")
+
+    return page
+
+
+# Valid position presets for stamp transform
+STAMP_POSITIONS = {"top-left", "top-right", "bottom-left", "bottom-right", "center", "custom"}
+
+
+def _create_text_overlay(
+    text: str,
+    width: float,
+    height: float,
+    x: float,
+    y: float,
+    font_name: str,
+    font_size: int,
+) -> bytes:
+    """
+    Create a PDF page with text overlay using reportlab.
+
+    Args:
+        text: Text to render
+        width: Page width in points
+        height: Page height in points
+        x: X position in points
+        y: Y position in points
+        font_name: Font name (PDF standard fonts)
+        font_size: Font size in points
+
+    Returns:
+        PDF bytes containing the text overlay
+    """
+    try:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import letter
+    except ImportError:
+        raise TransformError(
+            "reportlab is required for stamp transform. Install with: pip install reportlab"
+        )
+
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=(width, height))
+    c.setFont(font_name, font_size)
+    c.drawString(x, y, text)
+    c.save()
+    buffer.seek(0)
+    return buffer.read()
+
+
+def _calculate_stamp_position(
+    position: str,
+    page_width: float,
+    page_height: float,
+    text: str,
+    font_size: int,
+    margin: float,
+    custom_x: float = 0,
+    custom_y: float = 0,
+) -> tuple[float, float]:
+    """
+    Calculate x, y coordinates for stamp based on position preset.
+
+    Args:
+        position: Position preset or "custom"
+        page_width: Page width in points
+        page_height: Page height in points
+        text: Text to stamp (for width estimation)
+        font_size: Font size in points
+        margin: Margin from edge in points
+        custom_x: Custom X coordinate (used when position="custom")
+        custom_y: Custom Y coordinate (used when position="custom")
+
+    Returns:
+        (x, y) coordinates in points
+    """
+    # Estimate text width (approximately 0.5 * font_size per character for Helvetica)
+    text_width = len(text) * font_size * 0.5
+    text_height = font_size
+
+    if position == "custom":
+        return custom_x, custom_y
+    elif position == "top-left":
+        return margin, page_height - margin - text_height
+    elif position == "top-right":
+        return page_width - margin - text_width, page_height - margin - text_height
+    elif position == "bottom-left":
+        return margin, margin
+    elif position == "bottom-right":
+        return page_width - margin - text_width, margin
+    elif position == "center":
+        return (page_width - text_width) / 2, (page_height - text_height) / 2
+    else:
+        raise TransformError(f"Unknown stamp position: {position}. Valid options: {STAMP_POSITIONS}")
+
+
+def _format_stamp_text(
+    text: str,
+    page_num: int,
+    total_pages: int,
+    datetime_format: str,
+) -> str:
+    """
+    Replace placeholders in stamp text.
+
+    Args:
+        text: Text with placeholders
+        page_num: Current page number (1-indexed)
+        total_pages: Total number of pages
+        datetime_format: strftime format for datetime
+
+    Returns:
+        Formatted text with placeholders replaced
+    """
+    now = datetime.now()
+
+    result = text
+    result = result.replace("{page}", str(page_num))
+    result = result.replace("{total}", str(total_pages))
+    result = result.replace("{datetime}", now.strftime(datetime_format))
+    result = result.replace("{date}", now.strftime("%Y-%m-%d"))
+    result = result.replace("{time}", now.strftime("%H:%M:%S"))
+
+    return result
+
+
+def stamp_page(
+    page: PageObject,
+    text: str,
+    position: str = "bottom-right",
+    x: float | str = 0,
+    y: float | str = 0,
+    font_size: int = 10,
+    font_name: str = "Helvetica",
+    margin: float | str = 10,
+    page_num: int = 1,
+    total_pages: int = 1,
+    datetime_format: str = "%Y-%m-%d %H:%M:%S",
+) -> PageObject:
+    """
+    Add a text stamp/overlay to a page.
+
+    Supports placeholders:
+      - {page}: Current page number (1-indexed)
+      - {total}: Total page count
+      - {datetime}: Current datetime
+      - {date}: Current date
+      - {time}: Current time
+
+    Args:
+        page: The page to stamp
+        text: Text to stamp (with placeholder support)
+        position: Position preset or "custom"
+        x: X coordinate (used when position="custom")
+        y: Y coordinate (used when position="custom")
+        font_size: Font size in points
+        font_name: Font name (PDF standard font)
+        margin: Margin from edge for preset positions
+        page_num: Current page number (1-indexed)
+        total_pages: Total number of pages
+        datetime_format: strftime format for {datetime} placeholder
+
+    Returns:
+        The stamped page (mutates in place and returns)
+    """
+    if position not in STAMP_POSITIONS:
+        raise TransformError(f"Unknown stamp position: {position}. Valid options: {STAMP_POSITIONS}")
+
+    # Parse coordinates and margin
+    margin_pts = _parse_coordinate(margin)
+    x_pts = _parse_coordinate(x) if position == "custom" else 0
+    y_pts = _parse_coordinate(y) if position == "custom" else 0
+
+    # Get page dimensions
+    page_width, page_height = get_page_dimensions(page)
+
+    # Format text with placeholders
+    formatted_text = _format_stamp_text(text, page_num, total_pages, datetime_format)
+
+    # Calculate position
+    stamp_x, stamp_y = _calculate_stamp_position(
+        position, page_width, page_height,
+        formatted_text, font_size, margin_pts,
+        x_pts, y_pts
+    )
+
+    # Create overlay PDF
+    overlay_bytes = _create_text_overlay(
+        formatted_text, page_width, page_height,
+        stamp_x, stamp_y, font_name, font_size
+    )
+
+    # Merge overlay onto page
+    overlay_reader = PdfReader(io.BytesIO(overlay_bytes))
+    overlay_page = overlay_reader.pages[0]
+    page.merge_page(overlay_page)
 
     return page

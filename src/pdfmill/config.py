@@ -66,12 +66,38 @@ class RotateTransform:
 
 
 @dataclass
+class StampTransform:
+    """Stamp transformation configuration for adding text overlays.
+
+    Supports placeholders in text:
+      - {page}: Current page number (1-indexed)
+      - {total}: Total page count
+      - {datetime}: Current datetime (format controlled by datetime_format)
+      - {date}: Current date only
+      - {time}: Current time only
+
+    Position can be a preset string or custom coordinates:
+      - Presets: "top-left", "top-right", "bottom-left", "bottom-right", "center"
+      - Custom: Use x/y coordinates with units (e.g., "10mm", "0.5in")
+    """
+    text: str = "{page}/{total}"  # Text with placeholders
+    position: str = "bottom-right"  # Preset or "custom"
+    x: str | float = "10mm"  # X coordinate (used when position="custom")
+    y: str | float = "10mm"  # Y coordinate (used when position="custom")
+    font_size: int = 10
+    font_name: str = "Helvetica"  # PDF standard font
+    margin: str | float = "10mm"  # Margin from edge for preset positions
+    datetime_format: str = "%Y-%m-%d %H:%M:%S"  # strftime format
+
+
+@dataclass
 class Transform:
     """A single transformation step."""
-    type: str  # "rotate", "crop", "size"
+    type: str  # "rotate", "crop", "size", "stamp"
     rotate: RotateTransform | None = None
     crop: CropTransform | None = None
     size: SizeTransform | None = None
+    stamp: StampTransform | None = None
 
 
 @dataclass
@@ -158,6 +184,29 @@ def parse_transform(transform_data: dict[str, Any]) -> Transform:
                 fit=size_val.get("fit", "contain"),
             ),
         )
+    elif "stamp" in transform_data:
+        stamp_val = transform_data["stamp"]
+        if isinstance(stamp_val, str):
+            # Simple stamp: just text
+            return Transform(
+                type="stamp",
+                stamp=StampTransform(text=stamp_val),
+            )
+        elif isinstance(stamp_val, dict):
+            # Complex stamp with options
+            return Transform(
+                type="stamp",
+                stamp=StampTransform(
+                    text=stamp_val.get("text", "{page}/{total}"),
+                    position=stamp_val.get("position", "bottom-right"),
+                    x=stamp_val.get("x", "10mm"),
+                    y=stamp_val.get("y", "10mm"),
+                    font_size=stamp_val.get("font_size", 10),
+                    font_name=stamp_val.get("font_name", "Helvetica"),
+                    margin=stamp_val.get("margin", "10mm"),
+                    datetime_format=stamp_val.get("datetime_format", "%Y-%m-%d %H:%M:%S"),
+                ),
+            )
 
     raise ConfigError(f"Unknown transform type: {transform_data}")
 

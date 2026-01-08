@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`pdfmill` - A pip-installable Python package for configurable PDF processing. Splits multi-page PDFs, applies transformations (rotate, crop, resize), and prints to different printers via SumatraPDF. Configured via YAML files.
+`pdfmill` - A pip-installable Python package for configurable PDF processing. Splits multi-page PDFs, applies transformations (rotate, crop, resize, stamp), and prints to different printers via SumatraPDF. Configured via YAML files.
 
 ## Setup
 
@@ -16,6 +16,10 @@ pip install -e .
 ```
 
 **Dependencies**: pypdf, PyYAML, pywin32 (Windows only), SumatraPDF (portable exe)
+
+**Optional dependencies**:
+- `pip install pdfmill[stamp]` - For stamp transform (adds reportlab)
+- `pip install pdfmill[ocr]` - For auto-rotation via OCR (adds pymupdf, pytesseract, Pillow)
 
 ## Commands
 
@@ -50,7 +54,7 @@ src/pdfmill/
 - **cli.py** - Parses args, dispatches to processor or utility commands
 - **config.py** - Loads YAML, validates structure, returns typed `Config` dataclass
 - **selector.py** - Converts page specs (`"last"`, `"1-3"`, `[-1]`) to 0-indexed page list
-- **transforms.py** - Applies rotate/crop/resize to pypdf page objects
+- **transforms.py** - Applies rotate/crop/resize/stamp to pypdf page objects
 - **printer.py** - Finds SumatraPDF, sends print jobs with pass-through args
 - **processor.py** - Orchestrates: load config → get files → select pages → transform → write → print
 
@@ -115,6 +119,41 @@ Crop and resize support unit strings: `mm`, `in`, `pt`, `cm` (72 pt = 1 inch)
     lower_left: [72, 144]
     upper_right: [288, 432]
 ```
+
+## Stamp Transform
+
+Add page numbers, timestamps, or custom text to PDFs. Requires `pip install pdfmill[stamp]`.
+
+```yaml
+transforms:
+  # Simple: page numbers in bottom-right
+  - stamp: "{page}/{total}"
+
+  # Full configuration
+  - stamp:
+      text: "Page {page} of {total}"    # Text with placeholders
+      position: bottom-right             # top-left, top-right, bottom-left, bottom-right, center, custom
+      font_size: 10
+      font_name: Helvetica               # PDF standard fonts
+      margin: "10mm"                     # Margin from edge (for preset positions)
+      datetime_format: "%Y-%m-%d %H:%M:%S"
+
+  # Custom position
+  - stamp:
+      text: "{datetime}"
+      position: custom
+      x: "50mm"
+      y: "20mm"
+```
+
+**Placeholders**:
+- `{page}` - Current page number (1-indexed)
+- `{total}` - Total page count
+- `{datetime}` - Current datetime (uses `datetime_format`)
+- `{date}` - Current date (YYYY-MM-DD)
+- `{time}` - Current time (HH:MM:SS)
+
+**Position presets**: `top-left`, `top-right`, `bottom-left`, `bottom-right`, `center`, `custom`
 
 ## Key Constants
 
