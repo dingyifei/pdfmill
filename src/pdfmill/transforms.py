@@ -1,6 +1,5 @@
 """PDF transformation operations for pdfmill."""
 
-import io
 import re
 from typing import Literal
 
@@ -29,33 +28,33 @@ def detect_page_orientation(pdf_path: str, page_num: int = 0) -> int:
         TransformError: If OCR dependencies are not installed or detection fails
     """
     try:
-        import fitz  # pymupdf
+        from pdf2image import convert_from_path
     except ImportError:
         raise TransformError(
-            "pymupdf is required for auto rotation. Install with: pip install pymupdf"
+            "pdf2image is required for auto rotation. Install with: pip install pdf2image"
         )
 
     try:
         import pytesseract
-        from PIL import Image
     except ImportError:
         raise TransformError(
-            "pytesseract and Pillow are required for auto rotation. "
-            "Install with: pip install pytesseract Pillow"
+            "pytesseract is required for auto rotation. "
+            "Install with: pip install pytesseract"
         )
 
     try:
-        # Render PDF page to image
-        doc = fitz.open(pdf_path)
-        page = doc[page_num]
-        # Render at 150 DPI for good OCR accuracy without being too slow
-        mat = fitz.Matrix(150 / 72, 150 / 72)
-        pix = page.get_pixmap(matrix=mat)
-        img_data = pix.tobytes("png")
-        doc.close()
+        # Render PDF page to image at 150 DPI for good OCR accuracy
+        images = convert_from_path(
+            pdf_path,
+            first_page=page_num + 1,  # pdf2image uses 1-indexed pages
+            last_page=page_num + 1,
+            dpi=150,
+        )
 
-        # Convert to PIL Image
-        image = Image.open(io.BytesIO(img_data))
+        if not images:
+            raise TransformError(f"Failed to render page {page_num} from {pdf_path}")
+
+        image = images[0]
 
         # Use Tesseract OSD to detect orientation
         osd = pytesseract.image_to_osd(image, output_type=pytesseract.Output.DICT)
