@@ -444,6 +444,31 @@ class TestCalculateStampPosition:
             _calculate_stamp_position("invalid", 612, 792, "test", 12, 10)
 
 
+def _has_reportlab():
+    """Check if reportlab is installed."""
+    try:
+        from reportlab.pdfgen import canvas
+        return True
+    except ImportError:
+        return False
+
+
+def _create_minimal_pdf_bytes():
+    """Create minimal PDF bytes for testing."""
+    try:
+        from reportlab.pdfgen import canvas
+        import io
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=(612, 792))
+        c.drawString(100, 100, "test")
+        c.save()
+        buffer.seek(0)
+        return buffer.read()
+    except ImportError:
+        # Return a minimal PDF-like bytes if reportlab not available
+        return b"%PDF-1.4\n1 0 obj\n<</Type/Page>>\nendobj\ntrailer\n<</Root 1 0 R>>\n%%EOF"
+
+
 class TestStampPage:
     """Test stamp page transformation."""
 
@@ -488,26 +513,114 @@ class TestStampPage:
                 assert result is mock_page
 
 
-def _has_reportlab():
-    """Check if reportlab is installed."""
-    try:
-        from reportlab.pdfgen import canvas
-        return True
-    except ImportError:
-        return False
+@pytest.mark.skipif(not _has_reportlab(), reason="reportlab not installed")
+class TestStampIntegration:
+    """Integration tests for stamp transform with real PDFs."""
 
+    def test_stamp_real_pdf(self, temp_pdf):
+        """Test stamping a real PDF file."""
+        from pypdf import PdfReader, PdfWriter
 
-def _create_minimal_pdf_bytes():
-    """Create minimal PDF bytes for testing."""
-    try:
-        from reportlab.pdfgen import canvas
-        import io
-        buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=(612, 792))
-        c.drawString(100, 100, "test")
-        c.save()
-        buffer.seek(0)
-        return buffer.read()
-    except ImportError:
-        # Return a minimal PDF-like bytes if reportlab not available
-        return b"%PDF-1.4\n1 0 obj\n<</Type/Page>>\nendobj\ntrailer\n<</Root 1 0 R>>\n%%EOF"
+        reader = PdfReader(temp_pdf)
+        page = reader.pages[0]
+
+        # Apply stamp
+        stamp_page(
+            page,
+            text="1/1",
+            position="bottom-right",
+            font_size=12,
+            margin="10mm",
+            page_num=1,
+            total_pages=1,
+        )
+
+        # Write to verify no errors
+        writer = PdfWriter()
+        writer.add_page(page)
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+            writer.write(f)
+            output_path = f.name
+
+        # Verify output is valid PDF
+        output_reader = PdfReader(output_path)
+        assert len(output_reader.pages) == 1
+
+        # Cleanup
+        import os
+        os.unlink(output_path)
+
+    def test_stamp_multi_page_pdf(self, temp_multi_page_pdf):
+        """Test stamping multiple pages with correct page numbers."""
+        from pypdf import PdfReader, PdfWriter
+
+        reader = PdfReader(temp_multi_page_pdf)
+        total = len(reader.pages)
+
+        writer = PdfWriter()
+        for i, page in enumerate(reader.pages):
+            stamp_page(
+                page,
+                text="{page}/{total}",
+                position="bottom-right",
+                page_num=i + 1,
+                total_pages=total,
+            )
+            writer.add_page(page)
+
+        # Write and verify
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+            writer.write(f)
+            output_path = f.name
+
+        output_reader = PdfReader(output_path)
+        assert len(output_reader.pages) == 6
+
+        # Cleanup
+        import os
+        os.unlink(output_path)
+
+    def test_stamp_all_positions(self, temp_pdf):
+        """Test all position presets work without error."""
+        from pypdf import PdfReader
+
+        positions = ["top-left", "top-right", "bottom-left", "bottom-right", "center"]
+
+        for position in positions:
+            reader = PdfReader(temp_pdf)
+            page = reader.pages[0]
+            # Should not raise
+            stamp_page(page, text="Test", position=position)
+
+    def test_stamp_custom_position(self, temp_pdf):
+        """Test custom position with x/y coordinates."""
+        from pypdf import PdfReader
+
+        reader = PdfReader(temp_pdf)
+        page = reader.pages[0]
+
+        # Should not raise
+        stamp_page(
+            page,
+            text="Custom",
+            position="custom",
+            x="50mm",
+            y="100mm",
+        )
+
+    def test_stamp_with_datetime_placeholder(self, temp_pdf):
+        """Test datetime placeholder formatting."""
+        from pypdf import PdfReader
+
+        reader = PdfReader(temp_pdf)
+        page = reader.pages[0]
+
+        # Should not raise
+        stamp_page(
+            page,
+            text="{datetime}",
+            position="bottom-right",
+            datetime_format="%Y-%m-%d",
+        )
