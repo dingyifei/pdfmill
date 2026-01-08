@@ -10,6 +10,7 @@ from pdfmill.transforms import (
     rotate_page,
     crop_page,
     resize_page,
+    render_page,
     detect_page_orientation,
     TransformError,
     UNIT_TO_POINTS,
@@ -336,3 +337,66 @@ class TestDetectPageOrientation:
             mock_detect.return_value = 0
             result = mock_detect("test.pdf", 0)
             assert result == 0
+
+
+class TestRenderPage:
+    """Test page rasterization."""
+
+    def test_missing_pdf2image_raises(self):
+        """Test that missing pdf2image raises TransformError."""
+        mock_page = MagicMock()
+        with patch.dict("sys.modules", {"pdf2image": None}):
+            with patch("pdfmill.transforms.render_page") as mock_render:
+                mock_render.side_effect = TransformError(
+                    "pdf2image is required for render transform"
+                )
+                with pytest.raises(TransformError, match="pdf2image is required"):
+                    mock_render(mock_page, 150)
+
+    def test_missing_pillow_raises(self):
+        """Test that missing Pillow raises TransformError."""
+        mock_page = MagicMock()
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.side_effect = TransformError(
+                "Pillow is required for render transform"
+            )
+            with pytest.raises(TransformError, match="Pillow is required"):
+                mock_render(mock_page, 150)
+
+    def test_render_returns_page_object(self):
+        """Test that render_page returns a PageObject."""
+        mock_page = MagicMock()
+        mock_result_page = MagicMock()
+
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.return_value = mock_result_page
+            result = mock_render(mock_page, 300)
+            assert result is mock_result_page
+
+    def test_render_default_dpi(self):
+        """Test that render_page accepts default DPI."""
+        mock_page = MagicMock()
+        mock_result_page = MagicMock()
+
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.return_value = mock_result_page
+            result = mock_render(mock_page)
+            mock_render.assert_called_once_with(mock_page)
+
+    def test_render_custom_dpi(self):
+        """Test that render_page accepts custom DPI."""
+        mock_page = MagicMock()
+        mock_result_page = MagicMock()
+
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.return_value = mock_result_page
+            result = mock_render(mock_page, dpi=600)
+            mock_render.assert_called_once_with(mock_page, dpi=600)
+
+    def test_render_failed_raises(self):
+        """Test that render failure raises TransformError."""
+        mock_page = MagicMock()
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.side_effect = TransformError("Failed to render page to image")
+            with pytest.raises(TransformError, match="Failed to render"):
+                mock_render(mock_page, 150)
