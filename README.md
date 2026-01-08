@@ -12,7 +12,7 @@ Currently, supports only windows
 
 - **YAML Configuration**: Define processing pipelines in simple config files
 - **Page Selection**: Select pages by index, range, or pattern (`first`, `last`, `odd`, `even`)
-- **Transformations**: Rotate, crop, and resize pages with precise control
+- **Transformations**: Rotate, crop, resize, and stamp pages with precise control
 - **Multi-Output**: Split one PDF into multiple outputs with different settings
 - **Batch Processing**: Process single files or entire directories
 - **Input Filtering**: Filter PDFs by filename pattern or text content keywords
@@ -149,7 +149,31 @@ transforms:
       width: 100mm   # supports: mm, in, pt, cm
       height: 150mm
       fit: contain   # contain, cover, stretch
+
+  # Add page numbers or timestamps (requires: pip install pdfmill[stamp])
+  - stamp: "{page}/{total}"   # simple format
+
+  - stamp:                     # full configuration
+      text: "Page {page} of {total}"
+      position: bottom-right   # top-left, top-right, bottom-left, bottom-right, center, custom
+      font_size: 10
+      margin: "10mm"
+
+  - stamp:                     # custom position
+      text: "{datetime}"
+      position: custom
+      x: "50mm"
+      y: "20mm"
 ```
+
+**Stamp Placeholders**:
+| Placeholder | Description |
+|-------------|-------------|
+| `{page}` | Current page number (1-indexed) |
+| `{total}` | Total page count |
+| `{datetime}` | Current datetime (format: `YYYY-MM-DD HH:MM:SS`) |
+| `{date}` | Current date (`YYYY-MM-DD`) |
+| `{time}` | Current time (`HH:MM:SS`) |
 
 ### Debug Mode
 
