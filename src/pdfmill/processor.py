@@ -274,6 +274,10 @@ def apply_transforms(
         )
 
     for step_num, transform in enumerate(transforms, start=1):
+        # Skip disabled transforms
+        if not transform.enabled:
+            continue
+
         step_desc = _get_transform_description(transform)
 
         if transform.type == "rotate" and transform.rotate:
@@ -457,6 +461,11 @@ def process(
         print(f"\nProcessing: {pdf_path.name}")
 
         for profile_name, profile in config.outputs.items():
+            # Skip disabled profiles
+            if not profile.enabled:
+                print(f"  Skipping disabled profile: {profile_name}")
+                continue
+
             try:
                 # Determine output directory
                 profile_output_dir = output_dir if output_dir else profile.output_dir

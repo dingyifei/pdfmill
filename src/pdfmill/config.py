@@ -72,12 +72,14 @@ class Transform:
     rotate: RotateTransform | None = None
     crop: CropTransform | None = None
     size: SizeTransform | None = None
+    enabled: bool = True  # Set to False to skip this transform
 
 
 @dataclass
 class OutputProfile:
     """Configuration for a single output profile."""
     pages: str | list[int]  # Page selection spec
+    enabled: bool = True  # Set to False to skip this profile
     output_dir: Path = Path("./output")
     filename_prefix: str = ""
     filename_suffix: str = ""
@@ -122,6 +124,8 @@ class Config:
 
 def parse_transform(transform_data: dict[str, Any]) -> Transform:
     """Parse a single transform from config data."""
+    enabled = transform_data.get("enabled", True)
+
     if "rotate" in transform_data:
         rotate_val = transform_data["rotate"]
         if isinstance(rotate_val, (int, str)):
@@ -129,6 +133,7 @@ def parse_transform(transform_data: dict[str, Any]) -> Transform:
             return Transform(
                 type="rotate",
                 rotate=RotateTransform(angle=rotate_val),
+                enabled=enabled,
             )
         elif isinstance(rotate_val, dict):
             # Complex rotate with pages
@@ -138,6 +143,7 @@ def parse_transform(transform_data: dict[str, Any]) -> Transform:
                     angle=rotate_val.get("angle", 0),
                     pages=rotate_val.get("pages"),
                 ),
+                enabled=enabled,
             )
     elif "crop" in transform_data:
         crop_val = transform_data["crop"]
@@ -147,6 +153,7 @@ def parse_transform(transform_data: dict[str, Any]) -> Transform:
                 lower_left=tuple(crop_val.get("lower_left", [0, 0])),
                 upper_right=tuple(crop_val.get("upper_right", [612, 792])),
             ),
+            enabled=enabled,
         )
     elif "size" in transform_data:
         size_val = transform_data["size"]
@@ -157,6 +164,7 @@ def parse_transform(transform_data: dict[str, Any]) -> Transform:
                 height=size_val.get("height", ""),
                 fit=size_val.get("fit", "contain"),
             ),
+            enabled=enabled,
         )
 
     raise ConfigError(f"Unknown transform type: {transform_data}")
@@ -203,6 +211,7 @@ def parse_output_profile(name: str, data: dict[str, Any]) -> OutputProfile:
 
     return OutputProfile(
         pages=data["pages"],
+        enabled=data.get("enabled", True),
         output_dir=Path(data.get("output_dir", "./output")),
         filename_prefix=data.get("filename_prefix", ""),
         filename_suffix=data.get("filename_suffix", ""),
