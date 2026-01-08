@@ -170,13 +170,14 @@ class TransformDialog(tk.Toplevel):
     def __init__(self, parent, transform: Transform | None = None):
         super().__init__(parent)
         self.title("Edit Transform")
-        self.geometry("400x350")
+        self.geometry("400x380")
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
 
         self.result = None
 
+        self.enabled_var = tk.BooleanVar(value=True)
         self.type_var = tk.StringVar(value="rotate")
         self.angle_var = tk.StringVar(value="90")
         self.crop_ll_x_var = tk.StringVar(value="0")
@@ -186,6 +187,11 @@ class TransformDialog(tk.Toplevel):
         self.size_w_var = tk.StringVar(value="100mm")
         self.size_h_var = tk.StringVar(value="150mm")
         self.fit_var = tk.StringVar(value="contain")
+
+        # Enabled checkbox
+        row = ttk.Frame(self, padding=10)
+        row.pack(fill="x")
+        ttk.Checkbutton(row, text="Enabled", variable=self.enabled_var).pack(side="left")
 
         # Type selector
         row = ttk.Frame(self, padding=10)
@@ -257,6 +263,7 @@ class TransformDialog(tk.Toplevel):
             self.size_frame.pack(fill="x", padx=10, pady=5)
 
     def _load_transform(self, t: Transform):
+        self.enabled_var.set(t.enabled)
         self.type_var.set(t.type)
         if t.type == "rotate" and t.rotate:
             self.angle_var.set(str(t.rotate.angle))
@@ -272,13 +279,14 @@ class TransformDialog(tk.Toplevel):
 
     def _ok(self):
         t = self.type_var.get()
+        enabled = self.enabled_var.get()
         if t == "rotate":
             angle = self.angle_var.get()
             try:
                 angle = int(angle)
             except ValueError:
                 pass  # Keep as string (landscape/portrait/auto)
-            self.result = Transform(type="rotate", rotate=RotateTransform(angle=angle))
+            self.result = Transform(type="rotate", rotate=RotateTransform(angle=angle), enabled=enabled)
         elif t == "crop":
             self.result = Transform(
                 type="crop",
@@ -286,6 +294,7 @@ class TransformDialog(tk.Toplevel):
                     lower_left=(self.crop_ll_x_var.get(), self.crop_ll_y_var.get()),
                     upper_right=(self.crop_ur_x_var.get(), self.crop_ur_y_var.get()),
                 ),
+                enabled=enabled,
             )
         elif t == "size":
             self.result = Transform(
@@ -295,6 +304,7 @@ class TransformDialog(tk.Toplevel):
                     height=self.size_h_var.get(),
                     fit=self.fit_var.get(),
                 ),
+                enabled=enabled,
             )
         self.destroy()
 
@@ -395,6 +405,7 @@ class OutputProfileEditor(ttk.Frame):
         self.print_targets: dict[str, PrintTarget] = {}
 
         self.name_var = tk.StringVar()
+        self.enabled_var = tk.BooleanVar(value=True)
         self.pages_var = tk.StringVar(value="all")
         self.output_dir_var = tk.StringVar(value="./output")
         self.prefix_var = tk.StringVar()
@@ -404,11 +415,12 @@ class OutputProfileEditor(ttk.Frame):
         self.print_enabled_var = tk.BooleanVar(value=False)
         self.print_merge_var = tk.BooleanVar(value=False)
 
-        # Profile name
+        # Profile name and enabled
         row = ttk.Frame(self)
         row.pack(fill="x", pady=2)
         ttk.Label(row, text="Profile Name:").pack(side="left")
         ttk.Entry(row, textvariable=self.name_var, width=20).pack(side="left", padx=5)
+        ttk.Checkbutton(row, text="Enabled", variable=self.enabled_var).pack(side="left", padx=10)
 
         # Pages
         row = ttk.Frame(self)
@@ -488,12 +500,13 @@ class OutputProfileEditor(ttk.Frame):
             self._on_refresh_printers()
 
     def _transform_str(self, t: Transform) -> str:
+        disabled_prefix = "[DISABLED] " if not t.enabled else ""
         if t.type == "rotate" and t.rotate:
-            return f"rotate: {t.rotate.angle}"
+            return f"{disabled_prefix}rotate: {t.rotate.angle}"
         elif t.type == "crop" and t.crop:
-            return f"crop: {t.crop.lower_left} -> {t.crop.upper_right}"
+            return f"{disabled_prefix}crop: {t.crop.lower_left} -> {t.crop.upper_right}"
         elif t.type == "size" and t.size:
-            return f"size: {t.size.width} x {t.size.height} ({t.size.fit})"
+            return f"{disabled_prefix}size: {t.size.width} x {t.size.height} ({t.size.fit})"
         return str(t)
 
     def _refresh_transforms(self):
@@ -592,6 +605,7 @@ class OutputProfileEditor(ttk.Frame):
 
     def load(self, name: str, profile: OutputProfile):
         self.name_var.set(name)
+        self.enabled_var.set(profile.enabled)
         self.pages_var.set(str(profile.pages) if isinstance(profile.pages, str) else ",".join(map(str, profile.pages)))
         self.output_dir_var.set(str(profile.output_dir))
         self.prefix_var.set(profile.filename_prefix)
@@ -616,6 +630,7 @@ class OutputProfileEditor(ttk.Frame):
 
         return self.name_var.get(), OutputProfile(
             pages=pages,
+            enabled=self.enabled_var.get(),
             output_dir=Path(self.output_dir_var.get()),
             filename_prefix=self.prefix_var.get(),
             filename_suffix=self.suffix_var.get(),
@@ -660,8 +675,9 @@ class OutputsFrame(ttk.Frame):
 
     def _refresh_list(self):
         self.profile_list.delete(0, tk.END)
-        for name in self.profiles.keys():
-            self.profile_list.insert(tk.END, name)
+        for name, profile in self.profiles.items():
+            display_name = f"[DISABLED] {name}" if not profile.enabled else name
+            self.profile_list.insert(tk.END, display_name)
 
     def _save_current(self):
         if self.current_profile:
@@ -675,7 +691,9 @@ class OutputsFrame(ttk.Frame):
         sel = self.profile_list.curselection()
         if not sel:
             return
-        name = self.profile_list.get(sel[0])
+        display_name = self.profile_list.get(sel[0])
+        # Strip [DISABLED] prefix if present
+        name = display_name.replace("[DISABLED] ", "")
         if name == self.current_profile:
             return
         self._save_current()
@@ -700,7 +718,9 @@ class OutputsFrame(ttk.Frame):
     def _remove_profile(self):
         sel = self.profile_list.curselection()
         if sel:
-            name = self.profile_list.get(sel[0])
+            display_name = self.profile_list.get(sel[0])
+            # Strip [DISABLED] prefix if present
+            name = display_name.replace("[DISABLED] ", "")
             del self.profiles[name]
             self.current_profile = None
             self._refresh_list()
@@ -990,6 +1010,9 @@ class PdfMillApp(tk.Tk):
                 "pages": profile.pages,
                 "output_dir": str(profile.output_dir),
             }
+            # Only export enabled if False (True is default)
+            if not profile.enabled:
+                p["enabled"] = profile.enabled
             if profile.filename_prefix:
                 p["filename_prefix"] = profile.filename_prefix
             if profile.filename_suffix:
@@ -1002,23 +1025,25 @@ class PdfMillApp(tk.Tk):
             if profile.transforms:
                 p["transforms"] = []
                 for t in profile.transforms:
+                    transform_dict: dict[str, Any] = {}
                     if t.type == "rotate" and t.rotate:
-                        p["transforms"].append({"rotate": t.rotate.angle})
+                        transform_dict["rotate"] = t.rotate.angle
                     elif t.type == "crop" and t.crop:
-                        p["transforms"].append({
-                            "crop": {
-                                "lower_left": list(t.crop.lower_left),
-                                "upper_right": list(t.crop.upper_right),
-                            }
-                        })
+                        transform_dict["crop"] = {
+                            "lower_left": list(t.crop.lower_left),
+                            "upper_right": list(t.crop.upper_right),
+                        }
                     elif t.type == "size" and t.size:
-                        p["transforms"].append({
-                            "size": {
-                                "width": t.size.width,
-                                "height": t.size.height,
-                                "fit": t.size.fit,
-                            }
-                        })
+                        transform_dict["size"] = {
+                            "width": t.size.width,
+                            "height": t.size.height,
+                            "fit": t.size.fit,
+                        }
+                    # Only export enabled if False (True is default)
+                    if not t.enabled:
+                        transform_dict["enabled"] = t.enabled
+                    if transform_dict:
+                        p["transforms"].append(transform_dict)
 
             if profile.print.enabled or profile.print.targets:
                 p["print"] = {
