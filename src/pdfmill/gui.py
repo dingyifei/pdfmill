@@ -37,14 +37,15 @@ enable_high_dpi()
 from pdfmill.config import (
     Config, Settings, InputConfig, FilterConfig, OutputProfile,
     PrintConfig, PrintTarget, Transform, RotateTransform, CropTransform,
-    SizeTransform, load_config, ConfigError,
+    SizeTransform, SplitTransform, SplitRegion, CombineTransform,
+    CombineLayoutItem, load_config, ConfigError,
 )
 
 # Constants for dropdowns
 ON_ERROR_OPTIONS = ["continue", "stop"]
 SORT_OPTIONS = ["", "name_asc", "name_desc", "time_asc", "time_desc"]
 MATCH_OPTIONS = ["any", "all"]
-TRANSFORM_TYPES = ["rotate", "crop", "size"]
+TRANSFORM_TYPES = ["rotate", "crop", "size", "split", "combine"]
 ROTATE_ANGLES = ["0", "90", "180", "270", "landscape", "portrait", "auto"]
 FIT_MODES = ["contain", "cover", "stretch"]
 
@@ -170,8 +171,8 @@ class TransformDialog(tk.Toplevel):
     def __init__(self, parent, transform: Transform | None = None):
         super().__init__(parent)
         self.title("Edit Transform")
-        self.geometry("400x350")
-        self.resizable(False, False)
+        self.geometry("500x500")
+        self.resizable(True, True)
         self.transient(parent)
         self.grab_set()
 
@@ -186,6 +187,14 @@ class TransformDialog(tk.Toplevel):
         self.size_w_var = tk.StringVar(value="100mm")
         self.size_h_var = tk.StringVar(value="150mm")
         self.fit_var = tk.StringVar(value="contain")
+
+        # Split regions list
+        self.split_regions: list[SplitRegion] = []
+        # Combine layout list
+        self.combine_layout: list[CombineLayoutItem] = []
+        self.combine_page_w_var = tk.StringVar(value="8.5in")
+        self.combine_page_h_var = tk.StringVar(value="11in")
+        self.combine_pages_per_var = tk.IntVar(value=2)
 
         # Type selector
         row = ttk.Frame(self, padding=10)
@@ -231,6 +240,38 @@ class TransformDialog(tk.Toplevel):
         ttk.Label(row, text="Fit:").pack(side="left")
         ttk.Combobox(row, textvariable=self.fit_var, values=FIT_MODES, state="readonly", width=10).pack(side="left", padx=5)
 
+        # Split frame
+        self.split_frame = ttk.LabelFrame(self, text="Split Options", padding=10)
+        ttk.Label(self.split_frame, text="Regions (each becomes a separate page):").pack(anchor="w")
+        self.split_list = tk.Listbox(self.split_frame, height=5)
+        self.split_list.pack(fill="both", expand=True, pady=5)
+        btn_row = ttk.Frame(self.split_frame)
+        btn_row.pack(fill="x")
+        ttk.Button(btn_row, text="Add Region", command=self._add_split_region).pack(side="left", padx=2)
+        ttk.Button(btn_row, text="Edit Region", command=self._edit_split_region).pack(side="left", padx=2)
+        ttk.Button(btn_row, text="Remove", command=self._remove_split_region).pack(side="left", padx=2)
+
+        # Combine frame
+        self.combine_frame = ttk.LabelFrame(self, text="Combine Options", padding=10)
+        row = ttk.Frame(self.combine_frame)
+        row.pack(fill="x", pady=2)
+        ttk.Label(row, text="Output Page Size - Width:").pack(side="left")
+        ttk.Entry(row, textvariable=self.combine_page_w_var, width=8).pack(side="left", padx=5)
+        ttk.Label(row, text="Height:").pack(side="left")
+        ttk.Entry(row, textvariable=self.combine_page_h_var, width=8).pack(side="left", padx=5)
+        row = ttk.Frame(self.combine_frame)
+        row.pack(fill="x", pady=2)
+        ttk.Label(row, text="Pages per output:").pack(side="left")
+        ttk.Spinbox(row, textvariable=self.combine_pages_per_var, from_=1, to=16, width=5).pack(side="left", padx=5)
+        ttk.Label(self.combine_frame, text="Layout (where to place each input page):").pack(anchor="w", pady=(5, 0))
+        self.combine_list = tk.Listbox(self.combine_frame, height=5)
+        self.combine_list.pack(fill="both", expand=True, pady=5)
+        btn_row = ttk.Frame(self.combine_frame)
+        btn_row.pack(fill="x")
+        ttk.Button(btn_row, text="Add Placement", command=self._add_combine_item).pack(side="left", padx=2)
+        ttk.Button(btn_row, text="Edit Placement", command=self._edit_combine_item).pack(side="left", padx=2)
+        ttk.Button(btn_row, text="Remove", command=self._remove_combine_item).pack(side="left", padx=2)
+
         # Buttons
         btn_frame = ttk.Frame(self, padding=10)
         btn_frame.pack(fill="x", side="bottom")
@@ -247,6 +288,8 @@ class TransformDialog(tk.Toplevel):
         self.rotate_frame.pack_forget()
         self.crop_frame.pack_forget()
         self.size_frame.pack_forget()
+        self.split_frame.pack_forget()
+        self.combine_frame.pack_forget()
 
         t = self.type_var.get()
         if t == "rotate":
@@ -255,6 +298,68 @@ class TransformDialog(tk.Toplevel):
             self.crop_frame.pack(fill="x", padx=10, pady=5)
         elif t == "size":
             self.size_frame.pack(fill="x", padx=10, pady=5)
+        elif t == "split":
+            self.split_frame.pack(fill="both", expand=True, padx=10, pady=5)
+        elif t == "combine":
+            self.combine_frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+    def _refresh_split_list(self):
+        self.split_list.delete(0, tk.END)
+        for r in self.split_regions:
+            self.split_list.insert(tk.END, f"{r.lower_left} -> {r.upper_right}")
+
+    def _add_split_region(self):
+        dlg = RegionDialog(self)
+        self.wait_window(dlg)
+        if dlg.result:
+            self.split_regions.append(dlg.result)
+            self._refresh_split_list()
+
+    def _edit_split_region(self):
+        sel = self.split_list.curselection()
+        if not sel:
+            return
+        idx = sel[0]
+        dlg = RegionDialog(self, self.split_regions[idx])
+        self.wait_window(dlg)
+        if dlg.result:
+            self.split_regions[idx] = dlg.result
+            self._refresh_split_list()
+
+    def _remove_split_region(self):
+        sel = self.split_list.curselection()
+        if sel:
+            del self.split_regions[sel[0]]
+            self._refresh_split_list()
+
+    def _refresh_combine_list(self):
+        self.combine_list.delete(0, tk.END)
+        for item in self.combine_layout:
+            self.combine_list.insert(tk.END, f"Page {item.page}: pos={item.position}, scale={item.scale}")
+
+    def _add_combine_item(self):
+        dlg = CombineItemDialog(self)
+        self.wait_window(dlg)
+        if dlg.result:
+            self.combine_layout.append(dlg.result)
+            self._refresh_combine_list()
+
+    def _edit_combine_item(self):
+        sel = self.combine_list.curselection()
+        if not sel:
+            return
+        idx = sel[0]
+        dlg = CombineItemDialog(self, self.combine_layout[idx])
+        self.wait_window(dlg)
+        if dlg.result:
+            self.combine_layout[idx] = dlg.result
+            self._refresh_combine_list()
+
+    def _remove_combine_item(self):
+        sel = self.combine_list.curselection()
+        if sel:
+            del self.combine_layout[sel[0]]
+            self._refresh_combine_list()
 
     def _load_transform(self, t: Transform):
         self.type_var.set(t.type)
@@ -269,6 +374,15 @@ class TransformDialog(tk.Toplevel):
             self.size_w_var.set(t.size.width)
             self.size_h_var.set(t.size.height)
             self.fit_var.set(t.size.fit)
+        elif t.type == "split" and t.split:
+            self.split_regions = list(t.split.regions)
+            self._refresh_split_list()
+        elif t.type == "combine" and t.combine:
+            self.combine_page_w_var.set(t.combine.page_size[0])
+            self.combine_page_h_var.set(t.combine.page_size[1])
+            self.combine_pages_per_var.set(t.combine.pages_per_output)
+            self.combine_layout = list(t.combine.layout)
+            self._refresh_combine_list()
 
     def _ok(self):
         t = self.type_var.get()
@@ -296,6 +410,131 @@ class TransformDialog(tk.Toplevel):
                     fit=self.fit_var.get(),
                 ),
             )
+        elif t == "split":
+            self.result = Transform(
+                type="split",
+                split=SplitTransform(regions=list(self.split_regions)),
+            )
+        elif t == "combine":
+            self.result = Transform(
+                type="combine",
+                combine=CombineTransform(
+                    page_size=(self.combine_page_w_var.get(), self.combine_page_h_var.get()),
+                    layout=list(self.combine_layout),
+                    pages_per_output=self.combine_pages_per_var.get(),
+                ),
+            )
+        self.destroy()
+
+
+class RegionDialog(tk.Toplevel):
+    """Dialog for editing a split region."""
+
+    def __init__(self, parent, region: SplitRegion | None = None):
+        super().__init__(parent)
+        self.title("Edit Region")
+        self.geometry("350x200")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+
+        self.result = None
+
+        self.ll_x_var = tk.StringVar(value="0")
+        self.ll_y_var = tk.StringVar(value="0")
+        self.ur_x_var = tk.StringVar(value="4in")
+        self.ur_y_var = tk.StringVar(value="6in")
+
+        if region:
+            self.ll_x_var.set(str(region.lower_left[0]))
+            self.ll_y_var.set(str(region.lower_left[1]))
+            self.ur_x_var.set(str(region.upper_right[0]))
+            self.ur_y_var.set(str(region.upper_right[1]))
+
+        ttk.Label(self, text="Define the crop region (supports units: mm, in, pt, cm)").pack(pady=10, padx=10)
+
+        row = ttk.Frame(self, padding=5)
+        row.pack(fill="x", padx=10)
+        ttk.Label(row, text="Lower Left X:").pack(side="left")
+        ttk.Entry(row, textvariable=self.ll_x_var, width=10).pack(side="left", padx=5)
+        ttk.Label(row, text="Y:").pack(side="left")
+        ttk.Entry(row, textvariable=self.ll_y_var, width=10).pack(side="left", padx=5)
+
+        row = ttk.Frame(self, padding=5)
+        row.pack(fill="x", padx=10)
+        ttk.Label(row, text="Upper Right X:").pack(side="left")
+        ttk.Entry(row, textvariable=self.ur_x_var, width=10).pack(side="left", padx=5)
+        ttk.Label(row, text="Y:").pack(side="left")
+        ttk.Entry(row, textvariable=self.ur_y_var, width=10).pack(side="left", padx=5)
+
+        btn_frame = ttk.Frame(self, padding=10)
+        btn_frame.pack(fill="x", side="bottom")
+        ttk.Button(btn_frame, text="OK", command=self._ok).pack(side="right", padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(side="right")
+
+    def _ok(self):
+        self.result = SplitRegion(
+            lower_left=(self.ll_x_var.get(), self.ll_y_var.get()),
+            upper_right=(self.ur_x_var.get(), self.ur_y_var.get()),
+        )
+        self.destroy()
+
+
+class CombineItemDialog(tk.Toplevel):
+    """Dialog for editing a combine layout item."""
+
+    def __init__(self, parent, item: CombineLayoutItem | None = None):
+        super().__init__(parent)
+        self.title("Edit Placement")
+        self.geometry("400x220")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+
+        self.result = None
+
+        self.page_var = tk.IntVar(value=0)
+        self.pos_x_var = tk.StringVar(value="0")
+        self.pos_y_var = tk.StringVar(value="0")
+        self.scale_var = tk.DoubleVar(value=1.0)
+
+        if item:
+            self.page_var.set(item.page)
+            self.pos_x_var.set(str(item.position[0]))
+            self.pos_y_var.set(str(item.position[1]))
+            self.scale_var.set(item.scale)
+
+        ttk.Label(self, text="Define where to place an input page on the output").pack(pady=10, padx=10)
+
+        row = ttk.Frame(self, padding=5)
+        row.pack(fill="x", padx=10)
+        ttk.Label(row, text="Input Page (0-indexed):").pack(side="left")
+        ttk.Spinbox(row, textvariable=self.page_var, from_=0, to=15, width=5).pack(side="left", padx=5)
+
+        row = ttk.Frame(self, padding=5)
+        row.pack(fill="x", padx=10)
+        ttk.Label(row, text="Position X:").pack(side="left")
+        ttk.Entry(row, textvariable=self.pos_x_var, width=10).pack(side="left", padx=5)
+        ttk.Label(row, text="Y:").pack(side="left")
+        ttk.Entry(row, textvariable=self.pos_y_var, width=10).pack(side="left", padx=5)
+
+        row = ttk.Frame(self, padding=5)
+        row.pack(fill="x", padx=10)
+        ttk.Label(row, text="Scale:").pack(side="left")
+        ttk.Entry(row, textvariable=self.scale_var, width=8).pack(side="left", padx=5)
+        ttk.Label(row, text="(1.0 = 100%)").pack(side="left")
+
+        btn_frame = ttk.Frame(self, padding=10)
+        btn_frame.pack(fill="x", side="bottom")
+        ttk.Button(btn_frame, text="OK", command=self._ok).pack(side="right", padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(side="right")
+
+    def _ok(self):
+        self.result = CombineLayoutItem(
+            page=self.page_var.get(),
+            position=(self.pos_x_var.get(), self.pos_y_var.get()),
+            scale=self.scale_var.get(),
+        )
         self.destroy()
 
 
@@ -494,6 +733,11 @@ class OutputProfileEditor(ttk.Frame):
             return f"crop: {t.crop.lower_left} -> {t.crop.upper_right}"
         elif t.type == "size" and t.size:
             return f"size: {t.size.width} x {t.size.height} ({t.size.fit})"
+        elif t.type == "split" and t.split:
+            n = len(t.split.regions)
+            return f"split: {n} region(s)"
+        elif t.type == "combine" and t.combine:
+            return f"combine: {t.combine.pages_per_output} pages -> {t.combine.page_size}"
         return str(t)
 
     def _refresh_transforms(self):
@@ -1017,6 +1261,33 @@ class PdfMillApp(tk.Tk):
                                 "width": t.size.width,
                                 "height": t.size.height,
                                 "fit": t.size.fit,
+                            }
+                        })
+                    elif t.type == "split" and t.split:
+                        p["transforms"].append({
+                            "split": {
+                                "regions": [
+                                    {
+                                        "lower_left": list(r.lower_left),
+                                        "upper_right": list(r.upper_right),
+                                    }
+                                    for r in t.split.regions
+                                ]
+                            }
+                        })
+                    elif t.type == "combine" and t.combine:
+                        p["transforms"].append({
+                            "combine": {
+                                "page_size": list(t.combine.page_size),
+                                "pages_per_output": t.combine.pages_per_output,
+                                "layout": [
+                                    {
+                                        "page": item.page,
+                                        "position": list(item.position),
+                                        "scale": item.scale,
+                                    }
+                                    for item in t.combine.layout
+                                ]
                             }
                         })
 

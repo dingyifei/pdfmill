@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`pdfmill` - A pip-installable Python package for configurable PDF processing. Splits multi-page PDFs, applies transformations (rotate, crop, resize), and prints to different printers via SumatraPDF. Configured via YAML files.
+`pdfmill` - A pip-installable Python package for configurable PDF processing. Splits multi-page PDFs, applies transformations (rotate, crop, resize, split, combine), and prints to different printers via SumatraPDF. Configured via YAML files.
 
 ## Setup
 
@@ -50,7 +50,7 @@ src/pdfmill/
 - **cli.py** - Parses args, dispatches to processor or utility commands
 - **config.py** - Loads YAML, validates structure, returns typed `Config` dataclass
 - **selector.py** - Converts page specs (`"last"`, `"1-3"`, `[-1]`) to 0-indexed page list
-- **transforms.py** - Applies rotate/crop/resize to pypdf page objects
+- **transforms.py** - Applies rotate/crop/resize/split/combine to pypdf page objects
 - **printer.py** - Finds SumatraPDF, sends print jobs with pass-through args
 - **processor.py** - Orchestrates: load config → get files → select pages → transform → write → print
 
@@ -115,6 +115,42 @@ Crop and resize support unit strings: `mm`, `in`, `pt`, `cm` (72 pt = 1 inch)
     lower_left: [72, 144]
     upper_right: [288, 432]
 ```
+
+## Transforms
+
+### Split Transform
+
+Extracts multiple regions from each page, creating separate output pages. Useful for splitting label sheets or multi-up documents.
+
+```yaml
+- split:
+    regions:
+      - lower_left: ["0in", "3in"]
+        upper_right: ["4in", "6in"]
+      - lower_left: ["4in", "3in"]
+        upper_right: ["8in", "6in"]
+```
+
+Each input page produces N output pages (one per region).
+
+### Combine Transform
+
+Places multiple input pages onto a single output page. Useful for creating n-up layouts or booklets.
+
+```yaml
+- combine:
+    page_size: ["8.5in", "11in"]    # Output page dimensions
+    pages_per_output: 2              # Input pages consumed per output
+    layout:
+      - page: 0                      # First input page
+        position: ["0in", "5.5in"]   # Lower-left corner position
+        scale: 0.5                   # Scale factor (0.5 = 50%)
+      - page: 1                      # Second input page
+        position: ["0in", "0in"]
+        scale: 0.5
+```
+
+Input pages are batched by `pages_per_output`, and each batch produces one combined page.
 
 ## Key Constants
 

@@ -12,7 +12,9 @@ Currently, supports only windows
 
 - **YAML Configuration**: Define processing pipelines in simple config files
 - **Page Selection**: Select pages by index, range, or pattern (`first`, `last`, `odd`, `even`)
-- **Transformations**: Rotate, crop, and resize pages with precise control
+- **Transformations**: Rotate, crop, resize, split, and combine pages with precise control
+- **Split Transform**: Extract multiple regions from a page (e.g., split label sheets)
+- **Combine Transform**: Place multiple pages onto a single canvas (e.g., n-up layouts)
 - **Multi-Output**: Split one PDF into multiple outputs with different settings
 - **Batch Processing**: Process single files or entire directories
 - **Input Filtering**: Filter PDFs by filename pattern or text content keywords
@@ -149,6 +151,26 @@ transforms:
       width: 100mm   # supports: mm, in, pt, cm
       height: 150mm
       fit: contain   # contain, cover, stretch
+
+  # Split: extract multiple regions from each page (1 page -> N pages)
+  - split:
+      regions:
+        - lower_left: ["0in", "3in"]
+          upper_right: ["4in", "6in"]
+        - lower_left: ["4in", "3in"]
+          upper_right: ["8in", "6in"]
+
+  # Combine: place multiple pages onto one canvas (N pages -> 1 page)
+  - combine:
+      page_size: ["8.5in", "11in"]  # output page dimensions
+      pages_per_output: 2            # input pages consumed per output
+      layout:
+        - page: 0                    # first input page (0-indexed)
+          position: ["0in", "5.5in"] # lower-left corner position
+          scale: 0.5                 # scale factor (0.5 = 50%)
+        - page: 1
+          position: ["0in", "0in"]
+          scale: 0.5
 ```
 
 ### Debug Mode
