@@ -335,3 +335,130 @@ outputs:
 
         config = load_config(config_file)
         assert config.input.sort is None
+
+
+class TestEnabledField:
+    """Test enabled field for profiles and transforms."""
+
+    def test_transform_enabled_default_true(self):
+        """Transform enabled should default to True."""
+        t = parse_transform({"rotate": 90})
+        assert t.enabled is True
+
+    def test_transform_enabled_explicit_true(self):
+        """Transform with explicit enabled=True."""
+        t = parse_transform({"rotate": 90, "enabled": True})
+        assert t.enabled is True
+
+    def test_transform_enabled_false(self):
+        """Transform with enabled=False should be disabled."""
+        t = parse_transform({"rotate": 90, "enabled": False})
+        assert t.enabled is False
+
+    def test_crop_transform_enabled_false(self):
+        """Crop transform with enabled=False."""
+        t = parse_transform({
+            "crop": {"lower_left": [0, 0], "upper_right": [100, 100]},
+            "enabled": False
+        })
+        assert t.type == "crop"
+        assert t.enabled is False
+
+    def test_size_transform_enabled_false(self):
+        """Size transform with enabled=False."""
+        t = parse_transform({
+            "size": {"width": "4in", "height": "6in"},
+            "enabled": False
+        })
+        assert t.type == "size"
+        assert t.enabled is False
+
+    def test_profile_enabled_default_true(self):
+        """Profile enabled should default to True."""
+        profile = parse_output_profile("test", {"pages": "all"})
+        assert profile.enabled is True
+
+    def test_profile_enabled_explicit_true(self):
+        """Profile with explicit enabled=True."""
+        profile = parse_output_profile("test", {"pages": "all", "enabled": True})
+        assert profile.enabled is True
+
+    def test_profile_enabled_false(self):
+        """Profile with enabled=False should be disabled."""
+        profile = parse_output_profile("test", {"pages": "all", "enabled": False})
+        assert profile.enabled is False
+
+    def test_profile_with_disabled_transforms(self):
+        """Profile with some disabled transforms."""
+        data = {
+            "pages": "all",
+            "transforms": [
+                {"rotate": 90, "enabled": True},
+                {"rotate": 180, "enabled": False},
+                {"crop": {"lower_left": [0, 0], "upper_right": [100, 100]}},
+            ]
+        }
+        profile = parse_output_profile("test", data)
+        assert len(profile.transforms) == 3
+        assert profile.transforms[0].enabled is True
+        assert profile.transforms[1].enabled is False
+        assert profile.transforms[2].enabled is True  # default
+
+    def test_transform_dataclass_enabled_default(self):
+        """Transform dataclass enabled field defaults to True."""
+        t = Transform(type="rotate", rotate=RotateTransform(angle=90))
+        assert t.enabled is True
+
+    def test_transform_dataclass_enabled_false(self):
+        """Transform dataclass can be created with enabled=False."""
+        t = Transform(type="rotate", rotate=RotateTransform(angle=90), enabled=False)
+        assert t.enabled is False
+
+    def test_output_profile_dataclass_enabled_default(self):
+        """OutputProfile dataclass enabled field defaults to True."""
+        profile = OutputProfile(pages="all")
+        assert profile.enabled is True
+
+    def test_output_profile_dataclass_enabled_false(self):
+        """OutputProfile dataclass can be created with enabled=False."""
+        profile = OutputProfile(pages="all", enabled=False)
+        assert profile.enabled is False
+
+    def test_load_config_with_disabled_profile(self, tmp_path):
+        """Test loading a config file with a disabled profile."""
+        config_content = """
+version: 1
+outputs:
+  enabled_profile:
+    pages: all
+  disabled_profile:
+    enabled: false
+    pages: last
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        config = load_config(config_file)
+        assert config.outputs["enabled_profile"].enabled is True
+        assert config.outputs["disabled_profile"].enabled is False
+
+    def test_load_config_with_disabled_transform(self, tmp_path):
+        """Test loading a config file with a disabled transform."""
+        config_content = """
+version: 1
+outputs:
+  test:
+    pages: all
+    transforms:
+      - rotate: 90
+      - rotate: 180
+        enabled: false
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        config = load_config(config_file)
+        transforms = config.outputs["test"].transforms
+        assert len(transforms) == 2
+        assert transforms[0].enabled is True
+        assert transforms[1].enabled is False
