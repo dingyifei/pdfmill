@@ -7,7 +7,7 @@ from pypdf import PdfReader, PdfWriter
 
 from pdfmill.config import Config, ConfigError, FilterConfig, OutputProfile, PrintTarget, Transform
 from pdfmill.selector import select_pages, PageSelectionError
-from pdfmill.transforms import rotate_page, crop_page, resize_page, TransformError
+from pdfmill.transforms import rotate_page, crop_page, resize_page, render_page, TransformError
 from pdfmill.printer import print_pdf, PrinterError
 
 
@@ -212,6 +212,8 @@ def _get_transform_description(transform: Transform) -> str:
     elif transform.type == "size" and transform.size:
         size = transform.size
         return f"size_{size.fit}"
+    elif transform.type == "render" and transform.render:
+        return f"render_{transform.render.dpi}dpi"
     return transform.type
 
 
@@ -311,6 +313,15 @@ def apply_transforms(
                     print(f"    [dry-run] Resize page {i + 1} to {size.width} x {size.height} ({size.fit})")
                 else:
                     resize_page(page, size.width, size.height, size.fit)
+
+        elif transform.type == "render" and transform.render:
+            render = transform.render
+            for i, page in enumerate(pages):
+                if dry_run:
+                    print(f"    [dry-run] Render page {i + 1} at {render.dpi} DPI")
+                else:
+                    # render_page returns a new page, so we need to replace it
+                    pages[i] = render_page(page, render.dpi)
 
         # Save after each transform if debug enabled
         if debug and not dry_run and debug_output_dir:
