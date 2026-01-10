@@ -7,7 +7,7 @@ from pypdf import PdfReader, PdfWriter
 
 from pdfmill.config import Config, ConfigError, FilterConfig, OutputProfile, PrintTarget, Transform
 from pdfmill.selector import select_pages, PageSelectionError
-from pdfmill.transforms import rotate_page, crop_page, resize_page, render_page, TransformError
+from pdfmill.transforms import rotate_page, crop_page, resize_page, split_page, combine_pages, render_page, TransformError
 from pdfmill.printer import print_pdf, PrinterError
 
 
@@ -212,6 +212,12 @@ def _get_transform_description(transform: Transform) -> str:
     elif transform.type == "size" and transform.size:
         size = transform.size
         return f"size_{size.fit}"
+    elif transform.type == "split" and transform.split:
+        n = len(transform.split.regions)
+        return f"split{n}"
+    elif transform.type == "combine" and transform.combine:
+        n = transform.combine.pages_per_output
+        return f"combine{n}"
     elif transform.type == "render" and transform.render:
         return f"render_{transform.render.dpi}dpi"
     return transform.type
@@ -313,7 +319,42 @@ def apply_transforms(
                     print(f"    [dry-run] Resize page {i + 1} to {size.width} x {size.height} ({size.fit})")
                 else:
                     resize_page(page, size.width, size.height, size.fit)
+        elif transform.type == "split" and transform.split:
+            # Split: 1 page -> N pages (one per region)
+            split_cfg = transform.split
+            regions = [(r.lower_left, r.upper_right) for r in split_cfg.regions]
+            if dry_run:
+                print(f"    [dry-run] Split {len(pages)} page(s) into {len(regions)} regions each")
+                print(f"              Result: {len(pages) * len(regions)} pages")
+            else:
+                new_pages = []
+                for page in pages:
+                    new_pages.extend(split_page(page, regions))
+                pages = new_pages
 
+        elif transform.type == "combine" and transform.combine:
+            # Combine: N pages -> 1 page (batched)
+            combine_cfg = transform.combine
+            batch_size = combine_cfg.pages_per_output
+            layout = [
+                {
+                    "page": item.page,
+                    "position": item.position,
+                    "scale": item.scale,
+                }
+                for item in combine_cfg.layout
+            ]
+            if dry_run:
+                output_count = (len(pages) + batch_size - 1) // batch_size
+                print(f"    [dry-run] Combine {len(pages)} page(s) into {output_count} page(s)")
+                print(f"              ({batch_size} pages per output, size {combine_cfg.page_size})")
+            else:
+                new_pages = []
+                for i in range(0, len(pages), batch_size):
+                    batch = pages[i:i + batch_size]
+                    combined = combine_pages(batch, combine_cfg.page_size, layout)
+                    new_pages.append(combined)
+                pages = new_pages
         elif transform.type == "render" and transform.render:
             render = transform.render
             for i, page in enumerate(pages):

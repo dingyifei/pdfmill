@@ -14,6 +14,10 @@ from pdfmill.config import (
     RotateTransform,
     CropTransform,
     SizeTransform,
+    SplitTransform,
+    SplitRegion,
+    CombineTransform,
+    CombineLayoutItem,
     RenderTransform,
     OutputProfile,
     PrintConfig,
@@ -178,6 +182,72 @@ class TestParseTransform:
         with pytest.raises(ConfigError):
             parse_transform({})
 
+    def test_split_basic(self):
+        t = parse_transform({
+            "split": {
+                "regions": [
+                    {"lower_left": [0, 0], "upper_right": ["4in", "6in"]},
+                    {"lower_left": ["4in", 0], "upper_right": ["8in", "6in"]},
+                ]
+            }
+        })
+        assert t.type == "split"
+        assert t.split is not None
+        assert len(t.split.regions) == 2
+        assert t.split.regions[0].lower_left == (0, 0)
+        assert t.split.regions[0].upper_right == ("4in", "6in")
+        assert t.split.regions[1].lower_left == ("4in", 0)
+
+    def test_split_empty_regions(self):
+        t = parse_transform({"split": {"regions": []}})
+        assert t.type == "split"
+        assert t.split.regions == []
+
+    def test_split_region_defaults(self):
+        t = parse_transform({
+            "split": {
+                "regions": [{}]  # Empty region dict
+            }
+        })
+        assert t.split.regions[0].lower_left == (0, 0)
+        assert t.split.regions[0].upper_right == (612, 792)
+
+    def test_combine_basic(self):
+        t = parse_transform({
+            "combine": {
+                "page_size": ["8.5in", "11in"],
+                "pages_per_output": 2,
+                "layout": [
+                    {"page": 0, "position": ["0in", "5.5in"], "scale": 0.5},
+                    {"page": 1, "position": ["0in", "0in"], "scale": 0.5},
+                ]
+            }
+        })
+        assert t.type == "combine"
+        assert t.combine is not None
+        assert t.combine.page_size == ("8.5in", "11in")
+        assert t.combine.pages_per_output == 2
+        assert len(t.combine.layout) == 2
+        assert t.combine.layout[0].page == 0
+        assert t.combine.layout[0].position == ("0in", "5.5in")
+        assert t.combine.layout[0].scale == 0.5
+
+    def test_combine_defaults(self):
+        t = parse_transform({"combine": {}})
+        assert t.combine.page_size == ("8.5in", "11in")
+        assert t.combine.pages_per_output == 2
+        assert t.combine.layout == []
+
+    def test_combine_layout_item_defaults(self):
+        t = parse_transform({
+            "combine": {
+                "layout": [{}]  # Empty layout item
+            }
+        })
+        assert t.combine.layout[0].page == 0
+        assert t.combine.layout[0].position == (0, 0)
+        assert t.combine.layout[0].scale == 1.0
+
 
 class TestParseOutputProfile:
     """Test output profile parsing."""
@@ -275,6 +345,26 @@ class TestDataclasses:
         assert st.height == ""
         assert st.fit == "contain"
 
+    def test_split_region_defaults(self):
+        sr = SplitRegion()
+        assert sr.lower_left == (0, 0)
+        assert sr.upper_right == (612, 792)
+
+    def test_split_transform_defaults(self):
+        st = SplitTransform()
+        assert st.regions == []
+
+    def test_combine_layout_item_defaults(self):
+        cli = CombineLayoutItem()
+        assert cli.page == 0
+        assert cli.position == (0, 0)
+        assert cli.scale == 1.0
+
+    def test_combine_transform_defaults(self):
+        ct = CombineTransform()
+        assert ct.page_size == ("8.5in", "11in")
+        assert ct.layout == []
+        assert ct.pages_per_output == 2
     def test_render_transform_defaults(self):
         rt = RenderTransform()
         assert rt.dpi == 150

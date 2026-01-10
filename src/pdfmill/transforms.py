@@ -2,11 +2,12 @@
 
 import io
 import re
-import tempfile
+from copy import deepcopy
 from typing import Literal
 
 from pypdf import PageObject, PdfReader, PdfWriter, Transformation
-
+import tempfile
+from typing import Literal
 
 class TransformError(Exception):
     """Raised when a transformation fails."""
@@ -343,6 +344,102 @@ def resize_page(
     return page
 
 
+def split_page(
+    page: PageObject,
+    regions: list[tuple[tuple[float | str, float | str], tuple[float | str, float | str]]],
+) -> list[PageObject]:
+    """
+    Split a single page into multiple pages by extracting different regions.
+
+    Each region becomes a new page. This is useful for extracting multiple
+    labels or sections from a single source page.
+
+    Args:
+        page: The source page to split
+        regions: List of (lower_left, upper_right) coordinate tuples.
+                 Each tuple defines a crop region.
+
+    Returns:
+        List of new pages, one for each region
+
+    Example:
+        # Split a page with two labels side by side
+        regions = [
+            ((0, 0), ("4in", "6in")),      # Left label
+            (("4in", 0), ("8in", "6in")),  # Right label
+        ]
+        pages = split_page(source_page, regions)
+    """
+    result_pages = []
+
+    for lower_left, upper_right in regions:
+        # Create a deep copy of the page for each region
+        page_copy = deepcopy(page)
+        # Apply crop to extract the region
+        crop_page(page_copy, lower_left, upper_right)
+        result_pages.append(page_copy)
+
+    return result_pages
+
+
+def combine_pages(
+    pages: list[PageObject],
+    page_size: tuple[str, str],
+    layout: list[dict],
+) -> PageObject:
+    """
+    Combine multiple pages onto a single output page.
+
+    Places input pages at specified positions on a new canvas.
+    Useful for creating n-up layouts, booklets, or combining labels.
+
+    Args:
+        pages: List of source pages to combine
+        page_size: (width, height) of the output page, with units (e.g., "8.5in", "11in")
+        layout: List of placement specs, each with:
+            - page: 0-indexed input page number
+            - position: (x, y) lower-left corner position with units
+            - scale: Optional scale factor (default 1.0)
+
+    Returns:
+        A new page with all input pages placed according to layout
+
+    Example:
+        # Create 2-up layout (two pages side by side)
+        layout = [
+            {"page": 0, "position": ("0in", "0in"), "scale": 0.5},
+            {"page": 1, "position": ("4.25in", "0in"), "scale": 0.5},
+        ]
+        combined = combine_pages(pages, ("8.5in", "11in"), layout)
+    """
+    # Parse output page dimensions
+    width = parse_dimension(page_size[0])
+    height = parse_dimension(page_size[1])
+
+    # Create a blank output page
+    output_page = PageObject.create_blank_page(width=width, height=height)
+
+    for item in layout:
+        page_idx = item.get("page", 0)
+        if page_idx >= len(pages):
+            continue  # Skip if page doesn't exist
+
+        source_page = pages[page_idx]
+        position = item.get("position", (0, 0))
+        scale = item.get("scale", 1.0)
+
+        # Parse position coordinates
+        x = _parse_coordinate(position[0])
+        y = _parse_coordinate(position[1])
+
+        # Build transformation: scale then translate
+        # Note: transformations are applied in reverse order in the matrix
+        transform = Transformation().scale(sx=scale, sy=scale).translate(tx=x, ty=y)
+
+        # Merge the source page onto the output with the transformation
+        output_page.merge_transformed_page(source_page, transform)
+
+    return output_page
 def render_page(page: PageObject, dpi: int = 150) -> PageObject:
     """
     Rasterize a page to an image and re-embed it as a new PDF page.
