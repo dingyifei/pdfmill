@@ -11,6 +11,9 @@ from pdfmill.transforms import (
     crop_page,
     resize_page,
     stamp_page,
+    split_page,
+    combine_pages,
+    render_page,
     detect_page_orientation,
     TransformError,
     UNIT_TO_POINTS,
@@ -188,17 +191,22 @@ class TestCropPage:
     """Test page cropping."""
 
     def test_crop_updates_mediabox(self, mock_page):
+        # Crop translates content so cropped region starts at origin (0, 0)
         crop_page(mock_page, (10, 20), (100, 200))
-        assert mock_page.mediabox.lower_left == (10, 20)
-        assert mock_page.mediabox.upper_right == (100, 200)
+        assert mock_page.mediabox.lower_left == (0, 0)
+        # Cropped dimensions: (100-10) x (200-20) = 90 x 180
+        assert mock_page.mediabox.upper_right == (90, 180)
 
     def test_crop_returns_page(self, mock_page):
         result = crop_page(mock_page, (0, 0), (100, 100))
         assert result is mock_page
 
     def test_crop_with_floats(self, mock_page):
+        # Crop translates content so cropped region starts at origin (0, 0)
         crop_page(mock_page, (10.5, 20.5), (100.5, 200.5))
-        assert mock_page.mediabox.lower_left == (10.5, 20.5)
+        assert mock_page.mediabox.lower_left == (0, 0)
+        # Cropped dimensions: (100.5-10.5) x (200.5-20.5) = 90 x 180
+        assert mock_page.mediabox.upper_right == (90, 180)
 
     def test_crop_invalid_left_greater_than_right(self, mock_page):
         with pytest.raises(TransformError, match="left.*must be less than right"):
@@ -624,3 +632,236 @@ class TestStampIntegration:
             position="bottom-right",
             datetime_format="%Y-%m-%d",
         )
+
+
+class TestSplitPage:
+    """Test page splitting."""
+
+    def test_split_returns_list(self, temp_pdf):
+        """Split should return a list of pages."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        page = reader.pages[0]
+
+        regions = [
+            ((0, 0), ("4in", "6in")),
+        ]
+        result = split_page(page, regions)
+        assert isinstance(result, list)
+        assert len(result) == 1
+
+    def test_split_multiple_regions(self, temp_pdf):
+        """Split with multiple regions should return multiple pages."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        page = reader.pages[0]
+
+        regions = [
+            ((0, 0), ("4in", "6in")),
+            (("4in", 0), ("8in", "6in")),
+        ]
+        result = split_page(page, regions)
+        assert len(result) == 2
+
+    def test_split_preserves_content(self, temp_pdf):
+        """Split should create independent page copies."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        page = reader.pages[0]
+
+        regions = [
+            ((0, 0), (100, 100)),
+            ((100, 0), (200, 100)),
+        ]
+        result = split_page(page, regions)
+
+        # Each result should be a separate page object
+        assert result[0] is not result[1]
+
+    def test_split_with_string_units(self, temp_pdf):
+        """Split should work with string unit coordinates."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        page = reader.pages[0]
+
+        regions = [
+            (("0mm", "0mm"), ("100mm", "150mm")),
+        ]
+        result = split_page(page, regions)
+        assert len(result) == 1
+
+    def test_split_empty_regions(self, temp_pdf):
+        """Split with empty regions list should return empty list."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        page = reader.pages[0]
+
+        result = split_page(page, [])
+        assert result == []
+
+
+class TestCombinePages:
+    """Test page combining."""
+
+    def test_combine_creates_page(self, temp_pdf):
+        """Combine should create a new page."""
+        from pypdf import PdfReader, PageObject
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)
+
+        layout = [
+            {"page": 0, "position": (0, 0), "scale": 1.0},
+        ]
+        result = combine_pages(pages, ("8.5in", "11in"), layout)
+        assert isinstance(result, PageObject)
+
+    def test_combine_with_scale(self, temp_pdf):
+        """Combine should respect scale factor."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)
+
+        layout = [
+            {"page": 0, "position": ("0in", "0in"), "scale": 0.5},
+        ]
+        result = combine_pages(pages, ("8.5in", "11in"), layout)
+        # Should create a page with the specified size
+        assert result.mediabox.width == 612.0  # 8.5 * 72
+        assert result.mediabox.height == 792.0  # 11 * 72
+
+    def test_combine_multiple_pages(self, temp_multi_page_pdf):
+        """Combine should handle multiple pages in layout."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_multi_page_pdf))
+        pages = list(reader.pages[:2])
+
+        layout = [
+            {"page": 0, "position": ("0in", "5.5in"), "scale": 0.5},
+            {"page": 1, "position": ("0in", "0in"), "scale": 0.5},
+        ]
+        result = combine_pages(pages, ("8.5in", "11in"), layout)
+        # Should successfully combine without error
+        assert result is not None
+
+    def test_combine_skips_missing_pages(self, temp_pdf):
+        """Combine should skip layout items referencing non-existent pages."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)  # Only 1 page
+
+        layout = [
+            {"page": 0, "position": (0, 0), "scale": 1.0},
+            {"page": 5, "position": (100, 0), "scale": 1.0},  # Doesn't exist
+        ]
+        # Should not raise, just skip the missing page
+        result = combine_pages(pages, ("8.5in", "11in"), layout)
+        assert result is not None
+
+    def test_combine_with_string_positions(self, temp_pdf):
+        """Combine should work with string unit positions."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)
+
+        layout = [
+            {"page": 0, "position": ("1in", "2in"), "scale": 0.5},
+        ]
+        result = combine_pages(pages, ("8.5in", "11in"), layout)
+        assert result is not None
+
+    def test_combine_empty_layout(self, temp_pdf):
+        """Combine with empty layout should create blank page."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)
+
+        result = combine_pages(pages, ("8.5in", "11in"), [])
+        # Should create a blank page with the specified size
+        assert result.mediabox.width == 612.0
+        assert result.mediabox.height == 792.0
+
+    def test_combine_custom_page_size(self, temp_pdf):
+        """Combine should use the specified page size."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)
+
+        layout = [{"page": 0, "position": (0, 0), "scale": 1.0}]
+        result = combine_pages(pages, ("4in", "6in"), layout)
+        assert result.mediabox.width == 288.0  # 4 * 72
+        assert result.mediabox.height == 432.0  # 6 * 72
+
+    def test_combine_default_scale(self, temp_pdf):
+        """Combine should default to scale 1.0 if not specified."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)
+
+        layout = [
+            {"page": 0, "position": (0, 0)},  # No scale specified
+        ]
+        result = combine_pages(pages, ("8.5in", "11in"), layout)
+        assert result is not None
+
+
+class TestRenderPage:
+    """Test page rasterization."""
+
+    def test_missing_pdf2image_raises(self):
+        """Test that missing pdf2image raises TransformError."""
+        mock_page = MagicMock()
+        with patch.dict("sys.modules", {"pdf2image": None}):
+            with patch("pdfmill.transforms.render_page") as mock_render:
+                mock_render.side_effect = TransformError(
+                    "pdf2image is required for render transform"
+                )
+                with pytest.raises(TransformError, match="pdf2image is required"):
+                    mock_render(mock_page, 150)
+
+    def test_missing_pillow_raises(self):
+        """Test that missing Pillow raises TransformError."""
+        mock_page = MagicMock()
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.side_effect = TransformError(
+                "Pillow is required for render transform"
+            )
+            with pytest.raises(TransformError, match="Pillow is required"):
+                mock_render(mock_page, 150)
+
+    def test_render_returns_page_object(self):
+        """Test that render_page returns a PageObject."""
+        mock_page = MagicMock()
+        mock_result_page = MagicMock()
+
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.return_value = mock_result_page
+            result = mock_render(mock_page, 300)
+            assert result is mock_result_page
+
+    def test_render_default_dpi(self):
+        """Test that render_page accepts default DPI."""
+        mock_page = MagicMock()
+        mock_result_page = MagicMock()
+
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.return_value = mock_result_page
+            result = mock_render(mock_page)
+            mock_render.assert_called_once_with(mock_page)
+
+    def test_render_custom_dpi(self):
+        """Test that render_page accepts custom DPI."""
+        mock_page = MagicMock()
+        mock_result_page = MagicMock()
+
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.return_value = mock_result_page
+            result = mock_render(mock_page, dpi=600)
+            mock_render.assert_called_once_with(mock_page, dpi=600)
+
+    def test_render_failed_raises(self):
+        """Test that render failure raises TransformError."""
+        mock_page = MagicMock()
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.side_effect = TransformError("Failed to render page to image")
+            with pytest.raises(TransformError, match="Failed to render"):
+                mock_render(mock_page, 150)

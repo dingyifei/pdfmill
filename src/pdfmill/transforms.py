@@ -2,10 +2,12 @@
 
 import io
 import re
+import tempfile
+from copy import deepcopy
 from datetime import datetime
 from typing import Literal
 
-from pypdf import PageObject, PdfReader, Transformation
+from pypdf import PageObject, PdfReader, PdfWriter, Transformation
 
 
 class TransformError(Exception):
@@ -30,33 +32,33 @@ def detect_page_orientation(pdf_path: str, page_num: int = 0) -> int:
         TransformError: If OCR dependencies are not installed or detection fails
     """
     try:
-        import fitz  # pymupdf
+        from pdf2image import convert_from_path
     except ImportError:
         raise TransformError(
-            "pymupdf is required for auto rotation. Install with: pip install pymupdf"
+            "pdf2image is required for auto rotation. Install with: pip install pdf2image"
         )
 
     try:
         import pytesseract
-        from PIL import Image
     except ImportError:
         raise TransformError(
-            "pytesseract and Pillow are required for auto rotation. "
-            "Install with: pip install pytesseract Pillow"
+            "pytesseract is required for auto rotation. "
+            "Install with: pip install pytesseract"
         )
 
     try:
-        # Render PDF page to image
-        doc = fitz.open(pdf_path)
-        page = doc[page_num]
-        # Render at 150 DPI for good OCR accuracy without being too slow
-        mat = fitz.Matrix(150 / 72, 150 / 72)
-        pix = page.get_pixmap(matrix=mat)
-        img_data = pix.tobytes("png")
-        doc.close()
+        # Render PDF page to image at 150 DPI for good OCR accuracy
+        images = convert_from_path(
+            pdf_path,
+            first_page=page_num + 1,  # pdf2image uses 1-indexed pages
+            last_page=page_num + 1,
+            dpi=150,
+        )
 
-        # Convert to PIL Image
-        image = Image.open(io.BytesIO(img_data))
+        if not images:
+            raise TransformError(f"Failed to render page {page_num} from {pdf_path}")
+
+        image = images[0]
 
         # Use Tesseract OSD to detect orientation
         osd = pytesseract.image_to_osd(image, output_type=pytesseract.Output.DICT)
@@ -536,3 +538,161 @@ def stamp_page(
     page.merge_page(overlay_page)
 
     return page
+
+
+def split_page(
+    page: PageObject,
+    regions: list[tuple[tuple[float | str, float | str], tuple[float | str, float | str]]],
+) -> list[PageObject]:
+    """
+    Split a single page into multiple pages by extracting different regions.
+
+    Each region becomes a new page. This is useful for extracting multiple
+    labels or sections from a single source page.
+
+    Args:
+        page: The source page to split
+        regions: List of (lower_left, upper_right) coordinate tuples.
+                 Each tuple defines a crop region.
+
+    Returns:
+        List of new pages, one for each region
+
+    Example:
+        # Split a page with two labels side by side
+        regions = [
+            ((0, 0), ("4in", "6in")),      # Left label
+            (("4in", 0), ("8in", "6in")),  # Right label
+        ]
+        pages = split_page(source_page, regions)
+    """
+    result_pages = []
+
+    for lower_left, upper_right in regions:
+        # Create a deep copy of the page for each region
+        page_copy = deepcopy(page)
+        # Apply crop to extract the region
+        crop_page(page_copy, lower_left, upper_right)
+        result_pages.append(page_copy)
+
+    return result_pages
+
+
+def combine_pages(
+    pages: list[PageObject],
+    page_size: tuple[str, str],
+    layout: list[dict],
+) -> PageObject:
+    """
+    Combine multiple pages onto a single output page.
+
+    Places input pages at specified positions on a new canvas.
+    Useful for creating n-up layouts, booklets, or combining labels.
+
+    Args:
+        pages: List of source pages to combine
+        page_size: (width, height) of the output page, with units (e.g., "8.5in", "11in")
+        layout: List of placement specs, each with:
+            - page: 0-indexed input page number
+            - position: (x, y) lower-left corner position with units
+            - scale: Optional scale factor (default 1.0)
+
+    Returns:
+        A new page with all input pages placed according to layout
+
+    Example:
+        # Create 2-up layout (two pages side by side)
+        layout = [
+            {"page": 0, "position": ("0in", "0in"), "scale": 0.5},
+            {"page": 1, "position": ("4.25in", "0in"), "scale": 0.5},
+        ]
+        combined = combine_pages(pages, ("8.5in", "11in"), layout)
+    """
+    # Parse output page dimensions
+    width = parse_dimension(page_size[0])
+    height = parse_dimension(page_size[1])
+
+    # Create a blank output page
+    output_page = PageObject.create_blank_page(width=width, height=height)
+
+    for item in layout:
+        page_idx = item.get("page", 0)
+        if page_idx >= len(pages):
+            continue  # Skip if page doesn't exist
+
+        source_page = pages[page_idx]
+        position = item.get("position", (0, 0))
+        scale = item.get("scale", 1.0)
+
+        # Parse position coordinates
+        x = _parse_coordinate(position[0])
+        y = _parse_coordinate(position[1])
+
+        # Build transformation: scale then translate
+        # Note: transformations are applied in reverse order in the matrix
+        transform = Transformation().scale(sx=scale, sy=scale).translate(tx=x, ty=y)
+
+        # Merge the source page onto the output with the transformation
+        output_page.merge_transformed_page(source_page, transform)
+
+    return output_page
+
+
+def render_page(page: PageObject, dpi: int = 150) -> PageObject:
+    """
+    Rasterize a page to an image and re-embed it as a new PDF page.
+
+    This permanently removes any content outside the visible area (mediabox)
+    and flattens all layers, annotations, and transparency. The result is
+    a single image embedded in a PDF page.
+
+    Args:
+        page: The page to render
+        dpi: Resolution for rasterization (default 150)
+
+    Returns:
+        A new PageObject containing the rasterized image
+
+    Raises:
+        TransformError: If pdf2image or Pillow are not installed
+    """
+    try:
+        from pdf2image import convert_from_bytes
+    except ImportError:
+        raise TransformError(
+            "pdf2image is required for render transform. "
+            "Install with: pip install pdf2image"
+        )
+
+    try:
+        from PIL import Image
+    except ImportError:
+        raise TransformError(
+            "Pillow is required for render transform. "
+            "Install with: pip install Pillow"
+        )
+
+    # Write the single page to a temporary PDF in memory
+    writer = PdfWriter()
+    writer.add_page(page)
+
+    pdf_bytes = io.BytesIO()
+    writer.write(pdf_bytes)
+    pdf_bytes.seek(0)
+
+    # Render to image using pdf2image
+    images = convert_from_bytes(pdf_bytes.read(), dpi=dpi)
+
+    if not images:
+        raise TransformError("Failed to render page to image")
+
+    image = images[0]
+
+    # Save the image as a PDF in memory
+    img_pdf_bytes = io.BytesIO()
+    image.save(img_pdf_bytes, format="PDF", resolution=dpi)
+    img_pdf_bytes.seek(0)
+
+    # Read the image PDF and return the page
+    reader = PdfReader(img_pdf_bytes)
+    return reader.pages[0]

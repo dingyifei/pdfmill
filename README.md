@@ -12,7 +12,10 @@ Currently, supports only windows
 
 - **YAML Configuration**: Define processing pipelines in simple config files
 - **Page Selection**: Select pages by index, range, or pattern (`first`, `last`, `odd`, `even`)
-- **Transformations**: Rotate, crop, resize, and stamp pages with precise control
+- **Transformations**: Rotate, crop, resize, stamp, split, and combine pages with precise control
+- **Stamp Transform**: Add page numbers, timestamps, or custom text overlays
+- **Split Transform**: Extract multiple regions from a page (e.g., split label sheets)
+- **Combine Transform**: Place multiple pages onto a single canvas (e.g., n-up layouts)
 - **Multi-Output**: Split one PDF into multiple outputs with different settings
 - **Batch Processing**: Process single files or entire directories
 - **Input Filtering**: Filter PDFs by filename pattern or text content keywords
@@ -164,6 +167,31 @@ transforms:
       position: custom
       x: "50mm"
       y: "20mm"
+
+  # Split: extract multiple regions from each page (1 page -> N pages)
+  - split:
+      regions:
+        - lower_left: ["0in", "3in"]
+          upper_right: ["4in", "6in"]
+        - lower_left: ["4in", "3in"]
+          upper_right: ["8in", "6in"]
+
+  # Combine: place multiple pages onto one canvas (N pages -> 1 page)
+  - combine:
+      page_size: ["8.5in", "11in"]  # output page dimensions
+      pages_per_output: 2            # input pages consumed per output
+      layout:
+        - page: 0                    # first input page (0-indexed)
+          position: ["0in", "5.5in"] # lower-left corner position
+          scale: 0.5                 # scale factor (0.5 = 50%)
+        - page: 1
+          position: ["0in", "0in"]
+          scale: 0.5
+
+  # Render (rasterize) - converts page to image
+  - render: 300           # DPI value
+  - render: {dpi: 200}    # Dict form
+  - render: true          # Default 150 DPI
 ```
 
 **Stamp Placeholders**:
@@ -174,6 +202,8 @@ transforms:
 | `{datetime}` | Current datetime (format: `YYYY-MM-DD HH:MM:SS`) |
 | `{date}` | Current date (`YYYY-MM-DD`) |
 | `{time}` | Current time (`HH:MM:SS`) |
+
+**Note on render transform:** The render transform rasterizes pages to images and re-embeds them. This permanently removes any content outside the visible area (useful after cropping to truly remove hidden content) and flattens all layers, annotations, and transparency. Requires `poppler` to be installed on the system.
 
 ### Debug Mode
 
