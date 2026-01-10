@@ -184,17 +184,22 @@ class TestCropPage:
     """Test page cropping."""
 
     def test_crop_updates_mediabox(self, mock_page):
+        # Crop translates content so cropped region starts at origin (0, 0)
         crop_page(mock_page, (10, 20), (100, 200))
-        assert mock_page.mediabox.lower_left == (10, 20)
-        assert mock_page.mediabox.upper_right == (100, 200)
+        assert mock_page.mediabox.lower_left == (0, 0)
+        # Cropped dimensions: (100-10) x (200-20) = 90 x 180
+        assert mock_page.mediabox.upper_right == (90, 180)
 
     def test_crop_returns_page(self, mock_page):
         result = crop_page(mock_page, (0, 0), (100, 100))
         assert result is mock_page
 
     def test_crop_with_floats(self, mock_page):
+        # Crop translates content so cropped region starts at origin (0, 0)
         crop_page(mock_page, (10.5, 20.5), (100.5, 200.5))
-        assert mock_page.mediabox.lower_left == (10.5, 20.5)
+        assert mock_page.mediabox.lower_left == (0, 0)
+        # Cropped dimensions: (100.5-10.5) x (200.5-20.5) = 90 x 180
+        assert mock_page.mediabox.upper_right == (90, 180)
 
     def test_crop_invalid_left_greater_than_right(self, mock_page):
         with pytest.raises(TransformError, match="left.*must be less than right"):
