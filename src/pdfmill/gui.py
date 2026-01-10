@@ -38,14 +38,14 @@ from pdfmill.config import (
     Config, Settings, InputConfig, FilterConfig, OutputProfile,
     PrintConfig, PrintTarget, Transform, RotateTransform, CropTransform,
     SizeTransform, SplitTransform, SplitRegion, CombineTransform,
-    CombineLayoutItem, load_config, ConfigError,
+    RenderTransform, CombineLayoutItem, load_config, ConfigError,
 )
 
 # Constants for dropdowns
 ON_ERROR_OPTIONS = ["continue", "stop"]
 SORT_OPTIONS = ["", "name_asc", "name_desc", "time_asc", "time_desc"]
 MATCH_OPTIONS = ["any", "all"]
-TRANSFORM_TYPES = ["rotate", "crop", "size", "split", "combine"]
+TRANSFORM_TYPES = ["rotate", "crop", "size", "split", "combine", "render"]
 ROTATE_ANGLES = ["0", "90", "180", "270", "landscape", "portrait", "auto"]
 FIT_MODES = ["contain", "cover", "stretch"]
 
@@ -187,6 +187,7 @@ class TransformDialog(tk.Toplevel):
         self.size_w_var = tk.StringVar(value="100mm")
         self.size_h_var = tk.StringVar(value="150mm")
         self.fit_var = tk.StringVar(value="contain")
+        self.render_dpi_var = tk.IntVar(value=150)
 
         # Split regions list
         self.split_regions: list[SplitRegion] = []
@@ -271,6 +272,14 @@ class TransformDialog(tk.Toplevel):
         ttk.Button(btn_row, text="Add Placement", command=self._add_combine_item).pack(side="left", padx=2)
         ttk.Button(btn_row, text="Edit Placement", command=self._edit_combine_item).pack(side="left", padx=2)
         ttk.Button(btn_row, text="Remove", command=self._remove_combine_item).pack(side="left", padx=2)
+        
+        # Render frame
+        self.render_frame = ttk.LabelFrame(self, text="Render Options", padding=10)
+        row = ttk.Frame(self.render_frame)
+        row.pack(fill="x", pady=2)
+        ttk.Label(row, text="DPI:").pack(side="left")
+        ttk.Spinbox(row, textvariable=self.render_dpi_var, from_=72, to=600, width=10).pack(side="left", padx=5)
+        ttk.Label(row, text="(72-600, default 150)").pack(side="left")
 
         # Buttons
         btn_frame = ttk.Frame(self, padding=10)
@@ -290,6 +299,7 @@ class TransformDialog(tk.Toplevel):
         self.size_frame.pack_forget()
         self.split_frame.pack_forget()
         self.combine_frame.pack_forget()
+        self.render_frame.pack_forget()
 
         t = self.type_var.get()
         if t == "rotate":
@@ -302,7 +312,9 @@ class TransformDialog(tk.Toplevel):
             self.split_frame.pack(fill="both", expand=True, padx=10, pady=5)
         elif t == "combine":
             self.combine_frame.pack(fill="both", expand=True, padx=10, pady=5)
-
+        elif t == "render":
+            self.render_frame.pack(fill="x", padx=10, pady=5)
+            
     def _refresh_split_list(self):
         self.split_list.delete(0, tk.END)
         for r in self.split_regions:
@@ -360,7 +372,6 @@ class TransformDialog(tk.Toplevel):
         if sel:
             del self.combine_layout[sel[0]]
             self._refresh_combine_list()
-
     def _load_transform(self, t: Transform):
         self.type_var.set(t.type)
         if t.type == "rotate" and t.rotate:
@@ -383,6 +394,8 @@ class TransformDialog(tk.Toplevel):
             self.combine_pages_per_var.set(t.combine.pages_per_output)
             self.combine_layout = list(t.combine.layout)
             self._refresh_combine_list()
+        elif t.type == "render" and t.render:
+            self.render_dpi_var.set(t.render.dpi)
 
     def _ok(self):
         t = self.type_var.get()
@@ -424,6 +437,10 @@ class TransformDialog(tk.Toplevel):
                     pages_per_output=self.combine_pages_per_var.get(),
                 ),
             )
+        elif t == "render":
+            self.result = Transform(
+                type="render",
+                render=RenderTransform(dpi=self.render_dpi_var.get()),
         self.destroy()
 
 
@@ -738,6 +755,8 @@ class OutputProfileEditor(ttk.Frame):
             return f"split: {n} region(s)"
         elif t.type == "combine" and t.combine:
             return f"combine: {t.combine.pages_per_output} pages -> {t.combine.page_size}"
+        elif t.type == "render" and t.render:
+            return f"render: {t.render.dpi} DPI"
         return str(t)
 
     def _refresh_transforms(self):
@@ -1290,6 +1309,8 @@ class PdfMillApp(tk.Tk):
                                 ]
                             }
                         })
+                    elif t.type == "render" and t.render:
+                        p["transforms"].append({"render": {"dpi": t.render.dpi}})
 
             if profile.print.enabled or profile.print.targets:
                 p["print"] = {

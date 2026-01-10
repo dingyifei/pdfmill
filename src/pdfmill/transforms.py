@@ -5,8 +5,9 @@ import re
 from copy import deepcopy
 from typing import Literal
 
-from pypdf import PageObject, PdfWriter, Transformation
-
+from pypdf import PageObject, PdfReader, PdfWriter, Transformation
+import tempfile
+from typing import Literal
 
 class TransformError(Exception):
     """Raised when a transformation fails."""
@@ -30,33 +31,33 @@ def detect_page_orientation(pdf_path: str, page_num: int = 0) -> int:
         TransformError: If OCR dependencies are not installed or detection fails
     """
     try:
-        import fitz  # pymupdf
+        from pdf2image import convert_from_path
     except ImportError:
         raise TransformError(
-            "pymupdf is required for auto rotation. Install with: pip install pymupdf"
+            "pdf2image is required for auto rotation. Install with: pip install pdf2image"
         )
 
     try:
         import pytesseract
-        from PIL import Image
     except ImportError:
         raise TransformError(
-            "pytesseract and Pillow are required for auto rotation. "
-            "Install with: pip install pytesseract Pillow"
+            "pytesseract is required for auto rotation. "
+            "Install with: pip install pytesseract"
         )
 
     try:
-        # Render PDF page to image
-        doc = fitz.open(pdf_path)
-        page = doc[page_num]
-        # Render at 150 DPI for good OCR accuracy without being too slow
-        mat = fitz.Matrix(150 / 72, 150 / 72)
-        pix = page.get_pixmap(matrix=mat)
-        img_data = pix.tobytes("png")
-        doc.close()
+        # Render PDF page to image at 150 DPI for good OCR accuracy
+        images = convert_from_path(
+            pdf_path,
+            first_page=page_num + 1,  # pdf2image uses 1-indexed pages
+            last_page=page_num + 1,
+            dpi=150,
+        )
 
-        # Convert to PIL Image
-        image = Image.open(io.BytesIO(img_data))
+        if not images:
+            raise TransformError(f"Failed to render page {page_num} from {pdf_path}")
+
+        image = images[0]
 
         # Use Tesseract OSD to detect orientation
         osd = pytesseract.image_to_osd(image, output_type=pytesseract.Output.DICT)
@@ -439,3 +440,61 @@ def combine_pages(
         output_page.merge_transformed_page(source_page, transform)
 
     return output_page
+def render_page(page: PageObject, dpi: int = 150) -> PageObject:
+    """
+    Rasterize a page to an image and re-embed it as a new PDF page.
+
+    This permanently removes any content outside the visible area (mediabox)
+    and flattens all layers, annotations, and transparency. The result is
+    a single image embedded in a PDF page.
+
+    Args:
+        page: The page to render
+        dpi: Resolution for rasterization (default 150)
+
+    Returns:
+        A new PageObject containing the rasterized image
+
+    Raises:
+        TransformError: If pdf2image or Pillow are not installed
+    """
+    try:
+        from pdf2image import convert_from_bytes
+    except ImportError:
+        raise TransformError(
+            "pdf2image is required for render transform. "
+            "Install with: pip install pdf2image"
+        )
+
+    try:
+        from PIL import Image
+    except ImportError:
+        raise TransformError(
+            "Pillow is required for render transform. "
+            "Install with: pip install Pillow"
+        )
+
+    # Write the single page to a temporary PDF in memory
+    writer = PdfWriter()
+    writer.add_page(page)
+
+    pdf_bytes = io.BytesIO()
+    writer.write(pdf_bytes)
+    pdf_bytes.seek(0)
+
+    # Render to image using pdf2image
+    images = convert_from_bytes(pdf_bytes.read(), dpi=dpi)
+
+    if not images:
+        raise TransformError("Failed to render page to image")
+
+    image = images[0]
+
+    # Save the image as a PDF in memory
+    img_pdf_bytes = io.BytesIO()
+    image.save(img_pdf_bytes, format="PDF", resolution=dpi)
+    img_pdf_bytes.seek(0)
+
+    # Read the image PDF and return the page
+    reader = PdfReader(img_pdf_bytes)
+    return reader.pages[0]

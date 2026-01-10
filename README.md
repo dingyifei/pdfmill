@@ -171,7 +171,13 @@ transforms:
         - page: 1
           position: ["0in", "0in"]
           scale: 0.5
+  # Render (rasterize) - converts page to image
+  - render: 300           # DPI value
+  - render: {dpi: 200}    # Dict form
+  - render: true          # Default 150 DPI
 ```
+
+**Note on render transform:** The render transform rasterizes pages to images and re-embeds them. This permanently removes any content outside the visible area (useful after cropping to truly remove hidden content) and flattens all layers, annotations, and transparency. Requires `poppler` to be installed on the system.
 
 ### Debug Mode
 

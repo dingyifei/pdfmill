@@ -92,17 +92,25 @@ class CombineTransform:
     page_size: tuple[str, str] = ("8.5in", "11in")  # Output page dimensions
     layout: list[CombineLayoutItem] = field(default_factory=list)
     pages_per_output: int = 2  # How many input pages consumed per output page
+class RenderTransform:
+    """Render (rasterize) configuration.
+
+    Rasterizes pages to images and re-embeds them. This permanently removes
+    any content outside the visible area and flattens all layers.
+    """
+    dpi: int = 150  # Resolution for rasterization
 
 
 @dataclass
 class Transform:
     """A single transformation step."""
-    type: str  # "rotate", "crop", "size", "split", "combine"
+    type: str  # "rotate", "crop", "size", "split", "combine", "render"
     rotate: RotateTransform | None = None
     crop: CropTransform | None = None
     size: SizeTransform | None = None
     split: SplitTransform | None = None
     combine: CombineTransform | None = None
+    render: RenderTransform | None = None
 
 
 @dataclass
@@ -218,6 +226,28 @@ def parse_transform(transform_data: dict[str, Any]) -> Transform:
                 pages_per_output=combine_val.get("pages_per_output", 2),
             ),
         )
+    elif "render" in transform_data:
+        render_val = transform_data["render"]
+        if isinstance(render_val, int) and not isinstance(render_val, bool):
+            # Simple render: just dpi value (e.g., render: 300)
+            return Transform(
+                type="render",
+                render=RenderTransform(dpi=render_val),
+            )
+        elif isinstance(render_val, dict):
+            # Complex render with options (e.g., render: {dpi: 200})
+            return Transform(
+                type="render",
+                render=RenderTransform(
+                    dpi=render_val.get("dpi", 150),
+                ),
+            )
+        else:
+            # Default render (e.g., render: true or render: ~)
+            return Transform(
+                type="render",
+                render=RenderTransform(),
+            )
 
     raise ConfigError(f"Unknown transform type: {transform_data}")
 

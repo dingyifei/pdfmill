@@ -19,6 +19,7 @@ from pdfmill.config import (
     RotateTransform,
     CropTransform,
     SizeTransform,
+    RenderTransform,
     Settings,
     PrintConfig,
     PrintTarget,
@@ -129,6 +130,41 @@ class TestApplyTransforms:
         with patch("pdfmill.processor.resize_page") as mock_resize:
             apply_transforms(pages, transforms)
             mock_resize.assert_called_once()
+
+    def test_render_transform(self):
+        pages = [MagicMock(), MagicMock()]
+        transforms = [Transform(type="render", render=RenderTransform(dpi=300))]
+
+        with patch("pdfmill.processor.render_page") as mock_render:
+            mock_render.side_effect = lambda page, dpi: MagicMock()  # Returns new page
+            apply_transforms(pages, transforms)
+            assert mock_render.call_count == 2
+
+    def test_render_transform_replaces_pages(self):
+        original_pages = [MagicMock(), MagicMock()]
+        new_page_1 = MagicMock()
+        new_page_2 = MagicMock()
+        transforms = [Transform(type="render", render=RenderTransform(dpi=150))]
+
+        with patch("pdfmill.processor.render_page") as mock_render:
+            mock_render.side_effect = [new_page_1, new_page_2]
+            result = apply_transforms(original_pages, transforms)
+            # render_page returns new pages, so they should be replaced
+            assert result[0] is new_page_1
+            assert result[1] is new_page_2
+
+    def test_render_dry_run(self, capsys):
+        pages = [MagicMock()]
+        transforms = [Transform(type="render", render=RenderTransform(dpi=300))]
+
+        with patch("pdfmill.processor.render_page") as mock_render:
+            apply_transforms(pages, transforms, dry_run=True)
+            mock_render.assert_not_called()
+
+        captured = capsys.readouterr()
+        assert "[dry-run]" in captured.out
+        assert "Render" in captured.out
+        assert "300" in captured.out
 
     def test_dry_run_no_transform(self, capsys):
         pages = [MagicMock()]

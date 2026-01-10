@@ -50,7 +50,7 @@ src/pdfmill/
 - **cli.py** - Parses args, dispatches to processor or utility commands
 - **config.py** - Loads YAML, validates structure, returns typed `Config` dataclass
 - **selector.py** - Converts page specs (`"last"`, `"1-3"`, `[-1]`) to 0-indexed page list
-- **transforms.py** - Applies rotate/crop/resize/split/combine to pypdf page objects
+- **transforms.py** - Applies rotate/crop/resize//render/split/combine to pypdf page objects
 - **printer.py** - Finds SumatraPDF, sends print jobs with pass-through args
 - **processor.py** - Orchestrates: load config → get files → select pages → transform → write → print
 
@@ -151,6 +151,19 @@ Places multiple input pages onto a single output page. Useful for creating n-up 
 ```
 
 Input pages are batched by `pages_per_output`, and each batch produces one combined page.
+
+## Render Transform
+
+The `render` transform rasterizes pages to images and re-embeds them. This permanently removes content outside the visible area and flattens all layers.
+
+```yaml
+# Render (rasterize) page
+- render: 300           # Just DPI value
+- render: {dpi: 200}    # Dict form with options
+- render: true          # Default 150 DPI
+```
+
+Requires `poppler` installed on the system (used by pdf2image).
 
 ## Key Constants
 
