@@ -14,6 +14,7 @@ from pdfmill.config import (
     RotateTransform,
     CropTransform,
     SizeTransform,
+    RenderTransform,
     OutputProfile,
     PrintConfig,
     PrintTarget,
@@ -143,6 +144,32 @@ class TestParseTransform:
         assert t.size.height == ""
         assert t.size.fit == "contain"
 
+    def test_render_int_dpi(self):
+        t = parse_transform({"render": 300})
+        assert t.type == "render"
+        assert t.render is not None
+        assert t.render.dpi == 300
+
+    def test_render_dict_dpi(self):
+        t = parse_transform({"render": {"dpi": 200}})
+        assert t.type == "render"
+        assert t.render.dpi == 200
+
+    def test_render_dict_default_dpi(self):
+        t = parse_transform({"render": {}})
+        assert t.type == "render"
+        assert t.render.dpi == 150  # default
+
+    def test_render_boolean_true(self):
+        t = parse_transform({"render": True})
+        assert t.type == "render"
+        assert t.render.dpi == 150  # default
+
+    def test_render_none(self):
+        t = parse_transform({"render": None})
+        assert t.type == "render"
+        assert t.render.dpi == 150  # default
+
     def test_unknown_transform_raises(self):
         with pytest.raises(ConfigError, match="Unknown transform"):
             parse_transform({"unknown": "value"})
@@ -247,6 +274,14 @@ class TestDataclasses:
         assert st.width == ""
         assert st.height == ""
         assert st.fit == "contain"
+
+    def test_render_transform_defaults(self):
+        rt = RenderTransform()
+        assert rt.dpi == 150
+
+    def test_render_transform_custom_dpi(self):
+        rt = RenderTransform(dpi=300)
+        assert rt.dpi == 300
 
 
 class TestPrintTargets:

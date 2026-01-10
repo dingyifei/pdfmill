@@ -37,14 +37,14 @@ enable_high_dpi()
 from pdfmill.config import (
     Config, Settings, InputConfig, FilterConfig, OutputProfile,
     PrintConfig, PrintTarget, Transform, RotateTransform, CropTransform,
-    SizeTransform, load_config, ConfigError,
+    SizeTransform, RenderTransform, load_config, ConfigError,
 )
 
 # Constants for dropdowns
 ON_ERROR_OPTIONS = ["continue", "stop"]
 SORT_OPTIONS = ["", "name_asc", "name_desc", "time_asc", "time_desc"]
 MATCH_OPTIONS = ["any", "all"]
-TRANSFORM_TYPES = ["rotate", "crop", "size"]
+TRANSFORM_TYPES = ["rotate", "crop", "size", "render"]
 ROTATE_ANGLES = ["0", "90", "180", "270", "landscape", "portrait", "auto"]
 FIT_MODES = ["contain", "cover", "stretch"]
 
@@ -186,6 +186,7 @@ class TransformDialog(tk.Toplevel):
         self.size_w_var = tk.StringVar(value="100mm")
         self.size_h_var = tk.StringVar(value="150mm")
         self.fit_var = tk.StringVar(value="contain")
+        self.render_dpi_var = tk.IntVar(value=150)
 
         # Type selector
         row = ttk.Frame(self, padding=10)
@@ -231,6 +232,14 @@ class TransformDialog(tk.Toplevel):
         ttk.Label(row, text="Fit:").pack(side="left")
         ttk.Combobox(row, textvariable=self.fit_var, values=FIT_MODES, state="readonly", width=10).pack(side="left", padx=5)
 
+        # Render frame
+        self.render_frame = ttk.LabelFrame(self, text="Render Options", padding=10)
+        row = ttk.Frame(self.render_frame)
+        row.pack(fill="x", pady=2)
+        ttk.Label(row, text="DPI:").pack(side="left")
+        ttk.Spinbox(row, textvariable=self.render_dpi_var, from_=72, to=600, width=10).pack(side="left", padx=5)
+        ttk.Label(row, text="(72-600, default 150)").pack(side="left")
+
         # Buttons
         btn_frame = ttk.Frame(self, padding=10)
         btn_frame.pack(fill="x", side="bottom")
@@ -247,6 +256,7 @@ class TransformDialog(tk.Toplevel):
         self.rotate_frame.pack_forget()
         self.crop_frame.pack_forget()
         self.size_frame.pack_forget()
+        self.render_frame.pack_forget()
 
         t = self.type_var.get()
         if t == "rotate":
@@ -255,6 +265,8 @@ class TransformDialog(tk.Toplevel):
             self.crop_frame.pack(fill="x", padx=10, pady=5)
         elif t == "size":
             self.size_frame.pack(fill="x", padx=10, pady=5)
+        elif t == "render":
+            self.render_frame.pack(fill="x", padx=10, pady=5)
 
     def _load_transform(self, t: Transform):
         self.type_var.set(t.type)
@@ -269,6 +281,8 @@ class TransformDialog(tk.Toplevel):
             self.size_w_var.set(t.size.width)
             self.size_h_var.set(t.size.height)
             self.fit_var.set(t.size.fit)
+        elif t.type == "render" and t.render:
+            self.render_dpi_var.set(t.render.dpi)
 
     def _ok(self):
         t = self.type_var.get()
@@ -295,6 +309,11 @@ class TransformDialog(tk.Toplevel):
                     height=self.size_h_var.get(),
                     fit=self.fit_var.get(),
                 ),
+            )
+        elif t == "render":
+            self.result = Transform(
+                type="render",
+                render=RenderTransform(dpi=self.render_dpi_var.get()),
             )
         self.destroy()
 
@@ -494,6 +513,8 @@ class OutputProfileEditor(ttk.Frame):
             return f"crop: {t.crop.lower_left} -> {t.crop.upper_right}"
         elif t.type == "size" and t.size:
             return f"size: {t.size.width} x {t.size.height} ({t.size.fit})"
+        elif t.type == "render" and t.render:
+            return f"render: {t.render.dpi} DPI"
         return str(t)
 
     def _refresh_transforms(self):
@@ -1019,6 +1040,8 @@ class PdfMillApp(tk.Tk):
                                 "fit": t.size.fit,
                             }
                         })
+                    elif t.type == "render" and t.render:
+                        p["transforms"].append({"render": {"dpi": t.render.dpi}})
 
             if profile.print.enabled or profile.print.targets:
                 p["print"] = {

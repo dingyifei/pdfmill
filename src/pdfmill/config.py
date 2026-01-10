@@ -66,12 +66,23 @@ class RotateTransform:
 
 
 @dataclass
+class RenderTransform:
+    """Render (rasterize) configuration.
+
+    Rasterizes pages to images and re-embeds them. This permanently removes
+    any content outside the visible area and flattens all layers.
+    """
+    dpi: int = 150  # Resolution for rasterization
+
+
+@dataclass
 class Transform:
     """A single transformation step."""
-    type: str  # "rotate", "crop", "size"
+    type: str  # "rotate", "crop", "size", "render"
     rotate: RotateTransform | None = None
     crop: CropTransform | None = None
     size: SizeTransform | None = None
+    render: RenderTransform | None = None
 
 
 @dataclass
@@ -158,6 +169,28 @@ def parse_transform(transform_data: dict[str, Any]) -> Transform:
                 fit=size_val.get("fit", "contain"),
             ),
         )
+    elif "render" in transform_data:
+        render_val = transform_data["render"]
+        if isinstance(render_val, int) and not isinstance(render_val, bool):
+            # Simple render: just dpi value (e.g., render: 300)
+            return Transform(
+                type="render",
+                render=RenderTransform(dpi=render_val),
+            )
+        elif isinstance(render_val, dict):
+            # Complex render with options (e.g., render: {dpi: 200})
+            return Transform(
+                type="render",
+                render=RenderTransform(
+                    dpi=render_val.get("dpi", 150),
+                ),
+            )
+        else:
+            # Default render (e.g., render: true or render: ~)
+            return Transform(
+                type="render",
+                render=RenderTransform(),
+            )
 
     raise ConfigError(f"Unknown transform type: {transform_data}")
 
