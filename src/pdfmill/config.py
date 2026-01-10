@@ -92,6 +92,9 @@ class CombineTransform:
     page_size: tuple[str, str] = ("8.5in", "11in")  # Output page dimensions
     layout: list[CombineLayoutItem] = field(default_factory=list)
     pages_per_output: int = 2  # How many input pages consumed per output page
+
+
+@dataclass
 class RenderTransform:
     """Render (rasterize) configuration.
 
