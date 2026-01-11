@@ -77,15 +77,18 @@ input:
 
 outputs:
   profile_name:
+    enabled: true           # Set to false to skip this profile
     pages: "last"           # Page selection spec
-    transforms: []          # List of transforms
+    transforms:             # List of transforms
+      - rotate: 90
+        enabled: true       # Set to false to skip this transform
     output_dir: ./output
     filename_prefix: ""
     filename_suffix: ""
     sort: time_desc         # Override input.sort (error if both set)
     debug: false            # Save intermediate PDFs after each transform
     print:
-      enabled: true
+      enabled: true         # Set to false to disable printing (default: false)
       merge: false          # Merge all PDFs before printing as single job
       # Single printer (legacy, still supported):
       printer: "Printer Name"
@@ -102,6 +105,31 @@ outputs:
           printer: "Brother"
           weight: 50
           copies: 1
+```
+
+## Enable/Disable
+
+Profiles, transforms, and printing can be individually enabled/disabled:
+
+| Level | Field | Default | Description |
+|-------|-------|---------|-------------|
+| Profile | `enabled` | `true` | Skip entire profile when `false` |
+| Transform | `enabled` | `true` | Skip this transform when `false` |
+| Print | `print.enabled` | `false` | Printing is opt-in (must set `true` to print) |
+
+```yaml
+outputs:
+  label:
+    enabled: false          # Temporarily disable this profile
+    pages: last
+    transforms:
+      - rotate: 90
+        enabled: false      # Skip rotation
+      - crop:
+          lower_left: [0, 0]
+          upper_right: [100, 100]
+    print:
+      enabled: true         # Would print if profile was enabled
 ```
 
 ## Units

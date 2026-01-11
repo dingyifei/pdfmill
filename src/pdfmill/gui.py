@@ -179,6 +179,7 @@ class TransformDialog(tk.Toplevel):
 
         self.result = None
 
+        self.enabled_var = tk.BooleanVar(value=True)
         self.type_var = tk.StringVar(value="rotate")
         self.angle_var = tk.StringVar(value="90")
         self.crop_ll_x_var = tk.StringVar(value="0")
@@ -204,6 +205,11 @@ class TransformDialog(tk.Toplevel):
         self.combine_page_w_var = tk.StringVar(value="8.5in")
         self.combine_page_h_var = tk.StringVar(value="11in")
         self.combine_pages_per_var = tk.IntVar(value=2)
+
+        # Enabled checkbox
+        row = ttk.Frame(self, padding=10)
+        row.pack(fill="x")
+        ttk.Checkbutton(row, text="Enabled", variable=self.enabled_var).pack(side="left")
 
         # Type selector
         row = ttk.Frame(self, padding=10)
@@ -425,6 +431,7 @@ class TransformDialog(tk.Toplevel):
             del self.combine_layout[sel[0]]
             self._refresh_combine_list()
     def _load_transform(self, t: Transform):
+        self.enabled_var.set(t.enabled)
         self.type_var.set(t.type)
         if t.type == "rotate" and t.rotate:
             self.angle_var.set(str(t.rotate.angle))
@@ -458,13 +465,14 @@ class TransformDialog(tk.Toplevel):
 
     def _ok(self):
         t = self.type_var.get()
+        enabled = self.enabled_var.get()
         if t == "rotate":
             angle = self.angle_var.get()
             try:
                 angle = int(angle)
             except ValueError:
                 pass  # Keep as string (landscape/portrait/auto)
-            self.result = Transform(type="rotate", rotate=RotateTransform(angle=angle))
+            self.result = Transform(type="rotate", rotate=RotateTransform(angle=angle), enabled=enabled)
         elif t == "crop":
             self.result = Transform(
                 type="crop",
@@ -472,6 +480,7 @@ class TransformDialog(tk.Toplevel):
                     lower_left=(self.crop_ll_x_var.get(), self.crop_ll_y_var.get()),
                     upper_right=(self.crop_ur_x_var.get(), self.crop_ur_y_var.get()),
                 ),
+                enabled=enabled,
             )
         elif t == "size":
             self.result = Transform(
@@ -481,6 +490,7 @@ class TransformDialog(tk.Toplevel):
                     height=self.size_h_var.get(),
                     fit=self.fit_var.get(),
                 ),
+                enabled=enabled,
             )
         elif t == "stamp":
             self.result = Transform(
@@ -723,6 +733,7 @@ class OutputProfileEditor(ttk.Frame):
         self.print_targets: dict[str, PrintTarget] = {}
 
         self.name_var = tk.StringVar()
+        self.enabled_var = tk.BooleanVar(value=True)
         self.pages_var = tk.StringVar(value="all")
         self.output_dir_var = tk.StringVar(value="./output")
         self.prefix_var = tk.StringVar()
@@ -732,11 +743,12 @@ class OutputProfileEditor(ttk.Frame):
         self.print_enabled_var = tk.BooleanVar(value=False)
         self.print_merge_var = tk.BooleanVar(value=False)
 
-        # Profile name
+        # Profile name and enabled
         row = ttk.Frame(self)
         row.pack(fill="x", pady=2)
         ttk.Label(row, text="Profile Name:").pack(side="left")
         ttk.Entry(row, textvariable=self.name_var, width=20).pack(side="left", padx=5)
+        ttk.Checkbutton(row, text="Enabled", variable=self.enabled_var).pack(side="left", padx=10)
 
         # Pages
         row = ttk.Frame(self)
@@ -816,21 +828,22 @@ class OutputProfileEditor(ttk.Frame):
             self._on_refresh_printers()
 
     def _transform_str(self, t: Transform) -> str:
+        disabled_prefix = "[DISABLED] " if not t.enabled else ""
         if t.type == "rotate" and t.rotate:
-            return f"rotate: {t.rotate.angle}"
+            return f"{disabled_prefix}rotate: {t.rotate.angle}"
         elif t.type == "crop" and t.crop:
-            return f"crop: {t.crop.lower_left} -> {t.crop.upper_right}"
+            return f"{disabled_prefix}crop: {t.crop.lower_left} -> {t.crop.upper_right}"
         elif t.type == "size" and t.size:
-            return f"size: {t.size.width} x {t.size.height} ({t.size.fit})"
+            return f"{disabled_prefix}size: {t.size.width} x {t.size.height} ({t.size.fit})"
         elif t.type == "stamp" and t.stamp:
-            return f"stamp: '{t.stamp.text}' at {t.stamp.position}"
+            return f"{disabled_prefix}stamp: '{t.stamp.text}' at {t.stamp.position}"
         elif t.type == "split" and t.split:
             n = len(t.split.regions)
-            return f"split: {n} region(s)"
+            return f"{disabled_prefix}split: {n} region(s)"
         elif t.type == "combine" and t.combine:
-            return f"combine: {t.combine.pages_per_output} pages -> {t.combine.page_size}"
+            return f"{disabled_prefix}combine: {t.combine.pages_per_output} pages -> {t.combine.page_size}"
         elif t.type == "render" and t.render:
-            return f"render: {t.render.dpi} DPI"
+            return f"{disabled_prefix}render: {t.render.dpi} DPI"
         return str(t)
 
     def _refresh_transforms(self):
@@ -929,6 +942,7 @@ class OutputProfileEditor(ttk.Frame):
 
     def load(self, name: str, profile: OutputProfile):
         self.name_var.set(name)
+        self.enabled_var.set(profile.enabled)
         self.pages_var.set(str(profile.pages) if isinstance(profile.pages, str) else ",".join(map(str, profile.pages)))
         self.output_dir_var.set(str(profile.output_dir))
         self.prefix_var.set(profile.filename_prefix)
@@ -953,6 +967,7 @@ class OutputProfileEditor(ttk.Frame):
 
         return self.name_var.get(), OutputProfile(
             pages=pages,
+            enabled=self.enabled_var.get(),
             output_dir=Path(self.output_dir_var.get()),
             filename_prefix=self.prefix_var.get(),
             filename_suffix=self.suffix_var.get(),
@@ -997,8 +1012,9 @@ class OutputsFrame(ttk.Frame):
 
     def _refresh_list(self):
         self.profile_list.delete(0, tk.END)
-        for name in self.profiles.keys():
-            self.profile_list.insert(tk.END, name)
+        for name, profile in self.profiles.items():
+            display_name = f"[DISABLED] {name}" if not profile.enabled else name
+            self.profile_list.insert(tk.END, display_name)
 
     def _save_current(self):
         if self.current_profile:
@@ -1012,7 +1028,9 @@ class OutputsFrame(ttk.Frame):
         sel = self.profile_list.curselection()
         if not sel:
             return
-        name = self.profile_list.get(sel[0])
+        display_name = self.profile_list.get(sel[0])
+        # Strip [DISABLED] prefix if present
+        name = display_name.replace("[DISABLED] ", "")
         if name == self.current_profile:
             return
         self._save_current()
@@ -1037,7 +1055,9 @@ class OutputsFrame(ttk.Frame):
     def _remove_profile(self):
         sel = self.profile_list.curselection()
         if sel:
-            name = self.profile_list.get(sel[0])
+            display_name = self.profile_list.get(sel[0])
+            # Strip [DISABLED] prefix if present
+            name = display_name.replace("[DISABLED] ", "")
             del self.profiles[name]
             self.current_profile = None
             self._refresh_list()
@@ -1327,6 +1347,9 @@ class PdfMillApp(tk.Tk):
                 "pages": profile.pages,
                 "output_dir": str(profile.output_dir),
             }
+            # Only export enabled if False (True is default)
+            if not profile.enabled:
+                p["enabled"] = profile.enabled
             if profile.filename_prefix:
                 p["filename_prefix"] = profile.filename_prefix
             if profile.filename_suffix:
@@ -1339,23 +1362,20 @@ class PdfMillApp(tk.Tk):
             if profile.transforms:
                 p["transforms"] = []
                 for t in profile.transforms:
+                    transform_dict: dict[str, Any] = {}
                     if t.type == "rotate" and t.rotate:
-                        p["transforms"].append({"rotate": t.rotate.angle})
+                        transform_dict["rotate"] = t.rotate.angle
                     elif t.type == "crop" and t.crop:
-                        p["transforms"].append({
-                            "crop": {
-                                "lower_left": list(t.crop.lower_left),
-                                "upper_right": list(t.crop.upper_right),
-                            }
-                        })
+                        transform_dict["crop"] = {
+                            "lower_left": list(t.crop.lower_left),
+                            "upper_right": list(t.crop.upper_right),
+                        }
                     elif t.type == "size" and t.size:
-                        p["transforms"].append({
-                            "size": {
-                                "width": t.size.width,
-                                "height": t.size.height,
-                                "fit": t.size.fit,
-                            }
-                        })
+                        transform_dict["size"] = {
+                            "width": t.size.width,
+                            "height": t.size.height,
+                            "fit": t.size.fit,
+                        }
                     elif t.type == "stamp" and t.stamp:
                         stamp_dict: dict[str, Any] = {
                             "text": t.stamp.text,
@@ -1366,36 +1386,37 @@ class PdfMillApp(tk.Tk):
                         if t.stamp.position == "custom":
                             stamp_dict["x"] = t.stamp.x
                             stamp_dict["y"] = t.stamp.y
-                        p["transforms"].append({"stamp": stamp_dict})
+                        transform_dict["stamp"] = stamp_dict
                     elif t.type == "split" and t.split:
-                        p["transforms"].append({
-                            "split": {
-                                "regions": [
-                                    {
-                                        "lower_left": list(r.lower_left),
-                                        "upper_right": list(r.upper_right),
-                                    }
-                                    for r in t.split.regions
-                                ]
-                            }
-                        })
+                        transform_dict["split"] = {
+                            "regions": [
+                                {
+                                    "lower_left": list(r.lower_left),
+                                    "upper_right": list(r.upper_right),
+                                }
+                                for r in t.split.regions
+                            ]
+                        }
                     elif t.type == "combine" and t.combine:
-                        p["transforms"].append({
-                            "combine": {
-                                "page_size": list(t.combine.page_size),
-                                "pages_per_output": t.combine.pages_per_output,
-                                "layout": [
-                                    {
-                                        "page": item.page,
-                                        "position": list(item.position),
-                                        "scale": item.scale,
-                                    }
-                                    for item in t.combine.layout
-                                ]
-                            }
-                        })
+                        transform_dict["combine"] = {
+                            "page_size": list(t.combine.page_size),
+                            "pages_per_output": t.combine.pages_per_output,
+                            "layout": [
+                                {
+                                    "page": item.page,
+                                    "position": list(item.position),
+                                    "scale": item.scale,
+                                }
+                                for item in t.combine.layout
+                            ]
+                        }
                     elif t.type == "render" and t.render:
-                        p["transforms"].append({"render": {"dpi": t.render.dpi}})
+                        transform_dict["render"] = {"dpi": t.render.dpi}
+                    # Only export enabled if False (True is default)
+                    if not t.enabled:
+                        transform_dict["enabled"] = t.enabled
+                    if transform_dict:
+                        p["transforms"].append(transform_dict)
 
             if profile.print.enabled or profile.print.targets:
                 p["print"] = {

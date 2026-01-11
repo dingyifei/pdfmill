@@ -153,6 +153,10 @@ transforms:
       height: 150mm
       fit: contain   # contain, cover, stretch
 
+  # Disable a transform without removing it
+  - rotate: 90
+    enabled: false  # skip this transform
+
   # Add page numbers or timestamps (requires: pip install pdfmill[stamp])
   - stamp: "{page}/{total}"   # simple format
 
@@ -276,6 +280,31 @@ When `merge: false` with multiple targets:
 | `weight` | Page distribution weight (default: 1) |
 | `copies` | Number of copies (default: 1) |
 | `args` | Pass-through SumatraPDF arguments |
+
+### Enable/Disable
+
+Profiles, transforms, and printing can be individually enabled/disabled without removing configuration:
+
+```yaml
+outputs:
+  label:
+    enabled: false          # Skip this profile entirely
+    pages: last
+    transforms:
+      - rotate: 90
+        enabled: false      # Skip this transform
+      - crop:
+          lower_left: [0, 0]
+          upper_right: [100, 100]
+    print:
+      enabled: true         # Would print if profile was enabled
+```
+
+| Level | Field | Default | Description |
+|-------|-------|---------|-------------|
+| Profile | `enabled` | `true` | Skip entire profile when `false` |
+| Transform | `enabled` | `true` | Skip this transform when `false` |
+| Print | `print.enabled` | `false` | Printing is opt-in |
 
 ## Example Configs
 

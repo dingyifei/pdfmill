@@ -682,3 +682,130 @@ class TestMultiPrinterIntegration:
 
         with pytest.raises(ConfigError, match="Sort specified in both"):
             process(config, temp_multi_page_pdf, output_dir)
+
+
+class TestEnabledField:
+    """Test enabled field for profiles and transforms."""
+
+    def test_disabled_transform_skipped(self):
+        """Test that disabled transforms are not applied."""
+        pages = [MagicMock(), MagicMock()]
+        transforms = [
+            Transform(type="rotate", rotate=RotateTransform(angle=90), enabled=True),
+            Transform(type="rotate", rotate=RotateTransform(angle=180), enabled=False),
+        ]
+
+        with patch("pdfmill.processor.rotate_page") as mock_rotate:
+            apply_transforms(pages, transforms)
+            # Only the enabled transform should be called (once per page)
+            assert mock_rotate.call_count == 2
+
+    def test_all_disabled_transforms_skipped(self):
+        """Test that all disabled transforms are skipped."""
+        pages = [MagicMock()]
+        transforms = [
+            Transform(type="rotate", rotate=RotateTransform(angle=90), enabled=False),
+            Transform(type="crop", crop=CropTransform(), enabled=False),
+        ]
+
+        with patch("pdfmill.processor.rotate_page") as mock_rotate:
+            with patch("pdfmill.processor.crop_page") as mock_crop:
+                apply_transforms(pages, transforms)
+                mock_rotate.assert_not_called()
+                mock_crop.assert_not_called()
+
+    def test_mixed_enabled_disabled_transforms(self):
+        """Test processing with mix of enabled and disabled transforms."""
+        pages = [MagicMock()]
+        transforms = [
+            Transform(type="rotate", rotate=RotateTransform(angle=90), enabled=True),
+            Transform(type="crop", crop=CropTransform(), enabled=False),
+            Transform(type="size", size=SizeTransform(width="4in", height="6in"), enabled=True),
+        ]
+
+        with patch("pdfmill.processor.rotate_page") as mock_rotate:
+            with patch("pdfmill.processor.crop_page") as mock_crop:
+                with patch("pdfmill.processor.resize_page") as mock_resize:
+                    apply_transforms(pages, transforms)
+                    mock_rotate.assert_called_once()
+                    mock_crop.assert_not_called()
+                    mock_resize.assert_called_once()
+
+    def test_disabled_profile_skipped(self, temp_multi_page_pdf, temp_dir, capsys):
+        """Test that disabled profiles are skipped."""
+        config = Config(outputs={
+            "enabled": OutputProfile(pages="all", enabled=True),
+            "disabled": OutputProfile(pages="all", enabled=False),
+        })
+        output_dir = temp_dir / "output"
+
+        process(config, temp_multi_page_pdf, output_dir)
+
+        # Only one output should be created (from enabled profile)
+        outputs = list(output_dir.glob("*.pdf"))
+        assert len(outputs) == 1
+        assert "enabled" in outputs[0].name
+
+        # Check log message
+        captured = capsys.readouterr()
+        assert "Skipping disabled profile: disabled" in captured.out
+
+    def test_all_disabled_profiles_skipped(self, temp_multi_page_pdf, temp_dir, capsys):
+        """Test that all disabled profiles are skipped."""
+        config = Config(outputs={
+            "disabled1": OutputProfile(pages="all", enabled=False),
+            "disabled2": OutputProfile(pages="last", enabled=False),
+        })
+        output_dir = temp_dir / "output"
+
+        process(config, temp_multi_page_pdf, output_dir)
+
+        # No outputs should be created
+        if output_dir.exists():
+            outputs = list(output_dir.glob("*.pdf"))
+            assert len(outputs) == 0
+
+        captured = capsys.readouterr()
+        assert "Skipping disabled profile: disabled1" in captured.out
+        assert "Skipping disabled profile: disabled2" in captured.out
+
+    def test_disabled_profile_with_print_enabled_no_print(self, temp_multi_page_pdf, temp_dir):
+        """Test that disabled profile doesn't print even if print.enabled is True."""
+        config = Config(outputs={
+            "disabled": OutputProfile(
+                pages="all",
+                enabled=False,
+                print=PrintConfig(
+                    enabled=True,
+                    targets={"default": PrintTarget(printer="Test")}
+                ),
+            ),
+        })
+        output_dir = temp_dir / "output"
+
+        with patch("pdfmill.processor.print_pdf") as mock_print:
+            process(config, temp_multi_page_pdf, output_dir)
+            mock_print.assert_not_called()
+
+    def test_enabled_profile_default_value(self, temp_multi_page_pdf, temp_dir):
+        """Test that profile without explicit enabled defaults to True."""
+        config = Config(outputs={
+            "default_enabled": OutputProfile(pages="all"),  # No enabled field
+        })
+        output_dir = temp_dir / "output"
+
+        process(config, temp_multi_page_pdf, output_dir)
+
+        outputs = list(output_dir.glob("*.pdf"))
+        assert len(outputs) == 1
+
+    def test_transform_enabled_default_value(self):
+        """Test that transform without explicit enabled defaults to True."""
+        pages = [MagicMock()]
+        transforms = [
+            Transform(type="rotate", rotate=RotateTransform(angle=90)),  # No enabled field
+        ]
+
+        with patch("pdfmill.processor.rotate_page") as mock_rotate:
+            apply_transforms(pages, transforms)
+            mock_rotate.assert_called_once()
