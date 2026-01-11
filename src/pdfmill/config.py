@@ -66,12 +66,80 @@ class RotateTransform:
 
 
 @dataclass
+class StampTransform:
+    """Stamp transformation configuration for adding text overlays.
+
+    Supports placeholders in text:
+      - {page}: Current page number (1-indexed)
+      - {total}: Total page count
+      - {datetime}: Current datetime (format controlled by datetime_format)
+      - {date}: Current date only
+      - {time}: Current time only
+
+    Position can be a preset string or custom coordinates:
+      - Presets: "top-left", "top-right", "bottom-left", "bottom-right", "center"
+      - Custom: Use x/y coordinates with units (e.g., "10mm", "0.5in")
+    """
+    text: str = "{page}/{total}"  # Text with placeholders
+    position: str = "bottom-right"  # Preset or "custom"
+    x: str | float = "10mm"  # X coordinate (used when position="custom")
+    y: str | float = "10mm"  # Y coordinate (used when position="custom")
+    font_size: int = 10
+    font_name: str = "Helvetica"  # PDF standard font
+    margin: str | float = "10mm"  # Margin from edge for preset positions
+    datetime_format: str = "%Y-%m-%d %H:%M:%S"  # strftime format
+
+
+@dataclass
+class SplitRegion:
+    """A single region for split transform."""
+    lower_left: tuple[float | str, float | str] = (0, 0)
+    upper_right: tuple[float | str, float | str] = (612, 792)
+
+
+@dataclass
+class SplitTransform:
+    """Split transform: extract multiple regions from each page."""
+    regions: list[SplitRegion] = field(default_factory=list)
+
+
+@dataclass
+class CombineLayoutItem:
+    """A single page placement in combine transform."""
+    page: int = 0  # 0-indexed input page within the batch
+    position: tuple[float | str, float | str] = (0, 0)  # Lower-left corner position
+    scale: float = 1.0
+
+
+@dataclass
+class CombineTransform:
+    """Combine transform: place multiple pages onto a single canvas."""
+    page_size: tuple[str, str] = ("8.5in", "11in")  # Output page dimensions
+    layout: list[CombineLayoutItem] = field(default_factory=list)
+    pages_per_output: int = 2  # How many input pages consumed per output page
+
+
+@dataclass
+class RenderTransform:
+    """Render (rasterize) configuration.
+
+    Rasterizes pages to images and re-embeds them. This permanently removes
+    any content outside the visible area and flattens all layers.
+    """
+    dpi: int = 150  # Resolution for rasterization
+
+
+@dataclass
 class Transform:
     """A single transformation step."""
-    type: str  # "rotate", "crop", "size"
+    type: str  # "rotate", "crop", "size", "stamp", "split", "combine", "render"
     rotate: RotateTransform | None = None
     crop: CropTransform | None = None
     size: SizeTransform | None = None
+    stamp: StampTransform | None = None
+    split: SplitTransform | None = None
+    combine: CombineTransform | None = None
+    render: RenderTransform | None = None
     enabled: bool = True  # Set to False to skip this transform
 
 
@@ -166,6 +234,80 @@ def parse_transform(transform_data: dict[str, Any]) -> Transform:
             ),
             enabled=enabled,
         )
+    elif "stamp" in transform_data:
+        stamp_val = transform_data["stamp"]
+        if isinstance(stamp_val, str):
+            # Simple stamp: just text
+            return Transform(
+                type="stamp",
+                stamp=StampTransform(text=stamp_val),
+            )
+        elif isinstance(stamp_val, dict):
+            # Complex stamp with options
+            return Transform(
+                type="stamp",
+                stamp=StampTransform(
+                    text=stamp_val.get("text", "{page}/{total}"),
+                    position=stamp_val.get("position", "bottom-right"),
+                    x=stamp_val.get("x", "10mm"),
+                    y=stamp_val.get("y", "10mm"),
+                    font_size=stamp_val.get("font_size", 10),
+                    font_name=stamp_val.get("font_name", "Helvetica"),
+                    margin=stamp_val.get("margin", "10mm"),
+                    datetime_format=stamp_val.get("datetime_format", "%Y-%m-%d %H:%M:%S"),
+                ),
+            )
+    elif "split" in transform_data:
+        split_val = transform_data["split"]
+        regions = []
+        for r in split_val.get("regions", []):
+            regions.append(SplitRegion(
+                lower_left=tuple(r.get("lower_left", [0, 0])),
+                upper_right=tuple(r.get("upper_right", [612, 792])),
+            ))
+        return Transform(
+            type="split",
+            split=SplitTransform(regions=regions),
+        )
+    elif "combine" in transform_data:
+        combine_val = transform_data["combine"]
+        layout = []
+        for item in combine_val.get("layout", []):
+            layout.append(CombineLayoutItem(
+                page=item.get("page", 0),
+                position=tuple(item.get("position", [0, 0])),
+                scale=item.get("scale", 1.0),
+            ))
+        return Transform(
+            type="combine",
+            combine=CombineTransform(
+                page_size=tuple(combine_val.get("page_size", ["8.5in", "11in"])),
+                layout=layout,
+                pages_per_output=combine_val.get("pages_per_output", 2),
+            ),
+        )
+    elif "render" in transform_data:
+        render_val = transform_data["render"]
+        if isinstance(render_val, int) and not isinstance(render_val, bool):
+            # Simple render: just dpi value (e.g., render: 300)
+            return Transform(
+                type="render",
+                render=RenderTransform(dpi=render_val),
+            )
+        elif isinstance(render_val, dict):
+            # Complex render with options (e.g., render: {dpi: 200})
+            return Transform(
+                type="render",
+                render=RenderTransform(
+                    dpi=render_val.get("dpi", 150),
+                ),
+            )
+        else:
+            # Default render (e.g., render: true or render: ~)
+            return Transform(
+                type="render",
+                render=RenderTransform(),
+            )
 
     raise ConfigError(f"Unknown transform type: {transform_data}")
 

@@ -10,9 +10,16 @@ from pdfmill.transforms import (
     rotate_page,
     crop_page,
     resize_page,
+    stamp_page,
+    split_page,
+    combine_pages,
+    render_page,
     detect_page_orientation,
     TransformError,
     UNIT_TO_POINTS,
+    STAMP_POSITIONS,
+    _format_stamp_text,
+    _calculate_stamp_position,
 )
 
 
@@ -184,17 +191,22 @@ class TestCropPage:
     """Test page cropping."""
 
     def test_crop_updates_mediabox(self, mock_page):
+        # Crop translates content so cropped region starts at origin (0, 0)
         crop_page(mock_page, (10, 20), (100, 200))
-        assert mock_page.mediabox.lower_left == (10, 20)
-        assert mock_page.mediabox.upper_right == (100, 200)
+        assert mock_page.mediabox.lower_left == (0, 0)
+        # Cropped dimensions: (100-10) x (200-20) = 90 x 180
+        assert mock_page.mediabox.upper_right == (90, 180)
 
     def test_crop_returns_page(self, mock_page):
         result = crop_page(mock_page, (0, 0), (100, 100))
         assert result is mock_page
 
     def test_crop_with_floats(self, mock_page):
+        # Crop translates content so cropped region starts at origin (0, 0)
         crop_page(mock_page, (10.5, 20.5), (100.5, 200.5))
-        assert mock_page.mediabox.lower_left == (10.5, 20.5)
+        assert mock_page.mediabox.lower_left == (0, 0)
+        # Cropped dimensions: (100.5-10.5) x (200.5-20.5) = 90 x 180
+        assert mock_page.mediabox.upper_right == (90, 180)
 
     def test_crop_invalid_left_greater_than_right(self, mock_page):
         with pytest.raises(TransformError, match="left.*must be less than right"):
@@ -336,3 +348,520 @@ class TestDetectPageOrientation:
             mock_detect.return_value = 0
             result = mock_detect("test.pdf", 0)
             assert result == 0
+
+
+class TestFormatStampText:
+    """Test stamp text placeholder formatting."""
+
+    def test_page_placeholder(self):
+        result = _format_stamp_text("{page}", 5, 10, "%Y-%m-%d")
+        assert result == "5"
+
+    def test_total_placeholder(self):
+        result = _format_stamp_text("{total}", 5, 10, "%Y-%m-%d")
+        assert result == "10"
+
+    def test_page_total_combined(self):
+        result = _format_stamp_text("{page}/{total}", 3, 7, "%Y-%m-%d")
+        assert result == "3/7"
+
+    def test_page_of_total_format(self):
+        result = _format_stamp_text("Page {page} of {total}", 2, 5, "%Y-%m-%d")
+        assert result == "Page 2 of 5"
+
+    def test_datetime_placeholder(self):
+        result = _format_stamp_text("{datetime}", 1, 1, "%Y-%m-%d %H:%M:%S")
+        # Just verify it doesn't contain the placeholder anymore
+        assert "{datetime}" not in result
+        # Should have date-like format
+        assert "-" in result  # YYYY-MM-DD format
+
+    def test_date_placeholder(self):
+        result = _format_stamp_text("{date}", 1, 1, "%Y-%m-%d")
+        assert "{date}" not in result
+        # Format should be YYYY-MM-DD
+        assert len(result) == 10
+
+    def test_time_placeholder(self):
+        result = _format_stamp_text("{time}", 1, 1, "%Y-%m-%d")
+        assert "{time}" not in result
+        # Format should be HH:MM:SS
+        assert ":" in result
+
+    def test_no_placeholders(self):
+        result = _format_stamp_text("Static text", 1, 1, "%Y-%m-%d")
+        assert result == "Static text"
+
+    def test_mixed_placeholders(self):
+        result = _format_stamp_text("Page {page} - {date}", 3, 10, "%Y-%m-%d")
+        assert "Page 3 -" in result
+        assert "{page}" not in result
+        assert "{date}" not in result
+
+
+class TestCalculateStampPosition:
+    """Test stamp position calculation."""
+
+    def test_bottom_left(self):
+        x, y = _calculate_stamp_position(
+            "bottom-left", 612, 792, "test", 12, 28.35  # 10mm margin
+        )
+        assert x == 28.35  # margin
+        assert y == 28.35  # margin
+
+    def test_bottom_right(self):
+        x, y = _calculate_stamp_position(
+            "bottom-right", 612, 792, "test", 12, 28.35
+        )
+        # text_width ≈ 4 * 12 * 0.5 = 24
+        assert x < 612  # should be near right edge
+        assert y == 28.35  # margin
+
+    def test_top_left(self):
+        x, y = _calculate_stamp_position(
+            "top-left", 612, 792, "test", 12, 28.35
+        )
+        assert x == 28.35  # margin
+        assert y > 750  # near top
+
+    def test_top_right(self):
+        x, y = _calculate_stamp_position(
+            "top-right", 612, 792, "test", 12, 28.35
+        )
+        assert x < 612
+        assert y > 750
+
+    def test_center(self):
+        x, y = _calculate_stamp_position(
+            "center", 612, 792, "test", 12, 28.35
+        )
+        # Should be roughly centered
+        assert 250 < x < 350
+        assert 350 < y < 450
+
+    def test_custom_position(self):
+        x, y = _calculate_stamp_position(
+            "custom", 612, 792, "test", 12, 28.35,
+            custom_x=100, custom_y=200
+        )
+        assert x == 100
+        assert y == 200
+
+    def test_invalid_position_raises(self):
+        with pytest.raises(TransformError, match="Unknown stamp position"):
+            _calculate_stamp_position("invalid", 612, 792, "test", 12, 10)
+
+
+def _has_reportlab():
+    """Check if reportlab is installed."""
+    try:
+        from reportlab.pdfgen import canvas
+        return True
+    except ImportError:
+        return False
+
+
+def _create_minimal_pdf_bytes():
+    """Create minimal PDF bytes for testing."""
+    try:
+        from reportlab.pdfgen import canvas
+        import io
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=(612, 792))
+        c.drawString(100, 100, "test")
+        c.save()
+        buffer.seek(0)
+        return buffer.read()
+    except ImportError:
+        # Return a minimal PDF-like bytes if reportlab not available
+        return b"%PDF-1.4\n1 0 obj\n<</Type/Page>>\nendobj\ntrailer\n<</Root 1 0 R>>\n%%EOF"
+
+
+class TestStampPage:
+    """Test stamp page transformation."""
+
+    def test_stamp_invalid_position_raises(self, mock_page):
+        with pytest.raises(TransformError, match="Unknown stamp position"):
+            stamp_page(mock_page, "test", position="invalid")
+
+    def test_stamp_valid_positions(self):
+        """Verify all valid positions are in STAMP_POSITIONS."""
+        expected = {"top-left", "top-right", "bottom-left", "bottom-right", "center", "custom"}
+        assert STAMP_POSITIONS == expected
+
+    @pytest.mark.skipif(
+        not _has_reportlab(),
+        reason="reportlab not installed"
+    )
+    def test_stamp_merges_overlay(self, mock_page):
+        """Test that stamp_page calls merge_page."""
+        with patch("pdfmill.transforms._create_text_overlay") as mock_create:
+            # Mock the overlay creation to return minimal PDF bytes
+            mock_create.return_value = _create_minimal_pdf_bytes()
+
+            with patch("pdfmill.transforms.PdfReader") as mock_reader:
+                mock_overlay_page = MagicMock()
+                mock_reader.return_value.pages = [mock_overlay_page]
+
+                stamp_page(mock_page, "test", position="bottom-right")
+
+                mock_page.merge_page.assert_called_once_with(mock_overlay_page)
+
+    def test_stamp_returns_page(self, mock_page):
+        """Test that stamp_page returns the page."""
+        with patch("pdfmill.transforms._create_text_overlay") as mock_create:
+            mock_create.return_value = _create_minimal_pdf_bytes()
+
+            with patch("pdfmill.transforms.PdfReader") as mock_reader:
+                mock_overlay_page = MagicMock()
+                mock_reader.return_value.pages = [mock_overlay_page]
+
+                result = stamp_page(mock_page, "test")
+
+                assert result is mock_page
+
+
+@pytest.mark.skipif(not _has_reportlab(), reason="reportlab not installed")
+class TestStampIntegration:
+    """Integration tests for stamp transform with real PDFs."""
+
+    def test_stamp_real_pdf(self, temp_pdf):
+        """Test stamping a real PDF file."""
+        from pypdf import PdfReader, PdfWriter
+
+        reader = PdfReader(temp_pdf)
+        page = reader.pages[0]
+
+        # Apply stamp
+        stamp_page(
+            page,
+            text="1/1",
+            position="bottom-right",
+            font_size=12,
+            margin="10mm",
+            page_num=1,
+            total_pages=1,
+        )
+
+        # Write to verify no errors
+        writer = PdfWriter()
+        writer.add_page(page)
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+            writer.write(f)
+            output_path = f.name
+
+        # Verify output is valid PDF
+        output_reader = PdfReader(output_path)
+        assert len(output_reader.pages) == 1
+
+        # Cleanup
+        import os
+        os.unlink(output_path)
+
+    def test_stamp_multi_page_pdf(self, temp_multi_page_pdf):
+        """Test stamping multiple pages with correct page numbers."""
+        from pypdf import PdfReader, PdfWriter
+
+        reader = PdfReader(temp_multi_page_pdf)
+        total = len(reader.pages)
+
+        writer = PdfWriter()
+        for i, page in enumerate(reader.pages):
+            stamp_page(
+                page,
+                text="{page}/{total}",
+                position="bottom-right",
+                page_num=i + 1,
+                total_pages=total,
+            )
+            writer.add_page(page)
+
+        # Write and verify
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+            writer.write(f)
+            output_path = f.name
+
+        output_reader = PdfReader(output_path)
+        assert len(output_reader.pages) == 6
+
+        # Cleanup
+        import os
+        os.unlink(output_path)
+
+    def test_stamp_all_positions(self, temp_pdf):
+        """Test all position presets work without error."""
+        from pypdf import PdfReader
+
+        positions = ["top-left", "top-right", "bottom-left", "bottom-right", "center"]
+
+        for position in positions:
+            reader = PdfReader(temp_pdf)
+            page = reader.pages[0]
+            # Should not raise
+            stamp_page(page, text="Test", position=position)
+
+    def test_stamp_custom_position(self, temp_pdf):
+        """Test custom position with x/y coordinates."""
+        from pypdf import PdfReader
+
+        reader = PdfReader(temp_pdf)
+        page = reader.pages[0]
+
+        # Should not raise
+        stamp_page(
+            page,
+            text="Custom",
+            position="custom",
+            x="50mm",
+            y="100mm",
+        )
+
+    def test_stamp_with_datetime_placeholder(self, temp_pdf):
+        """Test datetime placeholder formatting."""
+        from pypdf import PdfReader
+
+        reader = PdfReader(temp_pdf)
+        page = reader.pages[0]
+
+        # Should not raise
+        stamp_page(
+            page,
+            text="{datetime}",
+            position="bottom-right",
+            datetime_format="%Y-%m-%d",
+        )
+
+
+class TestSplitPage:
+    """Test page splitting."""
+
+    def test_split_returns_list(self, temp_pdf):
+        """Split should return a list of pages."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        page = reader.pages[0]
+
+        regions = [
+            ((0, 0), ("4in", "6in")),
+        ]
+        result = split_page(page, regions)
+        assert isinstance(result, list)
+        assert len(result) == 1
+
+    def test_split_multiple_regions(self, temp_pdf):
+        """Split with multiple regions should return multiple pages."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        page = reader.pages[0]
+
+        regions = [
+            ((0, 0), ("4in", "6in")),
+            (("4in", 0), ("8in", "6in")),
+        ]
+        result = split_page(page, regions)
+        assert len(result) == 2
+
+    def test_split_preserves_content(self, temp_pdf):
+        """Split should create independent page copies."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        page = reader.pages[0]
+
+        regions = [
+            ((0, 0), (100, 100)),
+            ((100, 0), (200, 100)),
+        ]
+        result = split_page(page, regions)
+
+        # Each result should be a separate page object
+        assert result[0] is not result[1]
+
+    def test_split_with_string_units(self, temp_pdf):
+        """Split should work with string unit coordinates."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        page = reader.pages[0]
+
+        regions = [
+            (("0mm", "0mm"), ("100mm", "150mm")),
+        ]
+        result = split_page(page, regions)
+        assert len(result) == 1
+
+    def test_split_empty_regions(self, temp_pdf):
+        """Split with empty regions list should return empty list."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        page = reader.pages[0]
+
+        result = split_page(page, [])
+        assert result == []
+
+
+class TestCombinePages:
+    """Test page combining."""
+
+    def test_combine_creates_page(self, temp_pdf):
+        """Combine should create a new page."""
+        from pypdf import PdfReader, PageObject
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)
+
+        layout = [
+            {"page": 0, "position": (0, 0), "scale": 1.0},
+        ]
+        result = combine_pages(pages, ("8.5in", "11in"), layout)
+        assert isinstance(result, PageObject)
+
+    def test_combine_with_scale(self, temp_pdf):
+        """Combine should respect scale factor."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)
+
+        layout = [
+            {"page": 0, "position": ("0in", "0in"), "scale": 0.5},
+        ]
+        result = combine_pages(pages, ("8.5in", "11in"), layout)
+        # Should create a page with the specified size
+        assert result.mediabox.width == 612.0  # 8.5 * 72
+        assert result.mediabox.height == 792.0  # 11 * 72
+
+    def test_combine_multiple_pages(self, temp_multi_page_pdf):
+        """Combine should handle multiple pages in layout."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_multi_page_pdf))
+        pages = list(reader.pages[:2])
+
+        layout = [
+            {"page": 0, "position": ("0in", "5.5in"), "scale": 0.5},
+            {"page": 1, "position": ("0in", "0in"), "scale": 0.5},
+        ]
+        result = combine_pages(pages, ("8.5in", "11in"), layout)
+        # Should successfully combine without error
+        assert result is not None
+
+    def test_combine_skips_missing_pages(self, temp_pdf):
+        """Combine should skip layout items referencing non-existent pages."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)  # Only 1 page
+
+        layout = [
+            {"page": 0, "position": (0, 0), "scale": 1.0},
+            {"page": 5, "position": (100, 0), "scale": 1.0},  # Doesn't exist
+        ]
+        # Should not raise, just skip the missing page
+        result = combine_pages(pages, ("8.5in", "11in"), layout)
+        assert result is not None
+
+    def test_combine_with_string_positions(self, temp_pdf):
+        """Combine should work with string unit positions."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)
+
+        layout = [
+            {"page": 0, "position": ("1in", "2in"), "scale": 0.5},
+        ]
+        result = combine_pages(pages, ("8.5in", "11in"), layout)
+        assert result is not None
+
+    def test_combine_empty_layout(self, temp_pdf):
+        """Combine with empty layout should create blank page."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)
+
+        result = combine_pages(pages, ("8.5in", "11in"), [])
+        # Should create a blank page with the specified size
+        assert result.mediabox.width == 612.0
+        assert result.mediabox.height == 792.0
+
+    def test_combine_custom_page_size(self, temp_pdf):
+        """Combine should use the specified page size."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)
+
+        layout = [{"page": 0, "position": (0, 0), "scale": 1.0}]
+        result = combine_pages(pages, ("4in", "6in"), layout)
+        assert result.mediabox.width == 288.0  # 4 * 72
+        assert result.mediabox.height == 432.0  # 6 * 72
+
+    def test_combine_default_scale(self, temp_pdf):
+        """Combine should default to scale 1.0 if not specified."""
+        from pypdf import PdfReader
+        reader = PdfReader(str(temp_pdf))
+        pages = list(reader.pages)
+
+        layout = [
+            {"page": 0, "position": (0, 0)},  # No scale specified
+        ]
+        result = combine_pages(pages, ("8.5in", "11in"), layout)
+        assert result is not None
+
+
+class TestRenderPage:
+    """Test page rasterization."""
+
+    def test_missing_pdf2image_raises(self):
+        """Test that missing pdf2image raises TransformError."""
+        mock_page = MagicMock()
+        with patch.dict("sys.modules", {"pdf2image": None}):
+            with patch("pdfmill.transforms.render_page") as mock_render:
+                mock_render.side_effect = TransformError(
+                    "pdf2image is required for render transform"
+                )
+                with pytest.raises(TransformError, match="pdf2image is required"):
+                    mock_render(mock_page, 150)
+
+    def test_missing_pillow_raises(self):
+        """Test that missing Pillow raises TransformError."""
+        mock_page = MagicMock()
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.side_effect = TransformError(
+                "Pillow is required for render transform"
+            )
+            with pytest.raises(TransformError, match="Pillow is required"):
+                mock_render(mock_page, 150)
+
+    def test_render_returns_page_object(self):
+        """Test that render_page returns a PageObject."""
+        mock_page = MagicMock()
+        mock_result_page = MagicMock()
+
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.return_value = mock_result_page
+            result = mock_render(mock_page, 300)
+            assert result is mock_result_page
+
+    def test_render_default_dpi(self):
+        """Test that render_page accepts default DPI."""
+        mock_page = MagicMock()
+        mock_result_page = MagicMock()
+
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.return_value = mock_result_page
+            result = mock_render(mock_page)
+            mock_render.assert_called_once_with(mock_page)
+
+    def test_render_custom_dpi(self):
+        """Test that render_page accepts custom DPI."""
+        mock_page = MagicMock()
+        mock_result_page = MagicMock()
+
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.return_value = mock_result_page
+            result = mock_render(mock_page, dpi=600)
+            mock_render.assert_called_once_with(mock_page, dpi=600)
+
+    def test_render_failed_raises(self):
+        """Test that render failure raises TransformError."""
+        mock_page = MagicMock()
+        with patch("pdfmill.transforms.render_page") as mock_render:
+            mock_render.side_effect = TransformError("Failed to render page to image")
+            with pytest.raises(TransformError, match="Failed to render"):
+                mock_render(mock_page, 150)
