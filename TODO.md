@@ -76,7 +76,45 @@ Features and improvements planned for pdfmill.
 - [ ] Publish to PyPI
 
 ## Future Considerations
-- [ ] GUI configuration editor
+- [x] GUI configuration editor
 - [ ] Watch mode for automatic processing of new files
 - [ ] Config inheritance/imports (extend from base configs)
 - [ ] Logging with configurable verbosity levels
+
+---
+
+## System Design Improvements
+
+Architecture improvements to enhance maintainability and extensibility.
+
+### Completed
+
+- [x] **Enums for constrained values** - Added `StampPosition`, `SortOrder`, `FilterMatch`, `ErrorHandling`, `FitMode` enums in `config.py`
+- [x] **Improved ConfigError** - Added context fields (profile, transform_idx, field, suggestion) for better error messages
+
+### Phase 2: Validation (Medium Risk)
+
+- [ ] Validate page specs at config load time
+- [ ] Add `--validate --strict` mode for external resources (printers, paths)
+
+### Phase 3: Transform Registry (Higher Risk)
+
+- [ ] Define BaseTransform protocol/ABC
+- [ ] Implement TransformRegistry for plugin-style transforms
+- [ ] Migrate existing transforms to class-based
+- [ ] Eliminate 150-line elif dispatch chain in processor.py
+
+### Phase 4: Separation of Concerns (Higher Risk)
+
+- [ ] Extract PrintPipeline from processor.py
+- [ ] Create TransformExecutor class
+- [ ] Reduce processor.py to pure orchestration
+
+### Quick Reference
+
+| Improvement | Impact | Effort | Status |
+|-------------|--------|--------|--------|
+| Transform Registry | High | Medium | Pending |
+| Extract PrintPipeline | High | Medium | Pending |
+| Early Validation | Medium | Low | Pending |
+| Transform Context | Low | Low | Pending |

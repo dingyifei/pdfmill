@@ -5,7 +5,17 @@ from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
-from pdfmill.config import Config, ConfigError, FilterConfig, OutputProfile, PrintTarget, Transform
+from pdfmill.config import (
+    Config,
+    ConfigError,
+    ErrorHandling,
+    FilterConfig,
+    FilterMatch,
+    OutputProfile,
+    PrintTarget,
+    SortOrder,
+    Transform,
+)
 from pdfmill.selector import select_pages, PageSelectionError
 from pdfmill.transforms import rotate_page, crop_page, resize_page, stamp_page, split_page, combine_pages, render_page, TransformError
 from pdfmill.printer import print_pdf, PrinterError
@@ -46,9 +56,9 @@ def matches_filter(pdf_path: Path, filter_config: FilterConfig) -> bool:
 
     text = extract_pdf_text(pdf_path)
 
-    if filter_config.match == "all":
+    if filter_config.match == FilterMatch.ALL:
         return all(kw in text for kw in filter_config.keywords)
-    else:  # "any"
+    else:  # FilterMatch.ANY
         return any(kw in text for kw in filter_config.keywords)
 
 
@@ -71,29 +81,23 @@ def get_input_files(input_path: Path, pattern: str = "*.pdf") -> list[Path]:
         raise ProcessingError(f"Input path does not exist: {input_path}")
 
 
-VALID_SORT_OPTIONS = {"name_asc", "name_desc", "time_asc", "time_desc"}
-
-
-def sort_files(files: list[Path], sort_option: str) -> list[Path]:
+def sort_files(files: list[Path], sort_option: SortOrder) -> list[Path]:
     """Sort files by name or modification time.
 
     Args:
         files: List of file paths to sort
-        sort_option: One of name_asc, name_desc, time_asc, time_desc
+        sort_option: SortOrder enum value
 
     Returns:
         Sorted list of file paths
     """
-    if sort_option not in VALID_SORT_OPTIONS:
-        raise ConfigError(f"Invalid sort option: {sort_option}. Valid options: {VALID_SORT_OPTIONS}")
-
-    if sort_option == "name_asc":
+    if sort_option == SortOrder.NAME_ASC:
         return sorted(files, key=lambda f: f.name.lower())
-    elif sort_option == "name_desc":
+    elif sort_option == SortOrder.NAME_DESC:
         return sorted(files, key=lambda f: f.name.lower(), reverse=True)
-    elif sort_option == "time_asc":
+    elif sort_option == SortOrder.TIME_ASC:
         return sorted(files, key=lambda f: f.stat().st_mtime)
-    elif sort_option == "time_desc":
+    elif sort_option == SortOrder.TIME_DESC:
         return sorted(files, key=lambda f: f.stat().st_mtime, reverse=True)
     return files
 
@@ -517,14 +521,14 @@ def process(
     for profile_name, profile in config.outputs.items():
         if config.input.sort and profile.sort:
             raise ConfigError(
-                f"Sort specified in both input ({config.input.sort}) "
-                f"and profile '{profile_name}' ({profile.sort}). Use only one."
+                f"Sort specified in both input ({config.input.sort.value}) "
+                f"and profile '{profile_name}' ({profile.sort.value}). Use only one."
             )
 
     # Apply global input sorting if configured
     if config.input.sort:
         input_files = sort_files(input_files, config.input.sort)
-        print(f"Sorted files by: {config.input.sort}")
+        print(f"Sorted files by: {config.input.sort.value}")
 
     success_count = 0
     fail_count = 0
@@ -560,7 +564,7 @@ def process(
             except (ProcessingError, TransformError) as e:
                 print(f"  Error in profile '{profile_name}': {e}")
                 fail_count += 1
-                if config.settings.on_error == "stop":
+                if config.settings.on_error == ErrorHandling.STOP:
                     raise
 
     # Track merged files for cleanup (outside dry_run block for scope)
@@ -587,15 +591,15 @@ def process(
             # Apply per-profile sorting if configured (and no global sort)
             if profile.sort:
                 # Sort by source file
-                if profile.sort == "name_asc":
+                if profile.sort == SortOrder.NAME_ASC:
                     profile_files = sorted(profile_files, key=lambda x: x[2].name.lower())
-                elif profile.sort == "name_desc":
+                elif profile.sort == SortOrder.NAME_DESC:
                     profile_files = sorted(profile_files, key=lambda x: x[2].name.lower(), reverse=True)
-                elif profile.sort == "time_asc":
+                elif profile.sort == SortOrder.TIME_ASC:
                     profile_files = sorted(profile_files, key=lambda x: x[2].stat().st_mtime)
-                elif profile.sort == "time_desc":
+                elif profile.sort == SortOrder.TIME_DESC:
                     profile_files = sorted(profile_files, key=lambda x: x[2].stat().st_mtime, reverse=True)
-                print(f"Sorted profile '{profile_name}' files by: {profile.sort}")
+                print(f"Sorted profile '{profile_name}' files by: {profile.sort.value}")
 
             targets = profile.print.targets
             merge_output_dir = output_dir if output_dir else profile.output_dir
@@ -646,7 +650,7 @@ def process(
             except PrinterError as e:
                 print(f"  Print error: {e}")
                 fail_count += 1
-                if config.settings.on_error == "stop":
+                if config.settings.on_error == ErrorHandling.STOP:
                     raise
 
     # Cleanup

@@ -9,6 +9,8 @@ from typing import Literal
 
 from pypdf import PageObject, PdfReader, PdfWriter, Transformation
 
+from pdfmill.config import FitMode, StampPosition
+
 
 class TransformError(Exception):
     """Raised when a transformation fails."""
@@ -280,7 +282,7 @@ def resize_page(
     page: PageObject,
     width: str,
     height: str,
-    fit: Literal["contain", "cover", "stretch"] = "contain",
+    fit: FitMode = FitMode.CONTAIN,
 ) -> PageObject:
     """
     Resize a page to the target dimensions.
@@ -289,10 +291,10 @@ def resize_page(
         page: The page to resize
         width: Target width (e.g., "100mm", "4in")
         height: Target height (e.g., "150mm", "6in")
-        fit: How to fit content:
-            - "contain": Scale uniformly to fit within target, centered (may have whitespace)
-            - "cover": Scale uniformly to fill target, centered (may crop edges)
-            - "stretch": Stretch non-uniformly to exactly match target
+        fit: FitMode enum value:
+            - CONTAIN: Scale uniformly to fit within target, centered (may have whitespace)
+            - COVER: Scale uniformly to fill target, centered (may crop edges)
+            - STRETCH: Stretch non-uniformly to exactly match target
 
     Returns:
         The resized page (mutates in place and returns)
@@ -302,7 +304,7 @@ def resize_page(
 
     current_width, current_height = get_page_dimensions(page)
 
-    if fit == "stretch":
+    if fit == FitMode.STRETCH:
         # Non-uniform scaling using transformation matrix
         scale_x = target_width / current_width
         scale_y = target_height / current_height
@@ -314,14 +316,14 @@ def resize_page(
         # Update mediabox to target dimensions
         page.mediabox.lower_left = (0, 0)
         page.mediabox.upper_right = (target_width, target_height)
-    elif fit in ("contain", "cover"):
+    elif fit in (FitMode.CONTAIN, FitMode.COVER):
         # Uniform scaling
         scale_x = target_width / current_width
         scale_y = target_height / current_height
 
-        if fit == "contain":
+        if fit == FitMode.CONTAIN:
             scale = min(scale_x, scale_y)
-        else:  # cover
+        else:  # COVER
             scale = max(scale_x, scale_y)
 
         # Calculate scaled dimensions
@@ -340,13 +342,14 @@ def resize_page(
         page.mediabox.lower_left = (0, 0)
         page.mediabox.upper_right = (target_width, target_height)
     else:
-        raise TransformError(f"Unknown fit mode: {fit}")
+        # This should never happen with proper enum usage
+        valid = ", ".join(f.value for f in FitMode)
+        raise TransformError(f"Unknown fit mode: {fit}. Valid options: {valid}")
 
     return page
 
 
-# Valid position presets for stamp transform
-STAMP_POSITIONS = {"top-left", "top-right", "bottom-left", "bottom-right", "center", "custom"}
+# Valid position presets are defined by the StampPosition enum in config.py
 
 
 def _create_text_overlay(
@@ -391,7 +394,7 @@ def _create_text_overlay(
 
 
 def _calculate_stamp_position(
-    position: str,
+    position: StampPosition,
     page_width: float,
     page_height: float,
     text: str,
@@ -404,14 +407,14 @@ def _calculate_stamp_position(
     Calculate x, y coordinates for stamp based on position preset.
 
     Args:
-        position: Position preset or "custom"
+        position: StampPosition enum value
         page_width: Page width in points
         page_height: Page height in points
         text: Text to stamp (for width estimation)
         font_size: Font size in points
         margin: Margin from edge in points
-        custom_x: Custom X coordinate (used when position="custom")
-        custom_y: Custom Y coordinate (used when position="custom")
+        custom_x: Custom X coordinate (used when position=CUSTOM)
+        custom_y: Custom Y coordinate (used when position=CUSTOM)
 
     Returns:
         (x, y) coordinates in points
@@ -420,20 +423,22 @@ def _calculate_stamp_position(
     text_width = len(text) * font_size * 0.5
     text_height = font_size
 
-    if position == "custom":
+    if position == StampPosition.CUSTOM:
         return custom_x, custom_y
-    elif position == "top-left":
+    elif position == StampPosition.TOP_LEFT:
         return margin, page_height - margin - text_height
-    elif position == "top-right":
+    elif position == StampPosition.TOP_RIGHT:
         return page_width - margin - text_width, page_height - margin - text_height
-    elif position == "bottom-left":
+    elif position == StampPosition.BOTTOM_LEFT:
         return margin, margin
-    elif position == "bottom-right":
+    elif position == StampPosition.BOTTOM_RIGHT:
         return page_width - margin - text_width, margin
-    elif position == "center":
+    elif position == StampPosition.CENTER:
         return (page_width - text_width) / 2, (page_height - text_height) / 2
     else:
-        raise TransformError(f"Unknown stamp position: {position}. Valid options: {STAMP_POSITIONS}")
+        # This should never happen with proper enum usage
+        valid = ", ".join(p.value for p in StampPosition)
+        raise TransformError(f"Unknown stamp position: {position}. Valid options: {valid}")
 
 
 def _format_stamp_text(
@@ -469,7 +474,7 @@ def _format_stamp_text(
 def stamp_page(
     page: PageObject,
     text: str,
-    position: str = "bottom-right",
+    position: StampPosition = StampPosition.BOTTOM_RIGHT,
     x: float | str = 0,
     y: float | str = 0,
     font_size: int = 10,
@@ -492,9 +497,9 @@ def stamp_page(
     Args:
         page: The page to stamp
         text: Text to stamp (with placeholder support)
-        position: Position preset or "custom"
-        x: X coordinate (used when position="custom")
-        y: Y coordinate (used when position="custom")
+        position: StampPosition enum value
+        x: X coordinate (used when position=CUSTOM)
+        y: Y coordinate (used when position=CUSTOM)
         font_size: Font size in points
         font_name: Font name (PDF standard font)
         margin: Margin from edge for preset positions
@@ -505,13 +510,10 @@ def stamp_page(
     Returns:
         The stamped page (mutates in place and returns)
     """
-    if position not in STAMP_POSITIONS:
-        raise TransformError(f"Unknown stamp position: {position}. Valid options: {STAMP_POSITIONS}")
-
     # Parse coordinates and margin
     margin_pts = _parse_coordinate(margin)
-    x_pts = _parse_coordinate(x) if position == "custom" else 0
-    y_pts = _parse_coordinate(y) if position == "custom" else 0
+    x_pts = _parse_coordinate(x) if position == StampPosition.CUSTOM else 0
+    y_pts = _parse_coordinate(y) if position == StampPosition.CUSTOM else 0
 
     # Get page dimensions
     page_width, page_height = get_page_dimensions(page)

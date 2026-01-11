@@ -2,14 +2,109 @@
 
 import shlex
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 
+# ============================================================================
+# Enums for constrained string values
+# ============================================================================
+
+
+class StampPosition(str, Enum):
+    """Valid positions for stamp transforms."""
+
+    TOP_LEFT = "top-left"
+    TOP_RIGHT = "top-right"
+    BOTTOM_LEFT = "bottom-left"
+    BOTTOM_RIGHT = "bottom-right"
+    CENTER = "center"
+    CUSTOM = "custom"
+
+
+class SortOrder(str, Enum):
+    """Valid sort orders for file processing."""
+
+    NAME_ASC = "name_asc"
+    NAME_DESC = "name_desc"
+    TIME_ASC = "time_asc"
+    TIME_DESC = "time_desc"
+
+
+class FilterMatch(str, Enum):
+    """Filter matching modes."""
+
+    ANY = "any"  # OR: match if any keyword found
+    ALL = "all"  # AND: match only if all keywords found
+
+
+class ErrorHandling(str, Enum):
+    """Error handling modes."""
+
+    CONTINUE = "continue"  # Skip failed items, continue processing
+    STOP = "stop"  # Stop on first error
+
+
+class FitMode(str, Enum):
+    """Resize fit modes."""
+
+    CONTAIN = "contain"  # Fit within bounds, preserve aspect ratio
+    COVER = "cover"  # Cover bounds, may crop
+    STRETCH = "stretch"  # Stretch to exact dimensions
+
+
+# ============================================================================
+# Exceptions
+# ============================================================================
+
+
 class ConfigError(Exception):
-    """Raised when configuration is invalid."""
+    """Raised when configuration is invalid.
+
+    Attributes:
+        message: The error message.
+        profile: Name of the profile where error occurred (if applicable).
+        transform_idx: Index of the transform where error occurred (if applicable).
+        field: Name of the field with the error (if applicable).
+        suggestion: Suggested fix for the error (if applicable).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        profile: str | None = None,
+        transform_idx: int | None = None,
+        field: str | None = None,
+        suggestion: str | None = None,
+    ):
+        self.message = message
+        self.profile = profile
+        self.transform_idx = transform_idx
+        self.field = field
+        self.suggestion = suggestion
+        super().__init__(str(self))
+
+    def __str__(self) -> str:
+        parts = []
+
+        # Build context path
+        if self.profile:
+            context = f"In profile '{self.profile}'"
+            if self.transform_idx is not None:
+                context += f", transform #{self.transform_idx + 1}"
+            if self.field:
+                context += f", field '{self.field}'"
+            parts.append(context)
+
+        parts.append(self.message)
+
+        if self.suggestion:
+            parts.append(f"Suggestion: {self.suggestion}")
+
+        return "\n".join(parts)
 
 
 def _parse_args(args: list) -> list[str]:
@@ -21,6 +116,41 @@ def _parse_args(args: list) -> list[str]:
         else:
             result.append(str(arg))
     return result
+
+
+def _parse_enum(
+    enum_class: type[Enum],
+    value: str,
+    profile: str | None = None,
+    transform_idx: int | None = None,
+    field: str | None = None,
+) -> Enum:
+    """Parse a string value into an enum with validation.
+
+    Args:
+        enum_class: The enum class to parse into.
+        value: The string value to parse.
+        profile: Profile name for error context.
+        transform_idx: Transform index for error context.
+        field: Field name for error context.
+
+    Returns:
+        The parsed enum value.
+
+    Raises:
+        ConfigError: If the value is not a valid enum member.
+    """
+    try:
+        return enum_class(value)
+    except ValueError:
+        valid = ", ".join(e.value for e in enum_class)
+        raise ConfigError(
+            f"Invalid value '{value}'",
+            profile=profile,
+            transform_idx=transform_idx,
+            field=field,
+            suggestion=f"Valid values are: {valid}",
+        )
 
 
 @dataclass
@@ -55,7 +185,7 @@ class SizeTransform:
     """Size enforcement configuration."""
     width: str = ""  # e.g., "100mm", "4in", "288pt"
     height: str = ""
-    fit: str = "contain"  # contain, cover, stretch
+    fit: FitMode = FitMode.CONTAIN
 
 
 @dataclass
@@ -81,9 +211,9 @@ class StampTransform:
       - Custom: Use x/y coordinates with units (e.g., "10mm", "0.5in")
     """
     text: str = "{page}/{total}"  # Text with placeholders
-    position: str = "bottom-right"  # Preset or "custom"
-    x: str | float = "10mm"  # X coordinate (used when position="custom")
-    y: str | float = "10mm"  # Y coordinate (used when position="custom")
+    position: StampPosition = StampPosition.BOTTOM_RIGHT
+    x: str | float = "10mm"  # X coordinate (used when position=CUSTOM)
+    y: str | float = "10mm"  # Y coordinate (used when position=CUSTOM)
     font_size: int = 10
     font_name: str = "Helvetica"  # PDF standard font
     margin: str | float = "10mm"  # Margin from edge for preset positions
@@ -154,13 +284,13 @@ class OutputProfile:
     transforms: list[Transform] = field(default_factory=list)
     print: PrintConfig = field(default_factory=PrintConfig)
     debug: bool = False  # Output intermediate files after each transform
-    sort: str | None = None  # Override input.sort: name_asc, name_desc, time_asc, time_desc
+    sort: SortOrder | None = None  # Override input.sort
 
 
 @dataclass
 class Settings:
     """Global settings for the pipeline."""
-    on_error: str = "continue"  # "continue" or "stop"
+    on_error: ErrorHandling = ErrorHandling.CONTINUE
     cleanup_source: bool = False
     cleanup_output_after_print: bool = False
 
@@ -169,7 +299,7 @@ class Settings:
 class FilterConfig:
     """Keyword filter configuration for input files."""
     keywords: list[str] = field(default_factory=list)
-    match: str = "any"  # "any" (OR) or "all" (AND)
+    match: FilterMatch = FilterMatch.ANY
 
 
 @dataclass
@@ -178,7 +308,7 @@ class InputConfig:
     path: Path = Path("./input")
     pattern: str = "*.pdf"
     filter: FilterConfig | None = None
-    sort: str | None = None  # name_asc, name_desc, time_asc, time_desc
+    sort: SortOrder | None = None
 
 
 @dataclass
@@ -225,12 +355,14 @@ def parse_transform(transform_data: dict[str, Any]) -> Transform:
         )
     elif "size" in transform_data:
         size_val = transform_data["size"]
+        fit_str = size_val.get("fit", "contain")
+        fit = _parse_enum(FitMode, fit_str, field="fit")
         return Transform(
             type="size",
             size=SizeTransform(
                 width=size_val.get("width", ""),
                 height=size_val.get("height", ""),
-                fit=size_val.get("fit", "contain"),
+                fit=fit,
             ),
             enabled=enabled,
         )
@@ -241,14 +373,17 @@ def parse_transform(transform_data: dict[str, Any]) -> Transform:
             return Transform(
                 type="stamp",
                 stamp=StampTransform(text=stamp_val),
+                enabled=enabled,
             )
         elif isinstance(stamp_val, dict):
             # Complex stamp with options
+            position_str = stamp_val.get("position", "bottom-right")
+            position = _parse_enum(StampPosition, position_str, field="position")
             return Transform(
                 type="stamp",
                 stamp=StampTransform(
                     text=stamp_val.get("text", "{page}/{total}"),
-                    position=stamp_val.get("position", "bottom-right"),
+                    position=position,
                     x=stamp_val.get("x", "10mm"),
                     y=stamp_val.get("y", "10mm"),
                     font_size=stamp_val.get("font_size", 10),
@@ -256,6 +391,7 @@ def parse_transform(transform_data: dict[str, Any]) -> Transform:
                     margin=stamp_val.get("margin", "10mm"),
                     datetime_format=stamp_val.get("datetime_format", "%Y-%m-%d %H:%M:%S"),
                 ),
+                enabled=enabled,
             )
     elif "split" in transform_data:
         split_val = transform_data["split"]
@@ -351,6 +487,12 @@ def parse_output_profile(name: str, data: dict[str, Any]) -> OutputProfile:
             targets=targets,
         )
 
+    # Parse sort if provided
+    sort = None
+    sort_str = data.get("sort")
+    if sort_str:
+        sort = _parse_enum(SortOrder, sort_str, profile=name, field="sort")
+
     return OutputProfile(
         pages=data["pages"],
         enabled=data.get("enabled", True),
@@ -360,7 +502,7 @@ def parse_output_profile(name: str, data: dict[str, Any]) -> OutputProfile:
         transforms=transforms,
         print=print_config,
         debug=data.get("debug", False),
-        sort=data.get("sort"),
+        sort=sort,
     )
 
 
@@ -379,8 +521,10 @@ def load_config(config_path: Path) -> Config:
     settings = Settings()
     if "settings" in data:
         s = data["settings"]
+        on_error_str = s.get("on_error", "continue")
+        on_error = _parse_enum(ErrorHandling, on_error_str, field="settings.on_error")
         settings = Settings(
-            on_error=s.get("on_error", "continue"),
+            on_error=on_error,
             cleanup_source=s.get("cleanup_source", False),
             cleanup_output_after_print=s.get("cleanup_output_after_print", False),
         )
@@ -392,15 +536,22 @@ def load_config(config_path: Path) -> Config:
         filter_config = None
         if "filter" in i:
             f = i["filter"]
+            match_str = f.get("match", "any")
+            match = _parse_enum(FilterMatch, match_str, field="input.filter.match")
             filter_config = FilterConfig(
                 keywords=f.get("keywords", []),
-                match=f.get("match", "any"),
+                match=match,
             )
+        # Parse input sort if provided
+        input_sort = None
+        input_sort_str = i.get("sort")
+        if input_sort_str:
+            input_sort = _parse_enum(SortOrder, input_sort_str, field="input.sort")
         input_config = InputConfig(
             path=Path(i.get("path", "./input")),
             pattern=i.get("pattern", "*.pdf"),
             filter=filter_config,
-            sort=i.get("sort"),
+            sort=input_sort,
         )
 
     # Parse outputs

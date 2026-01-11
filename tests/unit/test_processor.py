@@ -23,6 +23,7 @@ from pdfmill.config import (
     Settings,
     PrintConfig,
     PrintTarget,
+    SortOrder,
 )
 
 
@@ -492,7 +493,7 @@ class TestSortFiles:
                 writer.write(f)
 
         files = list(temp_dir.glob("*.pdf"))
-        sorted_files = sort_files(files, "name_asc")
+        sorted_files = sort_files(files, SortOrder.NAME_ASC)
 
         assert [f.name for f in sorted_files] == ["alpha.pdf", "bravo.pdf", "charlie.pdf"]
 
@@ -508,7 +509,7 @@ class TestSortFiles:
                 writer.write(f)
 
         files = list(temp_dir.glob("*.pdf"))
-        sorted_files = sort_files(files, "name_desc")
+        sorted_files = sort_files(files, SortOrder.NAME_DESC)
 
         assert [f.name for f in sorted_files] == ["charlie.pdf", "bravo.pdf", "alpha.pdf"]
 
@@ -529,16 +530,24 @@ class TestSortFiles:
             os.utime(pdf, (1000000 + i * 1000, 1000000 + i * 1000))
 
         files = list(temp_dir.glob("*.pdf"))
-        sorted_files = sort_files(files, "time_asc")
+        sorted_files = sort_files(files, SortOrder.TIME_ASC)
 
         assert [f.name for f in sorted_files] == ["first.pdf", "second.pdf", "third.pdf"]
 
-    def test_sort_invalid_option_raises(self, temp_dir):
+    def test_sort_with_enum(self, temp_dir):
+        """Test that sort_files works with SortOrder enum."""
         from pdfmill.processor import sort_files
-        from pdfmill.config import ConfigError
 
-        with pytest.raises(ConfigError, match="Invalid sort option"):
-            sort_files([], "invalid_sort")
+        # Create test files
+        for name in ["a.pdf", "b.pdf", "c.pdf"]:
+            (temp_dir / name).touch()
+
+        files = list(temp_dir.glob("*.pdf"))
+        sorted_files = sort_files(files, SortOrder.NAME_ASC)
+        assert [f.name for f in sorted_files] == ["a.pdf", "b.pdf", "c.pdf"]
+
+        sorted_files = sort_files(files, SortOrder.NAME_DESC)
+        assert [f.name for f in sorted_files] == ["c.pdf", "b.pdf", "a.pdf"]
 
 
 class TestSplitPagesByWeight:
@@ -670,11 +679,11 @@ class TestMultiPrinterIntegration:
         from pdfmill.config import InputConfig, ConfigError
 
         config = Config(
-            input=InputConfig(sort="name_asc"),
+            input=InputConfig(sort=SortOrder.NAME_ASC),
             outputs={
                 "label": OutputProfile(
                     pages="all",
-                    sort="time_desc",  # Conflicts with input.sort
+                    sort=SortOrder.TIME_DESC,  # Conflicts with input.sort
                 )
             }
         )

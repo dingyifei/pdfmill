@@ -17,10 +17,10 @@ from pdfmill.transforms import (
     detect_page_orientation,
     TransformError,
     UNIT_TO_POINTS,
-    STAMP_POSITIONS,
     _format_stamp_text,
     _calculate_stamp_position,
 )
+from pdfmill.config import StampPosition
 
 
 class TestParseDimension:
@@ -404,14 +404,14 @@ class TestCalculateStampPosition:
 
     def test_bottom_left(self):
         x, y = _calculate_stamp_position(
-            "bottom-left", 612, 792, "test", 12, 28.35  # 10mm margin
+            StampPosition.BOTTOM_LEFT, 612, 792, "test", 12, 28.35  # 10mm margin
         )
         assert x == 28.35  # margin
         assert y == 28.35  # margin
 
     def test_bottom_right(self):
         x, y = _calculate_stamp_position(
-            "bottom-right", 612, 792, "test", 12, 28.35
+            StampPosition.BOTTOM_RIGHT, 612, 792, "test", 12, 28.35
         )
         # text_width ≈ 4 * 12 * 0.5 = 24
         assert x < 612  # should be near right edge
@@ -419,21 +419,21 @@ class TestCalculateStampPosition:
 
     def test_top_left(self):
         x, y = _calculate_stamp_position(
-            "top-left", 612, 792, "test", 12, 28.35
+            StampPosition.TOP_LEFT, 612, 792, "test", 12, 28.35
         )
         assert x == 28.35  # margin
         assert y > 750  # near top
 
     def test_top_right(self):
         x, y = _calculate_stamp_position(
-            "top-right", 612, 792, "test", 12, 28.35
+            StampPosition.TOP_RIGHT, 612, 792, "test", 12, 28.35
         )
         assert x < 612
         assert y > 750
 
     def test_center(self):
         x, y = _calculate_stamp_position(
-            "center", 612, 792, "test", 12, 28.35
+            StampPosition.CENTER, 612, 792, "test", 12, 28.35
         )
         # Should be roughly centered
         assert 250 < x < 350
@@ -441,15 +441,11 @@ class TestCalculateStampPosition:
 
     def test_custom_position(self):
         x, y = _calculate_stamp_position(
-            "custom", 612, 792, "test", 12, 28.35,
+            StampPosition.CUSTOM, 612, 792, "test", 12, 28.35,
             custom_x=100, custom_y=200
         )
         assert x == 100
         assert y == 200
-
-    def test_invalid_position_raises(self):
-        with pytest.raises(TransformError, match="Unknown stamp position"):
-            _calculate_stamp_position("invalid", 612, 792, "test", 12, 10)
 
 
 def _has_reportlab():
@@ -480,14 +476,11 @@ def _create_minimal_pdf_bytes():
 class TestStampPage:
     """Test stamp page transformation."""
 
-    def test_stamp_invalid_position_raises(self, mock_page):
-        with pytest.raises(TransformError, match="Unknown stamp position"):
-            stamp_page(mock_page, "test", position="invalid")
-
     def test_stamp_valid_positions(self):
-        """Verify all valid positions are in STAMP_POSITIONS."""
+        """Verify all expected positions are in StampPosition enum."""
         expected = {"top-left", "top-right", "bottom-left", "bottom-right", "center", "custom"}
-        assert STAMP_POSITIONS == expected
+        actual = {pos.value for pos in StampPosition}
+        assert actual == expected
 
     @pytest.mark.skipif(
         not _has_reportlab(),
@@ -503,7 +496,7 @@ class TestStampPage:
                 mock_overlay_page = MagicMock()
                 mock_reader.return_value.pages = [mock_overlay_page]
 
-                stamp_page(mock_page, "test", position="bottom-right")
+                stamp_page(mock_page, "test", position=StampPosition.BOTTOM_RIGHT)
 
                 mock_page.merge_page.assert_called_once_with(mock_overlay_page)
 
@@ -536,7 +529,7 @@ class TestStampIntegration:
         stamp_page(
             page,
             text="1/1",
-            position="bottom-right",
+            position=StampPosition.BOTTOM_RIGHT,
             font_size=12,
             margin="10mm",
             page_num=1,
@@ -571,7 +564,7 @@ class TestStampIntegration:
             stamp_page(
                 page,
                 text="{page}/{total}",
-                position="bottom-right",
+                position=StampPosition.BOTTOM_RIGHT,
                 page_num=i + 1,
                 total_pages=total,
             )
@@ -594,7 +587,13 @@ class TestStampIntegration:
         """Test all position presets work without error."""
         from pypdf import PdfReader
 
-        positions = ["top-left", "top-right", "bottom-left", "bottom-right", "center"]
+        positions = [
+            StampPosition.TOP_LEFT,
+            StampPosition.TOP_RIGHT,
+            StampPosition.BOTTOM_LEFT,
+            StampPosition.BOTTOM_RIGHT,
+            StampPosition.CENTER,
+        ]
 
         for position in positions:
             reader = PdfReader(temp_pdf)
@@ -613,7 +612,7 @@ class TestStampIntegration:
         stamp_page(
             page,
             text="Custom",
-            position="custom",
+            position=StampPosition.CUSTOM,
             x="50mm",
             y="100mm",
         )
@@ -629,7 +628,7 @@ class TestStampIntegration:
         stamp_page(
             page,
             text="{datetime}",
-            position="bottom-right",
+            position=StampPosition.BOTTOM_RIGHT,
             datetime_format="%Y-%m-%d",
         )
 
