@@ -3,9 +3,7 @@
 import re
 from typing import Sequence
 
-
-class PageSelectionError(Exception):
-    """Raised when page selection specification is invalid."""
+from pdfmill.exceptions import PageSelectionError
 
 
 def select_pages(spec: str | list[int], total_pages: int) -> list[int]:

@@ -39,14 +39,23 @@ from pdfmill.config import (
     PrintConfig, PrintTarget, Transform, RotateTransform, CropTransform,
     SizeTransform, load_config, ConfigError,
 )
+from pdfmill.constants import (
+    ON_ERROR_OPTIONS as _ON_ERROR_OPTIONS,
+    SORT_OPTIONS as _SORT_OPTIONS,
+    MATCH_MODES as _MATCH_MODES,
+    TRANSFORM_TYPES as _TRANSFORM_TYPES,
+    ROTATE_ANGLES as _ROTATE_ANGLES,
+    ROTATE_ORIENTATIONS as _ROTATE_ORIENTATIONS,
+    FIT_MODES as _FIT_MODES,
+)
 
-# Constants for dropdowns
-ON_ERROR_OPTIONS = ["continue", "stop"]
-SORT_OPTIONS = ["", "name_asc", "name_desc", "time_asc", "time_desc"]
-MATCH_OPTIONS = ["any", "all"]
-TRANSFORM_TYPES = ["rotate", "crop", "size"]
-ROTATE_ANGLES = ["0", "90", "180", "270", "landscape", "portrait", "auto"]
-FIT_MODES = ["contain", "cover", "stretch"]
+# Convert tuples to lists for tkinter dropdowns, with GUI-specific additions
+ON_ERROR_OPTIONS = list(_ON_ERROR_OPTIONS)
+SORT_OPTIONS = [""] + list(_SORT_OPTIONS)  # Empty option for "no sort"
+MATCH_OPTIONS = list(_MATCH_MODES)
+TRANSFORM_TYPES = list(_TRANSFORM_TYPES)
+ROTATE_ANGLES = [str(a) for a in _ROTATE_ANGLES] + list(_ROTATE_ORIENTATIONS)
+FIT_MODES = list(_FIT_MODES)
 
 
 class SettingsFrame(ttk.LabelFrame):

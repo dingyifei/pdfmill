@@ -5,14 +5,18 @@ from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
-from pdfmill.config import Config, ConfigError, FilterConfig, OutputProfile, PrintTarget, Transform
-from pdfmill.selector import select_pages, PageSelectionError
-from pdfmill.transforms import rotate_page, crop_page, resize_page, TransformError
-from pdfmill.printer import print_pdf, PrinterError
-
-
-class ProcessingError(Exception):
-    """Raised when PDF processing fails."""
+from pdfmill.config import Config, FilterConfig, OutputProfile, PrintTarget, Transform
+from pdfmill.constants import SORT_OPTIONS
+from pdfmill.exceptions import (
+    ConfigError,
+    PageSelectionError,
+    PrinterError,
+    ProcessingError,
+    TransformError,
+)
+from pdfmill.selector import select_pages
+from pdfmill.transforms import rotate_page, crop_page, resize_page
+from pdfmill.printer import print_pdf
 
 
 def extract_pdf_text(pdf_path: Path) -> str:
@@ -71,9 +75,6 @@ def get_input_files(input_path: Path, pattern: str = "*.pdf") -> list[Path]:
         raise ProcessingError(f"Input path does not exist: {input_path}")
 
 
-VALID_SORT_OPTIONS = {"name_asc", "name_desc", "time_asc", "time_desc"}
-
-
 def sort_files(files: list[Path], sort_option: str) -> list[Path]:
     """Sort files by name or modification time.
 
@@ -84,8 +85,8 @@ def sort_files(files: list[Path], sort_option: str) -> list[Path]:
     Returns:
         Sorted list of file paths
     """
-    if sort_option not in VALID_SORT_OPTIONS:
-        raise ConfigError(f"Invalid sort option: {sort_option}. Valid options: {VALID_SORT_OPTIONS}")
+    if sort_option not in SORT_OPTIONS:
+        raise ConfigError(f"Invalid sort option: {sort_option}. Valid options: {SORT_OPTIONS}")
 
     if sort_option == "name_asc":
         return sorted(files, key=lambda f: f.name.lower())

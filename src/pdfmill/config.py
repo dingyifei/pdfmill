@@ -7,9 +7,7 @@ from typing import Any
 
 import yaml
 
-
-class ConfigError(Exception):
-    """Raised when configuration is invalid."""
+from pdfmill.exceptions import ConfigError
 
 
 def _parse_args(args: list) -> list[str]:

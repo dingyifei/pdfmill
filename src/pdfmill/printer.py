@@ -8,6 +8,8 @@ import sys
 import urllib.request
 from pathlib import Path
 
+from pdfmill.exceptions import PrinterError
+
 # SumatraPDF version to download
 SUMATRA_VERSION = "3.5.2"
 
@@ -17,10 +19,6 @@ SUMATRA_URLS = {
     "arm64": f"https://www.sumatrapdfreader.org/dl/rel/{SUMATRA_VERSION}/SumatraPDF-{SUMATRA_VERSION}-arm64.exe",
     "x86": f"https://www.sumatrapdfreader.org/dl/rel/{SUMATRA_VERSION}/SumatraPDF-{SUMATRA_VERSION}.exe",
 }
-
-
-class PrinterError(Exception):
-    """Raised when printing fails."""
 
 
 def get_architecture() -> str:

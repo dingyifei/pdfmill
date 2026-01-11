@@ -6,9 +6,8 @@ from typing import Literal
 
 from pypdf import PageObject, Transformation
 
-
-class TransformError(Exception):
-    """Raised when a transformation fails."""
+from pdfmill.constants import UNIT_TO_POINTS
+from pdfmill.exceptions import TransformError
 
 
 def detect_page_orientation(pdf_path: str, page_num: int = 0) -> int:
@@ -71,15 +70,6 @@ def detect_page_orientation(pdf_path: str, page_num: int = 0) -> int:
         )
     except Exception as e:
         raise TransformError(f"OCR orientation detection failed: {e}")
-
-
-# Conversion factors to points (72 points per inch)
-UNIT_TO_POINTS = {
-    "pt": 1.0,
-    "in": 72.0,
-    "mm": 72.0 / 25.4,
-    "cm": 72.0 / 2.54,
-}
 
 
 def parse_dimension(value: str) -> float:
