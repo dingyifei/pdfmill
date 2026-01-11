@@ -15,7 +15,7 @@ from pdfmill.exceptions import (
     TransformError,
 )
 from pdfmill.selector import select_pages
-from pdfmill.transforms import rotate_page, crop_page, resize_page
+from pdfmill.transforms import TransformRegistry, TransformContext
 from pdfmill.printer import print_pdf
 
 
@@ -205,14 +205,11 @@ def split_pages_by_weight(
 
 def _get_transform_description(transform: Transform) -> str:
     """Get a short description of a transform for debug filenames."""
-    if transform.type == "rotate" and transform.rotate:
-        angle = transform.rotate.angle
-        return f"rotate{angle}"
-    elif transform.type == "crop" and transform.crop:
-        return "crop"
-    elif transform.type == "size" and transform.size:
-        size = transform.size
-        return f"size_{size.fit}"
+    if TransformRegistry.is_registered(transform.type):
+        handler = TransformRegistry.get_instance(transform.type)
+        desc = handler.describe(transform)
+        # Convert to filename-safe format
+        return desc.lower().replace(" ", "_").replace(":", "")
     return transform.type
 
 
@@ -277,41 +274,30 @@ def apply_transforms(
     for step_num, transform in enumerate(transforms, start=1):
         step_desc = _get_transform_description(transform)
 
-        if transform.type == "rotate" and transform.rotate:
-            rot = transform.rotate
-            pages_to_rotate = rot.pages if rot.pages else list(range(len(pages)))
+        # Get handler from registry
+        handler = TransformRegistry.get_instance(transform.type)
 
-            for idx in pages_to_rotate:
-                if idx < len(pages):
-                    if dry_run:
-                        print(f"    [dry-run] Rotate page {idx + 1} by {rot.angle}")
-                    else:
-                        # For auto rotation, we need the original page number in the source PDF
-                        orig_page_num = None
-                        if original_page_indices and idx < len(original_page_indices):
-                            orig_page_num = original_page_indices[idx]
-                        rotate_page(
-                            pages[idx],
-                            rot.angle,
-                            pdf_path=str(pdf_path) if pdf_path else None,
-                            page_num=orig_page_num,
-                        )
+        for i, page in enumerate(pages):
+            # Build context for this page
+            orig_page_num = None
+            if original_page_indices and i < len(original_page_indices):
+                orig_page_num = original_page_indices[i]
 
-        elif transform.type == "crop" and transform.crop:
-            crop = transform.crop
-            for i, page in enumerate(pages):
-                if dry_run:
-                    print(f"    [dry-run] Crop page {i + 1}: {crop.lower_left} to {crop.upper_right}")
-                else:
-                    crop_page(page, crop.lower_left, crop.upper_right)
+            context = TransformContext(
+                page_index=i,
+                total_pages=len(pages),
+                pdf_path=pdf_path,
+                original_page_index=orig_page_num,
+                dry_run=dry_run,
+            )
 
-        elif transform.type == "size" and transform.size:
-            size = transform.size
-            for i, page in enumerate(pages):
-                if dry_run:
-                    print(f"    [dry-run] Resize page {i + 1} to {size.width} x {size.height} ({size.fit})")
-                else:
-                    resize_page(page, size.width, size.height, size.fit)
+            if dry_run:
+                # Show dry-run message
+                desc = handler.describe(transform)
+                print(f"    [dry-run] {desc} (page {i + 1})")
+            else:
+                # Apply the transform
+                handler.apply(page, transform, context)
 
         # Save after each transform if debug enabled
         if debug and not dry_run and debug_output_dir:

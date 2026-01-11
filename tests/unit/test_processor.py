@@ -102,7 +102,7 @@ class TestApplyTransforms:
         pages = [MagicMock(), MagicMock()]
         transforms = [Transform(type="rotate", rotate=RotateTransform(angle=90))]
 
-        with patch("pdfmill.processor.rotate_page") as mock_rotate:
+        with patch("pdfmill.transforms.handlers.rotate_page") as mock_rotate:
             apply_transforms(pages, transforms)
             assert mock_rotate.call_count == 2
 
@@ -110,7 +110,7 @@ class TestApplyTransforms:
         pages = [MagicMock(), MagicMock(), MagicMock()]
         transforms = [Transform(type="rotate", rotate=RotateTransform(angle=90, pages=[0, 2]))]
 
-        with patch("pdfmill.processor.rotate_page") as mock_rotate:
+        with patch("pdfmill.transforms.handlers.rotate_page") as mock_rotate:
             apply_transforms(pages, transforms)
             assert mock_rotate.call_count == 2
 
@@ -118,7 +118,7 @@ class TestApplyTransforms:
         pages = [MagicMock(), MagicMock()]
         transforms = [Transform(type="crop", crop=CropTransform(lower_left=(10, 20), upper_right=(100, 200)))]
 
-        with patch("pdfmill.processor.crop_page") as mock_crop:
+        with patch("pdfmill.transforms.handlers.crop_page") as mock_crop:
             apply_transforms(pages, transforms)
             assert mock_crop.call_count == 2
 
@@ -126,7 +126,7 @@ class TestApplyTransforms:
         pages = [MagicMock()]
         transforms = [Transform(type="size", size=SizeTransform(width="4in", height="6in", fit="contain"))]
 
-        with patch("pdfmill.processor.resize_page") as mock_resize:
+        with patch("pdfmill.transforms.handlers.resize_page") as mock_resize:
             apply_transforms(pages, transforms)
             mock_resize.assert_called_once()
 
@@ -134,7 +134,7 @@ class TestApplyTransforms:
         pages = [MagicMock()]
         transforms = [Transform(type="rotate", rotate=RotateTransform(angle=90))]
 
-        with patch("pdfmill.processor.rotate_page") as mock_rotate:
+        with patch("pdfmill.transforms.handlers.rotate_page") as mock_rotate:
             apply_transforms(pages, transforms, dry_run=True)
             mock_rotate.assert_not_called()
 
@@ -148,8 +148,8 @@ class TestApplyTransforms:
             Transform(type="crop", crop=CropTransform()),
         ]
 
-        with patch("pdfmill.processor.rotate_page") as mock_rotate:
-            with patch("pdfmill.processor.crop_page") as mock_crop:
+        with patch("pdfmill.transforms.handlers.rotate_page") as mock_rotate:
+            with patch("pdfmill.transforms.handlers.crop_page") as mock_crop:
                 apply_transforms(pages, transforms)
                 mock_rotate.assert_called_once()
                 mock_crop.assert_called_once()

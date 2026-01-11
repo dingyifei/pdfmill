@@ -162,12 +162,12 @@ class TestRotatePage:
             rotate_page(mock_page, "auto", pdf_path="test.pdf")
 
     def test_auto_with_ocr_no_rotation_needed(self, mock_page):
-        with patch("pdfmill.transforms.detect_page_orientation", return_value=0):
+        with patch("pdfmill.transforms.core.detect_page_orientation", return_value=0):
             rotate_page(mock_page, "auto", pdf_path="test.pdf", page_num=0)
             mock_page.add_transformation.assert_not_called()
 
     def test_auto_with_ocr_rotation_detected(self, mock_page):
-        with patch("pdfmill.transforms.detect_page_orientation", return_value=90):
+        with patch("pdfmill.transforms.core.detect_page_orientation", return_value=90):
             rotate_page(mock_page, "auto", pdf_path="test.pdf", page_num=0)
             mock_page.add_transformation.assert_called_once()
 
@@ -184,17 +184,20 @@ class TestCropPage:
     """Test page cropping."""
 
     def test_crop_updates_mediabox(self, mock_page):
+        # crop_page translates content so cropped region starts at origin
         crop_page(mock_page, (10, 20), (100, 200))
-        assert mock_page.mediabox.lower_left == (10, 20)
-        assert mock_page.mediabox.upper_right == (100, 200)
+        assert mock_page.mediabox.lower_left == (0, 0)
+        assert mock_page.mediabox.upper_right == (90, 180)  # width=100-10, height=200-20
 
     def test_crop_returns_page(self, mock_page):
         result = crop_page(mock_page, (0, 0), (100, 100))
         assert result is mock_page
 
     def test_crop_with_floats(self, mock_page):
+        # crop_page translates content so cropped region starts at origin
         crop_page(mock_page, (10.5, 20.5), (100.5, 200.5))
-        assert mock_page.mediabox.lower_left == (10.5, 20.5)
+        assert mock_page.mediabox.lower_left == (0, 0)
+        assert mock_page.mediabox.upper_right == (90, 180)  # width=100.5-10.5, height=200.5-20.5
 
     def test_crop_invalid_left_greater_than_right(self, mock_page):
         with pytest.raises(TransformError, match="left.*must be less than right"):

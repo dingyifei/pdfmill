@@ -110,9 +110,12 @@ class TestPipelineIntegration:
 
         reader = PdfReader(str(outputs[0]))
         page = reader.pages[0]
-        # Verify crop was applied (mediabox should be updated)
-        assert float(page.mediabox.lower_left[0]) == 50
-        assert float(page.mediabox.lower_left[1]) == 50
+        # Verify crop was applied (content is translated so cropped region starts at origin)
+        assert float(page.mediabox.lower_left[0]) == 0
+        assert float(page.mediabox.lower_left[1]) == 0
+        # Cropped dimensions: width=300-50=250, height=400-50=350
+        assert float(page.mediabox.upper_right[0]) == 250
+        assert float(page.mediabox.upper_right[1]) == 350
 
     def test_process_multiple_profiles(self, temp_multi_page_pdf, temp_dir):
         """Test processing with multiple output profiles."""
