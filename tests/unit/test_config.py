@@ -14,6 +14,7 @@ from pdfmill.config import (
     RotateTransform,
     CropTransform,
     SizeTransform,
+    StampTransform,
     SplitTransform,
     SplitRegion,
     CombineTransform,
@@ -147,6 +148,58 @@ class TestParseTransform:
         assert t.size.width == ""
         assert t.size.height == ""
         assert t.size.fit == "contain"
+
+    def test_stamp_simple_string(self):
+        t = parse_transform({"stamp": "Page {page}"})
+        assert t.type == "stamp"
+        assert t.stamp is not None
+        assert t.stamp.text == "Page {page}"
+        # Should have defaults
+        assert t.stamp.position == "bottom-right"
+        assert t.stamp.font_size == 10
+
+    def test_stamp_full_config(self):
+        t = parse_transform({
+            "stamp": {
+                "text": "{page}/{total}",
+                "position": "top-left",
+                "font_size": 14,
+                "font_name": "Times-Roman",
+                "margin": "15mm",
+                "datetime_format": "%Y/%m/%d",
+            }
+        })
+        assert t.type == "stamp"
+        assert t.stamp.text == "{page}/{total}"
+        assert t.stamp.position == "top-left"
+        assert t.stamp.font_size == 14
+        assert t.stamp.font_name == "Times-Roman"
+        assert t.stamp.margin == "15mm"
+        assert t.stamp.datetime_format == "%Y/%m/%d"
+
+    def test_stamp_custom_position(self):
+        t = parse_transform({
+            "stamp": {
+                "text": "Test",
+                "position": "custom",
+                "x": "50mm",
+                "y": "100mm",
+            }
+        })
+        assert t.stamp.position == "custom"
+        assert t.stamp.x == "50mm"
+        assert t.stamp.y == "100mm"
+
+    def test_stamp_defaults(self):
+        t = parse_transform({"stamp": {}})
+        assert t.stamp.text == "{page}/{total}"
+        assert t.stamp.position == "bottom-right"
+        assert t.stamp.x == "10mm"
+        assert t.stamp.y == "10mm"
+        assert t.stamp.font_size == 10
+        assert t.stamp.font_name == "Helvetica"
+        assert t.stamp.margin == "10mm"
+        assert t.stamp.datetime_format == "%Y-%m-%d %H:%M:%S"
 
     def test_render_int_dpi(self):
         t = parse_transform({"render": 300})
@@ -345,6 +398,17 @@ class TestDataclasses:
         assert st.height == ""
         assert st.fit == "contain"
 
+    def test_stamp_transform_defaults(self):
+        st = StampTransform()
+        assert st.text == "{page}/{total}"
+        assert st.position == "bottom-right"
+        assert st.x == "10mm"
+        assert st.y == "10mm"
+        assert st.font_size == 10
+        assert st.font_name == "Helvetica"
+        assert st.margin == "10mm"
+        assert st.datetime_format == "%Y-%m-%d %H:%M:%S"
+
     def test_split_region_defaults(self):
         sr = SplitRegion()
         assert sr.lower_left == (0, 0)
@@ -365,6 +429,7 @@ class TestDataclasses:
         assert ct.page_size == ("8.5in", "11in")
         assert ct.layout == []
         assert ct.pages_per_output == 2
+
     def test_render_transform_defaults(self):
         rt = RenderTransform()
         assert rt.dpi == 150

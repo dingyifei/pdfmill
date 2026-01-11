@@ -37,7 +37,7 @@ enable_high_dpi()
 from pdfmill.config import (
     Config, Settings, InputConfig, FilterConfig, OutputProfile,
     PrintConfig, PrintTarget, Transform, RotateTransform, CropTransform,
-    SizeTransform, SplitTransform, SplitRegion, CombineTransform,
+    SizeTransform, StampTransform, SplitTransform, SplitRegion, CombineTransform,
     RenderTransform, CombineLayoutItem, load_config, ConfigError,
 )
 
@@ -45,9 +45,10 @@ from pdfmill.config import (
 ON_ERROR_OPTIONS = ["continue", "stop"]
 SORT_OPTIONS = ["", "name_asc", "name_desc", "time_asc", "time_desc"]
 MATCH_OPTIONS = ["any", "all"]
-TRANSFORM_TYPES = ["rotate", "crop", "size", "split", "combine", "render"]
+TRANSFORM_TYPES = ["rotate", "crop", "size", "stamp", "split", "combine", "render"]
 ROTATE_ANGLES = ["0", "90", "180", "270", "landscape", "portrait", "auto"]
 FIT_MODES = ["contain", "cover", "stretch"]
+STAMP_POSITIONS = ["bottom-right", "bottom-left", "top-right", "top-left", "center", "custom"]
 
 
 class SettingsFrame(ttk.LabelFrame):
@@ -187,6 +188,13 @@ class TransformDialog(tk.Toplevel):
         self.size_w_var = tk.StringVar(value="100mm")
         self.size_h_var = tk.StringVar(value="150mm")
         self.fit_var = tk.StringVar(value="contain")
+        # Stamp variables
+        self.stamp_text_var = tk.StringVar(value="{page}/{total}")
+        self.stamp_pos_var = tk.StringVar(value="bottom-right")
+        self.stamp_x_var = tk.StringVar(value="10mm")
+        self.stamp_y_var = tk.StringVar(value="10mm")
+        self.stamp_fontsize_var = tk.IntVar(value=10)
+        self.stamp_margin_var = tk.StringVar(value="10mm")
         self.render_dpi_var = tk.IntVar(value=150)
 
         # Split regions list
@@ -241,6 +249,37 @@ class TransformDialog(tk.Toplevel):
         ttk.Label(row, text="Fit:").pack(side="left")
         ttk.Combobox(row, textvariable=self.fit_var, values=FIT_MODES, state="readonly", width=10).pack(side="left", padx=5)
 
+        # Stamp frame
+        self.stamp_frame = ttk.LabelFrame(self, text="Stamp Options", padding=10)
+        row = ttk.Frame(self.stamp_frame)
+        row.pack(fill="x", pady=2)
+        ttk.Label(row, text="Text:").pack(side="left")
+        ttk.Entry(row, textvariable=self.stamp_text_var, width=25).pack(side="left", padx=5)
+        row = ttk.Frame(self.stamp_frame)
+        row.pack(fill="x", pady=2)
+        ttk.Label(row, text="Position:").pack(side="left")
+        pos_combo = ttk.Combobox(row, textvariable=self.stamp_pos_var, values=STAMP_POSITIONS, width=12)
+        pos_combo.pack(side="left", padx=5)
+        pos_combo.bind("<<ComboboxSelected>>", lambda e: self._update_stamp_xy_state())
+        row = ttk.Frame(self.stamp_frame)
+        row.pack(fill="x", pady=2)
+        ttk.Label(row, text="X:").pack(side="left")
+        self.stamp_x_entry = ttk.Entry(row, textvariable=self.stamp_x_var, width=8)
+        self.stamp_x_entry.pack(side="left", padx=5)
+        ttk.Label(row, text="Y:").pack(side="left")
+        self.stamp_y_entry = ttk.Entry(row, textvariable=self.stamp_y_var, width=8)
+        self.stamp_y_entry.pack(side="left", padx=5)
+        ttk.Label(row, text="(for custom position)").pack(side="left", padx=5)
+        row = ttk.Frame(self.stamp_frame)
+        row.pack(fill="x", pady=2)
+        ttk.Label(row, text="Font Size:").pack(side="left")
+        ttk.Spinbox(row, textvariable=self.stamp_fontsize_var, from_=6, to=72, width=5).pack(side="left", padx=5)
+        ttk.Label(row, text="Margin:").pack(side="left")
+        ttk.Entry(row, textvariable=self.stamp_margin_var, width=8).pack(side="left", padx=5)
+        # Help text
+        help_text = ttk.Label(self.stamp_frame, text="Placeholders: {page}, {total}, {datetime}, {date}, {time}", font=("TkDefaultFont", 8))
+        help_text.pack(anchor="w", pady=(5, 0))
+
         # Split frame
         self.split_frame = ttk.LabelFrame(self, text="Split Options", padding=10)
         ttk.Label(self.split_frame, text="Regions (each becomes a separate page):").pack(anchor="w")
@@ -272,7 +311,7 @@ class TransformDialog(tk.Toplevel):
         ttk.Button(btn_row, text="Add Placement", command=self._add_combine_item).pack(side="left", padx=2)
         ttk.Button(btn_row, text="Edit Placement", command=self._edit_combine_item).pack(side="left", padx=2)
         ttk.Button(btn_row, text="Remove", command=self._remove_combine_item).pack(side="left", padx=2)
-        
+
         # Render frame
         self.render_frame = ttk.LabelFrame(self, text="Render Options", padding=10)
         row = ttk.Frame(self.render_frame)
@@ -297,6 +336,7 @@ class TransformDialog(tk.Toplevel):
         self.rotate_frame.pack_forget()
         self.crop_frame.pack_forget()
         self.size_frame.pack_forget()
+        self.stamp_frame.pack_forget()
         self.split_frame.pack_forget()
         self.combine_frame.pack_forget()
         self.render_frame.pack_forget()
@@ -308,13 +348,25 @@ class TransformDialog(tk.Toplevel):
             self.crop_frame.pack(fill="x", padx=10, pady=5)
         elif t == "size":
             self.size_frame.pack(fill="x", padx=10, pady=5)
+        elif t == "stamp":
+            self.stamp_frame.pack(fill="x", padx=10, pady=5)
+            self._update_stamp_xy_state()
         elif t == "split":
             self.split_frame.pack(fill="both", expand=True, padx=10, pady=5)
         elif t == "combine":
             self.combine_frame.pack(fill="both", expand=True, padx=10, pady=5)
         elif t == "render":
             self.render_frame.pack(fill="x", padx=10, pady=5)
-            
+
+    def _update_stamp_xy_state(self):
+        """Enable/disable X/Y entries based on position selection."""
+        if self.stamp_pos_var.get() == "custom":
+            self.stamp_x_entry.configure(state="normal")
+            self.stamp_y_entry.configure(state="normal")
+        else:
+            self.stamp_x_entry.configure(state="disabled")
+            self.stamp_y_entry.configure(state="disabled")
+
     def _refresh_split_list(self):
         self.split_list.delete(0, tk.END)
         for r in self.split_regions:
@@ -385,6 +437,13 @@ class TransformDialog(tk.Toplevel):
             self.size_w_var.set(t.size.width)
             self.size_h_var.set(t.size.height)
             self.fit_var.set(t.size.fit)
+        elif t.type == "stamp" and t.stamp:
+            self.stamp_text_var.set(t.stamp.text)
+            self.stamp_pos_var.set(t.stamp.position)
+            self.stamp_x_var.set(str(t.stamp.x))
+            self.stamp_y_var.set(str(t.stamp.y))
+            self.stamp_fontsize_var.set(t.stamp.font_size)
+            self.stamp_margin_var.set(str(t.stamp.margin))
         elif t.type == "split" and t.split:
             self.split_regions = list(t.split.regions)
             self._refresh_split_list()
@@ -423,6 +482,18 @@ class TransformDialog(tk.Toplevel):
                     fit=self.fit_var.get(),
                 ),
             )
+        elif t == "stamp":
+            self.result = Transform(
+                type="stamp",
+                stamp=StampTransform(
+                    text=self.stamp_text_var.get(),
+                    position=self.stamp_pos_var.get(),
+                    x=self.stamp_x_var.get(),
+                    y=self.stamp_y_var.get(),
+                    font_size=self.stamp_fontsize_var.get(),
+                    margin=self.stamp_margin_var.get(),
+                ),
+            )
         elif t == "split":
             self.result = Transform(
                 type="split",
@@ -441,6 +512,7 @@ class TransformDialog(tk.Toplevel):
             self.result = Transform(
                 type="render",
                 render=RenderTransform(dpi=self.render_dpi_var.get()),
+            )
         self.destroy()
 
 
@@ -750,6 +822,8 @@ class OutputProfileEditor(ttk.Frame):
             return f"crop: {t.crop.lower_left} -> {t.crop.upper_right}"
         elif t.type == "size" and t.size:
             return f"size: {t.size.width} x {t.size.height} ({t.size.fit})"
+        elif t.type == "stamp" and t.stamp:
+            return f"stamp: '{t.stamp.text}' at {t.stamp.position}"
         elif t.type == "split" and t.split:
             n = len(t.split.regions)
             return f"split: {n} region(s)"
@@ -1282,6 +1356,17 @@ class PdfMillApp(tk.Tk):
                                 "fit": t.size.fit,
                             }
                         })
+                    elif t.type == "stamp" and t.stamp:
+                        stamp_dict: dict[str, Any] = {
+                            "text": t.stamp.text,
+                            "position": t.stamp.position,
+                            "font_size": t.stamp.font_size,
+                            "margin": t.stamp.margin,
+                        }
+                        if t.stamp.position == "custom":
+                            stamp_dict["x"] = t.stamp.x
+                            stamp_dict["y"] = t.stamp.y
+                        p["transforms"].append({"stamp": stamp_dict})
                     elif t.type == "split" and t.split:
                         p["transforms"].append({
                             "split": {

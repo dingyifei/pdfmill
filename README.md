@@ -12,7 +12,8 @@ Currently, supports only windows
 
 - **YAML Configuration**: Define processing pipelines in simple config files
 - **Page Selection**: Select pages by index, range, or pattern (`first`, `last`, `odd`, `even`)
-- **Transformations**: Rotate, crop, resize, split, and combine pages with precise control
+- **Transformations**: Rotate, crop, resize, stamp, split, and combine pages with precise control
+- **Stamp Transform**: Add page numbers, timestamps, or custom text overlays
 - **Split Transform**: Extract multiple regions from a page (e.g., split label sheets)
 - **Combine Transform**: Place multiple pages onto a single canvas (e.g., n-up layouts)
 - **Multi-Output**: Split one PDF into multiple outputs with different settings
@@ -152,6 +153,21 @@ transforms:
       height: 150mm
       fit: contain   # contain, cover, stretch
 
+  # Add page numbers or timestamps (requires: pip install pdfmill[stamp])
+  - stamp: "{page}/{total}"   # simple format
+
+  - stamp:                     # full configuration
+      text: "Page {page} of {total}"
+      position: bottom-right   # top-left, top-right, bottom-left, bottom-right, center, custom
+      font_size: 10
+      margin: "10mm"
+
+  - stamp:                     # custom position
+      text: "{datetime}"
+      position: custom
+      x: "50mm"
+      y: "20mm"
+
   # Split: extract multiple regions from each page (1 page -> N pages)
   - split:
       regions:
@@ -171,11 +187,21 @@ transforms:
         - page: 1
           position: ["0in", "0in"]
           scale: 0.5
+
   # Render (rasterize) - converts page to image
   - render: 300           # DPI value
   - render: {dpi: 200}    # Dict form
   - render: true          # Default 150 DPI
 ```
+
+**Stamp Placeholders**:
+| Placeholder | Description |
+|-------------|-------------|
+| `{page}` | Current page number (1-indexed) |
+| `{total}` | Total page count |
+| `{datetime}` | Current datetime (format: `YYYY-MM-DD HH:MM:SS`) |
+| `{date}` | Current date (`YYYY-MM-DD`) |
+| `{time}` | Current time (`HH:MM:SS`) |
 
 **Note on render transform:** The render transform rasterizes pages to images and re-embeds them. This permanently removes any content outside the visible area (useful after cropping to truly remove hidden content) and flattens all layers, annotations, and transparency. Requires `poppler` to be installed on the system.
 
