@@ -652,3 +652,101 @@ outputs:
         assert len(transforms) == 2
         assert transforms[0].enabled is True
         assert transforms[1].enabled is False
+
+
+class TestPageSpecValidation:
+    """Test page spec syntax validation during config loading."""
+
+    def test_invalid_page_spec_raises_config_error(self, tmp_path):
+        """Test that invalid page spec syntax raises ConfigError."""
+        config_content = """
+version: 1
+outputs:
+  test:
+    pages: "abc"
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with pytest.raises(ConfigError) as exc:
+            load_config(config_file)
+
+        assert "pages" in str(exc.value)
+        assert "test" in str(exc.value)  # Profile name
+
+    def test_invalid_range_syntax_raises(self, tmp_path):
+        """Test that malformed range syntax raises ConfigError."""
+        config_content = """
+version: 1
+outputs:
+  label:
+    pages: "1-2-3"
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with pytest.raises(ConfigError, match="hyphens"):
+            load_config(config_file)
+
+    def test_valid_range_syntax_accepted(self, tmp_path):
+        """Test that valid range syntax is accepted even with large numbers."""
+        config_content = """
+version: 1
+outputs:
+  test:
+    pages: "1-999"
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        # Should not raise - syntax is valid even if range may be out of bounds
+        config = load_config(config_file)
+        assert config.outputs["test"].pages == "1-999"
+
+    def test_valid_keywords_accepted(self, tmp_path):
+        """Test that valid keywords are accepted."""
+        config_content = """
+version: 1
+outputs:
+  first_page:
+    pages: first
+  last_page:
+    pages: last
+  all_pages:
+    pages: all
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        config = load_config(config_file)
+        assert config.outputs["first_page"].pages == "first"
+        assert config.outputs["last_page"].pages == "last"
+        assert config.outputs["all_pages"].pages == "all"
+
+    def test_valid_list_accepted(self, tmp_path):
+        """Test that valid page lists are accepted."""
+        config_content = """
+version: 1
+outputs:
+  test:
+    pages: [1, 3, 5]
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        config = load_config(config_file)
+        assert config.outputs["test"].pages == [1, 3, 5]
+
+    def test_empty_page_spec_raises(self, tmp_path):
+        """Test that empty page spec raises ConfigError."""
+        config_content = """
+version: 1
+outputs:
+  test:
+    pages: ""
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        with pytest.raises(ConfigError, match="empty"):
+            load_config(config_file)

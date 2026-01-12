@@ -2,7 +2,12 @@
 
 import pytest
 
-from pdfmill.selector import select_pages, _select_from_list, PageSelectionError
+from pdfmill.selector import (
+    select_pages,
+    _select_from_list,
+    validate_page_spec_syntax,
+    PageSelectionError,
+)
 
 
 class TestSelectPagesKeywords:
@@ -184,3 +189,120 @@ class TestSelectFromList:
     def test_out_of_range_negative(self):
         with pytest.raises(PageSelectionError):
             _select_from_list([-10], 5)
+
+
+class TestValidatePageSpecSyntax:
+    """Test page spec syntax validation without total_pages."""
+
+    # Valid keyword cases
+    def test_keyword_first(self):
+        validate_page_spec_syntax("first")  # Should not raise
+
+    def test_keyword_last(self):
+        validate_page_spec_syntax("last")
+
+    def test_keyword_all(self):
+        validate_page_spec_syntax("all")
+
+    def test_keyword_odd(self):
+        validate_page_spec_syntax("odd")
+
+    def test_keyword_even(self):
+        validate_page_spec_syntax("even")
+
+    def test_keyword_case_insensitive(self):
+        validate_page_spec_syntax("LAST")
+        validate_page_spec_syntax("All")
+        validate_page_spec_syntax("FIRST")
+
+    def test_keyword_with_whitespace(self):
+        validate_page_spec_syntax("  first  ")
+
+    # Valid list cases
+    def test_integer_list(self):
+        validate_page_spec_syntax([1, 3, 5])
+
+    def test_negative_in_list(self):
+        validate_page_spec_syntax([-1, -2])
+
+    def test_mixed_list(self):
+        validate_page_spec_syntax([1, -1, 3])
+
+    def test_empty_list(self):
+        validate_page_spec_syntax([])
+
+    # Valid single int cases
+    def test_single_int(self):
+        validate_page_spec_syntax(5)
+
+    def test_single_int_string(self):
+        validate_page_spec_syntax("5")
+
+    def test_large_page_number(self):
+        # Large numbers are valid syntax (runtime check catches out-of-range)
+        validate_page_spec_syntax("999999")
+
+    # Valid range cases
+    def test_simple_range(self):
+        validate_page_spec_syntax("1-3")
+
+    def test_open_end_range(self):
+        validate_page_spec_syntax("3-")
+
+    def test_last_n_pages(self):
+        validate_page_spec_syntax("-2")
+
+    def test_negative_offset_range(self):
+        validate_page_spec_syntax("1--1")
+
+    def test_negative_offset_range_open_start(self):
+        validate_page_spec_syntax("--1")
+
+    # Invalid cases
+    def test_unknown_keyword_raises(self):
+        with pytest.raises(PageSelectionError, match="Unknown"):
+            validate_page_spec_syntax("abc")
+
+    def test_unknown_keyword_typo_raises(self):
+        with pytest.raises(PageSelectionError, match="Unknown"):
+            validate_page_spec_syntax("frist")
+
+    def test_too_many_hyphens_raises(self):
+        with pytest.raises(PageSelectionError, match="hyphens"):
+            validate_page_spec_syntax("1-2-3")
+
+    def test_non_integer_in_range_raises(self):
+        with pytest.raises(PageSelectionError, match="must be integers"):
+            validate_page_spec_syntax("a-b")
+
+    def test_non_integer_start_raises(self):
+        with pytest.raises(PageSelectionError, match="must be integers"):
+            validate_page_spec_syntax("a-3")
+
+    def test_non_integer_end_raises(self):
+        with pytest.raises(PageSelectionError, match="must be integers"):
+            validate_page_spec_syntax("1-b")
+
+    def test_mixed_type_list_raises(self):
+        with pytest.raises(PageSelectionError, match="only integers"):
+            validate_page_spec_syntax([1, "2", 3])
+
+    def test_string_in_list_raises(self):
+        with pytest.raises(PageSelectionError, match="only integers"):
+            validate_page_spec_syntax(["first"])
+
+    def test_float_in_list_raises(self):
+        with pytest.raises(PageSelectionError, match="only integers"):
+            validate_page_spec_syntax([1.5])
+
+    def test_empty_string_raises(self):
+        with pytest.raises(PageSelectionError, match="cannot be empty"):
+            validate_page_spec_syntax("")
+
+    def test_whitespace_only_raises(self):
+        with pytest.raises(PageSelectionError, match="cannot be empty"):
+            validate_page_spec_syntax("   ")
+
+    def test_invalid_negative_offset_raises(self):
+        with pytest.raises(PageSelectionError, match="must be integers"):
+            validate_page_spec_syntax("1--a")

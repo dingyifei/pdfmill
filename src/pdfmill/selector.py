@@ -124,3 +124,105 @@ def _select_from_list(pages: Sequence[int], total_pages: int) -> list[int]:
             )
         result.append(idx)
     return result
+
+
+def validate_page_spec_syntax(spec: str | list[int]) -> None:
+    """
+    Validate page specification syntax without requiring total_pages.
+
+    This validates the FORMAT only - it cannot check if page numbers are valid
+    for a specific PDF since we don't know total_pages at config load time.
+
+    Args:
+        spec: Page selection specification
+
+    Raises:
+        PageSelectionError: If the specification syntax is invalid
+    """
+    # Handle list input
+    if isinstance(spec, list):
+        for i, item in enumerate(spec):
+            if not isinstance(item, int):
+                raise PageSelectionError(
+                    f"Page list must contain only integers, "
+                    f"got {type(item).__name__} at index {i}"
+                )
+        return
+
+    # Handle single integer
+    if isinstance(spec, int):
+        return
+
+    # Must be a string from here
+    if not isinstance(spec, str):
+        raise PageSelectionError(
+            f"Page specification must be a string, int, or list of ints, "
+            f"got {type(spec).__name__}"
+        )
+
+    spec_str = spec.strip().lower()
+
+    # Empty string is invalid
+    if not spec_str:
+        raise PageSelectionError("Page specification cannot be empty")
+
+    # Check keywords
+    keywords = {"first", "last", "all", "odd", "even"}
+    if spec_str in keywords:
+        return
+
+    # Check negative offset range: "1--1"
+    if "--" in spec_str:
+        parts = spec_str.split("--")
+        if len(parts) != 2:
+            raise PageSelectionError(
+                f"Invalid range specification: '{spec}'. "
+                f"Negative offset range must have format 'start--offset' (e.g., '1--1')"
+            )
+        start_str, offset_str = parts
+        try:
+            if start_str:
+                int(start_str)
+            if offset_str:
+                int(offset_str)
+        except ValueError:
+            raise PageSelectionError(
+                f"Invalid range specification: '{spec}'. "
+                f"Range values must be integers"
+            )
+        return
+
+    # Check simple range: "1-3", "3-", "-2"
+    if "-" in spec_str:
+        parts = spec_str.split("-")
+        if len(parts) != 2:
+            raise PageSelectionError(
+                f"Invalid range specification: '{spec}'. "
+                f"Expected format like '1-3', '3-', or '-2', but got {len(parts) - 1} hyphens"
+            )
+        start_str, end_str = parts
+        try:
+            if start_str:
+                int(start_str)
+            if end_str:
+                int(end_str)
+        except ValueError:
+            raise PageSelectionError(
+                f"Invalid range specification: '{spec}'. "
+                f"Range values must be integers"
+            )
+        return
+
+    # Check single page number
+    try:
+        int(spec_str)
+        return
+    except ValueError:
+        pass
+
+    # Unknown format
+    raise PageSelectionError(
+        f"Unknown page specification: '{spec}'. "
+        f"Valid formats: keywords (first, last, all, odd, even), "
+        f"ranges (1-3, 3-, -2, 1--1), page numbers (5), or lists ([1, 3, 5])"
+    )

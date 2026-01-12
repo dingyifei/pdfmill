@@ -317,3 +317,139 @@ class TestMain:
         ])
 
         assert result == 1
+
+
+class TestStrictValidation:
+    """Test --validate --strict mode."""
+
+    def test_strict_flag_parsed(self):
+        parser = create_parser()
+        args = parser.parse_args(["--validate", "--strict"])
+        assert args.validate is True
+        assert args.strict is True
+
+    def test_strict_validation_success(self, tmp_path, capsys):
+        """Test --strict passes when all resources exist."""
+        # Create input directory
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+
+        # Create valid config
+        config_content = f"""
+version: 1
+input:
+  path: {input_dir}
+outputs:
+  test:
+    pages: all
+    output_dir: {tmp_path / "output"}
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        result = main([
+            "--config", str(config_file),
+            "--validate",
+            "--strict",
+        ])
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Strict validation" in captured.out
+
+    def test_strict_validation_missing_input_path(self, tmp_path, capsys):
+        """Test --strict fails when input path doesn't exist."""
+        config_content = f"""
+version: 1
+input:
+  path: {tmp_path / "nonexistent"}
+outputs:
+  test:
+    pages: all
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        result = main([
+            "--config", str(config_file),
+            "--validate",
+            "--strict",
+        ])
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "input.path" in captured.out
+        assert "does not exist" in captured.out
+
+    def test_strict_validation_printer_not_found(self, tmp_path, capsys):
+        """Test --strict fails when printer doesn't exist."""
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+
+        config_content = f"""
+version: 1
+input:
+  path: {input_dir}
+outputs:
+  test:
+    pages: all
+    output_dir: {tmp_path}
+    print:
+      enabled: true
+      printer: NonExistentPrinter12345
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        result = main([
+            "--config", str(config_file),
+            "--validate",
+            "--strict",
+        ])
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "NonExistentPrinter12345" in captured.out
+
+    def test_validate_without_strict(self, tmp_path, capsys):
+        """Test --validate without --strict doesn't check external resources."""
+        config_content = f"""
+version: 1
+input:
+  path: {tmp_path / "nonexistent"}
+outputs:
+  test:
+    pages: all
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        result = main([
+            "--config", str(config_file),
+            "--validate",
+        ])
+
+        # Should pass - we're only validating syntax, not strict checking
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Strict validation" not in captured.out
+
+    def test_invalid_page_spec_fails_validate(self, tmp_path, capsys):
+        """Test that invalid page spec syntax fails --validate."""
+        config_content = """
+version: 1
+outputs:
+  test:
+    pages: "invalid-spec-abc"
+"""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(config_content)
+
+        result = main([
+            "--config", str(config_file),
+            "--validate",
+        ])
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "pages" in captured.err.lower() or "Unknown" in captured.err

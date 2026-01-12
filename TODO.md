@@ -64,6 +64,7 @@ Features and improvements planned for pdfmill.
 - [x] Override output directory via CLI
 - [x] `--dry-run` flag
 - [x] `--validate` flag
+- [x] `--validate --strict` flag (check external resources)
 - [x] `--list-printers` command
 - [x] `--version` flag
 
@@ -91,11 +92,7 @@ Architecture improvements to enhance maintainability and extensibility.
 
 - [x] **Enums for constrained values** - Added `StampPosition`, `SortOrder`, `FilterMatch`, `ErrorHandling`, `FitMode` enums in `config.py`
 - [x] **Improved ConfigError** - Added context fields (profile, transform_idx, field, suggestion) for better error messages
-
-### Phase 2: Validation (Medium Risk)
-
-- [ ] Validate page specs at config load time
-- [ ] Add `--validate --strict` mode for external resources (printers, paths)
+- [x] **Phase 2: Validation** - Added `validate_page_spec_syntax()` for early page spec validation, `--validate --strict` mode for external resources (printers, paths)
 
 ### Phase 3: Transform Registry (Higher Risk)
 
@@ -114,7 +111,7 @@ Architecture improvements to enhance maintainability and extensibility.
 
 | Improvement | Impact | Effort | Status |
 |-------------|--------|--------|--------|
-| Transform Registry | High | Medium | Pending |
-| Extract PrintPipeline | High | Medium | Pending |
-| Early Validation | Medium | Low | Pending |
+| Early Validation (Phase 2) | Medium | Low | **Done** |
+| Transform Registry (Phase 3) | High | Medium | Pending |
+| Extract PrintPipeline (Phase 4) | High | Medium | Pending |
 | Transform Context | Low | Low | Pending |

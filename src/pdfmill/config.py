@@ -8,6 +8,8 @@ from typing import Any
 
 import yaml
 
+from pdfmill.selector import PageSelectionError, validate_page_spec_syntax
+
 
 # ============================================================================
 # Enums for constrained string values
@@ -452,6 +454,18 @@ def parse_output_profile(name: str, data: dict[str, Any]) -> OutputProfile:
     """Parse an output profile from config data."""
     if "pages" not in data:
         raise ConfigError(f"Output profile '{name}' missing required 'pages' field")
+
+    # Validate page spec syntax at config load time
+    pages = data["pages"]
+    try:
+        validate_page_spec_syntax(pages)
+    except PageSelectionError as e:
+        raise ConfigError(
+            str(e),
+            profile=name,
+            field="pages",
+            suggestion="Use keywords (first, last, all, odd, even), ranges (1-3), or page lists ([1, 3, 5])",
+        )
 
     transforms = []
     if "transforms" in data:

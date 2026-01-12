@@ -109,6 +109,12 @@ Examples:
     )
 
     parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="With --validate, also check external resources (printers exist, paths valid)",
+    )
+
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show what would be done without actually doing it",
@@ -170,8 +176,29 @@ def main(args: list[str] | None = None) -> int:
         from pdfmill.config import load_config, ConfigError
         try:
             config = load_config(parsed.config)
-            print(f"Configuration is valid: {parsed.config}")
+            print(f"Configuration syntax is valid: {parsed.config}")
             print(f"  Outputs defined: {', '.join(config.outputs.keys())}")
+
+            # If --strict, perform additional validation
+            if parsed.strict:
+                from pdfmill.validation import validate_strict
+
+                print("\nStrict validation:")
+                result = validate_strict(config)
+
+                if result.issues:
+                    for issue in result.issues:
+                        print(f"  {issue}")
+                    error_count = sum(1 for i in result.issues if i.level == "error")
+                    warning_count = sum(1 for i in result.issues if i.level == "warning")
+                    if result.has_errors:
+                        print(f"\nValidation failed with {error_count} error(s)")
+                        return 1
+                    else:
+                        print(f"\nValidation passed with {warning_count} warning(s)")
+                else:
+                    print("  All external resources validated successfully")
+
             return 0
         except ConfigError as e:
             print(f"Configuration error: {e}", file=sys.stderr)
