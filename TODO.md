@@ -81,6 +81,7 @@ Features and improvements planned for pdfmill.
 - [ ] Watch mode for automatic processing of new files
 - [ ] Config inheritance/imports (extend from base configs)
 - [ ] Logging with configurable verbosity levels
+- [ ] improve UI gui.py by moving it into gui/ package. 
 
 ---
 
