@@ -10,7 +10,6 @@ import yaml
 
 from pdfmill.selector import PageSelectionError, validate_page_spec_syntax
 
-
 # ============================================================================
 # Enums for constrained string values
 # ============================================================================
@@ -113,7 +112,7 @@ def _parse_args(args: list) -> list[str]:
     """Parse args list, splitting any items that contain spaces."""
     result = []
     for arg in args:
-        if isinstance(arg, str) and ' ' in arg:
+        if isinstance(arg, str) and " " in arg:
             result.extend(shlex.split(arg))
         else:
             result.append(str(arg))
@@ -158,8 +157,9 @@ def _parse_enum(
 @dataclass
 class PrintTarget:
     """A single printer target with distribution settings."""
+
     printer: str
-    weight: int = 1      # For page distribution (ppm/ipm)
+    weight: int = 1  # For page distribution (ppm/ipm)
     copies: int = 1
     args: list[str] = field(default_factory=list)
 
@@ -167,6 +167,7 @@ class PrintTarget:
 @dataclass
 class PrintConfig:
     """Print configuration for an output profile."""
+
     enabled: bool = False
     merge: bool = False  # Merge all PDFs before printing as single job
     targets: dict[str, PrintTarget] = field(default_factory=dict)
@@ -178,6 +179,7 @@ class CropTransform:
 
     Coordinates can be floats (points) or strings with units (e.g., "100mm", "4in", "288pt").
     """
+
     lower_left: tuple[float | str, float | str] = (0, 0)
     upper_right: tuple[float | str, float | str] = (612, 792)  # Default letter size
 
@@ -185,6 +187,7 @@ class CropTransform:
 @dataclass
 class SizeTransform:
     """Size enforcement configuration."""
+
     width: str = ""  # e.g., "100mm", "4in", "288pt"
     height: str = ""
     fit: FitMode = FitMode.CONTAIN
@@ -193,6 +196,7 @@ class SizeTransform:
 @dataclass
 class RotateTransform:
     """Rotation configuration."""
+
     angle: int | str = 0  # 0, 90, 180, 270 or "landscape", "portrait"
     pages: list[int] | None = None  # If None, apply to all pages
 
@@ -212,6 +216,7 @@ class StampTransform:
       - Presets: "top-left", "top-right", "bottom-left", "bottom-right", "center"
       - Custom: Use x/y coordinates with units (e.g., "10mm", "0.5in")
     """
+
     text: str = "{page}/{total}"  # Text with placeholders
     position: StampPosition = StampPosition.BOTTOM_RIGHT
     x: str | float = "10mm"  # X coordinate (used when position=CUSTOM)
@@ -225,6 +230,7 @@ class StampTransform:
 @dataclass
 class SplitRegion:
     """A single region for split transform."""
+
     lower_left: tuple[float | str, float | str] = (0, 0)
     upper_right: tuple[float | str, float | str] = (612, 792)
 
@@ -232,12 +238,14 @@ class SplitRegion:
 @dataclass
 class SplitTransform:
     """Split transform: extract multiple regions from each page."""
+
     regions: list[SplitRegion] = field(default_factory=list)
 
 
 @dataclass
 class CombineLayoutItem:
     """A single page placement in combine transform."""
+
     page: int = 0  # 0-indexed input page within the batch
     position: tuple[float | str, float | str] = (0, 0)  # Lower-left corner position
     scale: float = 1.0
@@ -246,6 +254,7 @@ class CombineLayoutItem:
 @dataclass
 class CombineTransform:
     """Combine transform: place multiple pages onto a single canvas."""
+
     page_size: tuple[str, str] = ("8.5in", "11in")  # Output page dimensions
     layout: list[CombineLayoutItem] = field(default_factory=list)
     pages_per_output: int = 2  # How many input pages consumed per output page
@@ -258,12 +267,14 @@ class RenderTransform:
     Rasterizes pages to images and re-embeds them. This permanently removes
     any content outside the visible area and flattens all layers.
     """
+
     dpi: int = 150  # Resolution for rasterization
 
 
 @dataclass
 class Transform:
     """A single transformation step."""
+
     type: str  # "rotate", "crop", "size", "stamp", "split", "combine", "render"
     rotate: RotateTransform | None = None
     crop: CropTransform | None = None
@@ -278,6 +289,7 @@ class Transform:
 @dataclass
 class OutputProfile:
     """Configuration for a single output profile."""
+
     pages: str | list[int]  # Page selection spec
     enabled: bool = True  # Set to False to skip this profile
     output_dir: Path = Path("./output")
@@ -292,6 +304,7 @@ class OutputProfile:
 @dataclass
 class Settings:
     """Global settings for the pipeline."""
+
     on_error: ErrorHandling = ErrorHandling.CONTINUE
     cleanup_source: bool = False
     cleanup_output_after_print: bool = False
@@ -300,6 +313,7 @@ class Settings:
 @dataclass
 class FilterConfig:
     """Keyword filter configuration for input files."""
+
     keywords: list[str] = field(default_factory=list)
     match: FilterMatch = FilterMatch.ANY
 
@@ -307,6 +321,7 @@ class FilterConfig:
 @dataclass
 class InputConfig:
     """Input configuration."""
+
     path: Path = Path("./input")
     pattern: str = "*.pdf"
     filter: FilterConfig | None = None
@@ -316,6 +331,7 @@ class InputConfig:
 @dataclass
 class Config:
     """Root configuration object."""
+
     version: int = 1
     settings: Settings = field(default_factory=Settings)
     input: InputConfig = field(default_factory=InputConfig)
@@ -399,10 +415,12 @@ def parse_transform(transform_data: dict[str, Any]) -> Transform:
         split_val = transform_data["split"]
         regions = []
         for r in split_val.get("regions", []):
-            regions.append(SplitRegion(
-                lower_left=tuple(r.get("lower_left", [0, 0])),
-                upper_right=tuple(r.get("upper_right", [612, 792])),
-            ))
+            regions.append(
+                SplitRegion(
+                    lower_left=tuple(r.get("lower_left", [0, 0])),
+                    upper_right=tuple(r.get("upper_right", [612, 792])),
+                )
+            )
         return Transform(
             type="split",
             split=SplitTransform(regions=regions),
@@ -411,11 +429,13 @@ def parse_transform(transform_data: dict[str, Any]) -> Transform:
         combine_val = transform_data["combine"]
         layout = []
         for item in combine_val.get("layout", []):
-            layout.append(CombineLayoutItem(
-                page=item.get("page", 0),
-                position=tuple(item.get("position", [0, 0])),
-                scale=item.get("scale", 1.0),
-            ))
+            layout.append(
+                CombineLayoutItem(
+                    page=item.get("page", 0),
+                    position=tuple(item.get("position", [0, 0])),
+                    scale=item.get("scale", 1.0),
+                )
+            )
         return Transform(
             type="combine",
             combine=CombineTransform(
@@ -525,7 +545,7 @@ def load_config(config_path: Path) -> Config:
     if not config_path.exists():
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     if not isinstance(data, dict):

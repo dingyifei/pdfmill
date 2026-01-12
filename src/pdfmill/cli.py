@@ -9,7 +9,7 @@ from pdfmill import __version__
 
 def show_version() -> None:
     """Show version information including SumatraPDF status."""
-    from pdfmill.printer import get_sumatra_status, SUMATRA_VERSION
+    from pdfmill.printer import SUMATRA_VERSION, get_sumatra_status
 
     print(f"pdfmill {__version__}")
 
@@ -22,7 +22,7 @@ def show_version() -> None:
 
 def cmd_install(force: bool = False) -> int:
     """Install SumatraPDF."""
-    from pdfmill.printer import download_sumatra, PrinterError
+    from pdfmill.printer import PrinterError, download_sumatra
 
     try:
         download_sumatra(force=force)
@@ -44,7 +44,7 @@ def cmd_uninstall() -> int:
 
 def cmd_list_printers() -> int:
     """List available printers."""
-    from pdfmill.printer import list_printers, PrinterError
+    from pdfmill.printer import PrinterError, list_printers
 
     try:
         printers = list_printers()
@@ -79,25 +79,29 @@ Examples:
     )
 
     parser.add_argument(
-        "-V", "--version",
+        "-V",
+        "--version",
         action="store_true",
         help="Show version information and exit",
     )
 
     parser.add_argument(
-        "-c", "--config",
+        "-c",
+        "--config",
         type=Path,
         help="Path to YAML configuration file",
     )
 
     parser.add_argument(
-        "-i", "--input",
+        "-i",
+        "--input",
         type=Path,
         help="Input PDF file or directory containing PDFs",
     )
 
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         help="Output directory (overrides config)",
     )
@@ -160,6 +164,7 @@ def main(args: list[str] | None = None) -> int:
         return cmd_uninstall()
     elif parsed.command == "gui":
         from pdfmill.gui import launch_gui
+
         return launch_gui()
 
     # Handle --list-printers
@@ -173,7 +178,8 @@ def main(args: list[str] | None = None) -> int:
 
     # Handle --validate
     if parsed.validate:
-        from pdfmill.config import load_config, ConfigError
+        from pdfmill.config import ConfigError, load_config
+
         try:
             config = load_config(parsed.config)
             print(f"Configuration syntax is valid: {parsed.config}")
@@ -212,7 +218,7 @@ def main(args: list[str] | None = None) -> int:
         print("Error: --input is required for processing", file=sys.stderr)
         return 1
 
-    from pdfmill.config import load_config, ConfigError
+    from pdfmill.config import ConfigError, load_config
     from pdfmill.processor import process
 
     try:
