@@ -7,11 +7,11 @@ from unittest.mock import patch, MagicMock
 from pdfmill.processor import (
     get_input_files,
     generate_output_filename,
-    apply_transforms,
     process_single_pdf,
     process,
     ProcessingError,
 )
+from pdfmill.pipeline import TransformExecutor
 from pdfmill.config import (
     Config,
     OutputProfile,
@@ -98,7 +98,7 @@ class TestGenerateOutputFilename:
 
 
 class TestApplyTransforms:
-    """Test transform application."""
+    """Test transform application via TransformExecutor."""
 
     def test_rotate_transform(self):
         pages = [MagicMock(), MagicMock()]
@@ -108,8 +108,9 @@ class TestApplyTransforms:
         mock_handler.apply.return_value = MagicMock(pages=pages)
         mock_handler.describe.return_value = "rotate90"
 
-        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
-            apply_transforms(pages, transforms)
+        executor = TransformExecutor()
+        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+            executor.apply(pages, transforms)
             mock_handler.apply.assert_called_once()
 
     def test_rotate_specific_pages(self):
@@ -120,8 +121,9 @@ class TestApplyTransforms:
         mock_handler.apply.return_value = MagicMock(pages=pages)
         mock_handler.describe.return_value = "rotate90"
 
-        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
-            apply_transforms(pages, transforms)
+        executor = TransformExecutor()
+        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+            executor.apply(pages, transforms)
             mock_handler.apply.assert_called_once()
 
     def test_crop_transform(self):
@@ -132,8 +134,9 @@ class TestApplyTransforms:
         mock_handler.apply.return_value = MagicMock(pages=pages)
         mock_handler.describe.return_value = "crop"
 
-        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
-            apply_transforms(pages, transforms)
+        executor = TransformExecutor()
+        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+            executor.apply(pages, transforms)
             mock_handler.apply.assert_called_once()
 
     def test_size_transform(self):
@@ -144,8 +147,9 @@ class TestApplyTransforms:
         mock_handler.apply.return_value = MagicMock(pages=pages)
         mock_handler.describe.return_value = "size_contain"
 
-        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
-            apply_transforms(pages, transforms)
+        executor = TransformExecutor()
+        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+            executor.apply(pages, transforms)
             mock_handler.apply.assert_called_once()
 
     def test_render_transform(self):
@@ -157,8 +161,9 @@ class TestApplyTransforms:
         mock_handler.apply.return_value = MagicMock(pages=new_pages)
         mock_handler.describe.return_value = "render_300dpi"
 
-        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
-            apply_transforms(pages, transforms)
+        executor = TransformExecutor()
+        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+            executor.apply(pages, transforms)
             mock_handler.apply.assert_called_once()
 
     def test_render_transform_replaces_pages(self):
@@ -171,8 +176,9 @@ class TestApplyTransforms:
         mock_handler.apply.return_value = MagicMock(pages=[new_page_1, new_page_2])
         mock_handler.describe.return_value = "render_150dpi"
 
-        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
-            result = apply_transforms(original_pages, transforms)
+        executor = TransformExecutor()
+        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+            result = executor.apply(original_pages, transforms)
             # Handler returns new pages, so they should be replaced
             assert result[0] is new_page_1
             assert result[1] is new_page_2
@@ -184,8 +190,9 @@ class TestApplyTransforms:
         mock_handler = MagicMock()
         mock_handler.describe.return_value = "render_300dpi"
 
-        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
-            apply_transforms(pages, transforms, dry_run=True)
+        executor = TransformExecutor()
+        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+            executor.apply(pages, transforms, dry_run=True)
             mock_handler.apply.assert_not_called()
 
         captured = capsys.readouterr()
@@ -199,8 +206,9 @@ class TestApplyTransforms:
         mock_handler = MagicMock()
         mock_handler.describe.return_value = "rotate90"
 
-        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
-            apply_transforms(pages, transforms, dry_run=True)
+        executor = TransformExecutor()
+        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+            executor.apply(pages, transforms, dry_run=True)
             mock_handler.apply.assert_not_called()
 
         captured = capsys.readouterr()
@@ -217,14 +225,16 @@ class TestApplyTransforms:
         mock_handler.apply.return_value = MagicMock(pages=pages)
         mock_handler.describe.return_value = "transform"
 
-        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
-            apply_transforms(pages, transforms)
+        executor = TransformExecutor()
+        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+            executor.apply(pages, transforms)
             # Two transforms, so apply should be called twice
             assert mock_handler.apply.call_count == 2
 
     def test_returns_pages(self):
         pages = [MagicMock()]
-        result = apply_transforms(pages, [])
+        executor = TransformExecutor()
+        result = executor.apply(pages, [])
         assert result is pages
 
 
@@ -421,7 +431,7 @@ class TestProcess:
         })
         output_dir = temp_dir / "output"
 
-        with patch("pdfmill.processor.print_pdf") as mock_print:
+        with patch("pdfmill.pipeline.printing.print_pdf") as mock_print:
             mock_print.return_value = True
             process(config, temp_multi_page_pdf, output_dir)
             mock_print.assert_called_once()
@@ -443,7 +453,7 @@ class TestProcess:
         )
         output_dir = temp_dir / "output"
 
-        with patch("pdfmill.processor.print_pdf") as mock_print:
+        with patch("pdfmill.pipeline.printing.print_pdf") as mock_print:
             mock_print.side_effect = PrinterError("Print failed")
             process(config, temp_multi_page_pdf, output_dir)
 
@@ -499,7 +509,7 @@ class TestCleanup:
             }
         )
 
-        with patch("pdfmill.processor.print_pdf") as mock_print:
+        with patch("pdfmill.pipeline.printing.print_pdf") as mock_print:
             mock_print.return_value = True
             process(config, source_pdf, output_dir)
 
@@ -585,7 +595,7 @@ class TestSplitPagesByWeight:
     """Test page splitting across printer targets."""
 
     def test_split_two_printers_equal_weight(self, temp_dir):
-        from pdfmill.processor import split_pages_by_weight
+        from pdfmill.pipeline import PrintPipeline
         from pypdf import PdfWriter, PdfReader
 
         # Create 10-page PDF
@@ -601,7 +611,8 @@ class TestSplitPagesByWeight:
             "printer_b": PrintTarget(printer="B", weight=50),
         }
 
-        result = split_pages_by_weight(pdf_path, targets, temp_dir, "test")
+        pipeline = PrintPipeline()
+        result = pipeline.split_pages_by_weight(pdf_path, targets, temp_dir, "test")
 
         assert len(result) == 2
         # Each should get 5 pages
@@ -611,7 +622,7 @@ class TestSplitPagesByWeight:
         assert len(reader_b.pages) == 5
 
     def test_split_unequal_weight(self, temp_dir):
-        from pdfmill.processor import split_pages_by_weight
+        from pdfmill.pipeline import PrintPipeline
         from pypdf import PdfWriter, PdfReader
 
         # Create 10-page PDF
@@ -627,7 +638,8 @@ class TestSplitPagesByWeight:
             "slow": PrintTarget(printer="Slow", weight=50),
         }
 
-        result = split_pages_by_weight(pdf_path, targets, temp_dir, "test")
+        pipeline = PrintPipeline()
+        result = pipeline.split_pages_by_weight(pdf_path, targets, temp_dir, "test")
 
         # Fast (100/150 = 67%) gets ~7 pages, slow gets the rest
         reader_fast = PdfReader(str(result["fast"]))
@@ -636,7 +648,7 @@ class TestSplitPagesByWeight:
         assert len(reader_slow.pages) == 3
 
     def test_split_zero_weight_skipped(self, temp_dir):
-        from pdfmill.processor import split_pages_by_weight
+        from pdfmill.pipeline import PrintPipeline
         from pypdf import PdfWriter
 
         pdf_path = temp_dir / "source.pdf"
@@ -651,13 +663,14 @@ class TestSplitPagesByWeight:
             "inactive": PrintTarget(printer="Inactive", weight=0),
         }
 
-        result = split_pages_by_weight(pdf_path, targets, temp_dir, "test")
+        pipeline = PrintPipeline()
+        result = pipeline.split_pages_by_weight(pdf_path, targets, temp_dir, "test")
 
         assert "active" in result
         assert "inactive" not in result
 
     def test_split_single_page(self, temp_dir):
-        from pdfmill.processor import split_pages_by_weight
+        from pdfmill.pipeline import PrintPipeline
         from pypdf import PdfWriter, PdfReader
 
         pdf_path = temp_dir / "source.pdf"
@@ -671,7 +684,8 @@ class TestSplitPagesByWeight:
             "slow": PrintTarget(printer="Slow", weight=50),
         }
 
-        result = split_pages_by_weight(pdf_path, targets, temp_dir, "test")
+        pipeline = PrintPipeline()
+        result = pipeline.split_pages_by_weight(pdf_path, targets, temp_dir, "test")
 
         # Single page goes to highest weight
         assert "fast" in result
@@ -698,7 +712,7 @@ class TestMultiPrinterIntegration:
         })
         output_dir = temp_dir / "output"
 
-        with patch("pdfmill.processor.print_pdf") as mock_print:
+        with patch("pdfmill.pipeline.printing.print_pdf") as mock_print:
             mock_print.return_value = True
             process(config, temp_multi_page_pdf, output_dir)
 
@@ -739,8 +753,9 @@ class TestEnabledField:
         mock_handler.apply.return_value = MagicMock(pages=pages)
         mock_handler.describe.return_value = "rotate90"
 
-        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
-            apply_transforms(pages, transforms)
+        executor = TransformExecutor()
+        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+            executor.apply(pages, transforms)
             # Only the enabled transform should be called
             mock_handler.apply.assert_called_once()
 
@@ -756,8 +771,9 @@ class TestEnabledField:
         mock_handler.apply.return_value = MagicMock(pages=pages)
         mock_handler.describe.return_value = "transform"
 
-        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
-            apply_transforms(pages, transforms)
+        executor = TransformExecutor()
+        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+            executor.apply(pages, transforms)
             mock_handler.apply.assert_not_called()
 
     def test_mixed_enabled_disabled_transforms(self):
@@ -773,8 +789,9 @@ class TestEnabledField:
         mock_handler.apply.return_value = MagicMock(pages=pages)
         mock_handler.describe.return_value = "transform"
 
-        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
-            apply_transforms(pages, transforms)
+        executor = TransformExecutor()
+        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+            executor.apply(pages, transforms)
             # 2 enabled transforms
             assert mock_handler.apply.call_count == 2
 
@@ -830,7 +847,7 @@ class TestEnabledField:
         })
         output_dir = temp_dir / "output"
 
-        with patch("pdfmill.processor.print_pdf") as mock_print:
+        with patch("pdfmill.pipeline.printing.print_pdf") as mock_print:
             process(config, temp_multi_page_pdf, output_dir)
             mock_print.assert_not_called()
 
@@ -857,6 +874,7 @@ class TestEnabledField:
         mock_handler.apply.return_value = MagicMock(pages=pages)
         mock_handler.describe.return_value = "rotate90"
 
-        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
-            apply_transforms(pages, transforms)
+        executor = TransformExecutor()
+        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+            executor.apply(pages, transforms)
             mock_handler.apply.assert_called_once()

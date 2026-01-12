@@ -12,13 +12,12 @@ from pdfmill.config import (
     FilterConfig,
     FilterMatch,
     OutputProfile,
-    PrintTarget,
     SortOrder,
-    Transform,
 )
 from pdfmill.selector import select_pages, PageSelectionError
-from pdfmill.transforms import get_transform, TransformContext, TransformError
-from pdfmill.printer import print_pdf, PrinterError
+from pdfmill.transforms import TransformError
+from pdfmill.printer import PrinterError
+from pdfmill.pipeline import TransformExecutor, PrintPipeline
 
 
 class ProcessingError(Exception):
@@ -113,200 +112,6 @@ def generate_output_filename(
     return f"{prefix}{stem}{suffix}_{profile_name}.pdf"
 
 
-def merge_pdfs(pdf_paths: list[Path], output_path: Path) -> Path:
-    """
-    Merge multiple PDFs into a single file.
-
-    Args:
-        pdf_paths: List of PDF files to merge (in order)
-        output_path: Path for the merged output file
-
-    Returns:
-        Path to the merged PDF
-    """
-    writer = PdfWriter()
-
-    for pdf_path in pdf_paths:
-        reader = PdfReader(str(pdf_path))
-        for page in reader.pages:
-            writer.add_page(page)
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, "wb") as f:
-        writer.write(f)
-
-    return output_path
-
-
-def split_pages_by_weight(
-    pdf_path: Path,
-    targets: dict[str, PrintTarget],
-    output_dir: Path,
-    profile_name: str,
-) -> dict[str, Path]:
-    """Split PDF pages across targets by weight ratio.
-
-    Pages assigned sequentially: highest weight gets first pages.
-    This allows stacking printouts in order when collecting from multiple printers.
-
-    Args:
-        pdf_path: Path to PDF to split
-        targets: Dict of target name to PrintTarget
-        output_dir: Directory for split PDF outputs
-        profile_name: Profile name for output filenames
-
-    Returns:
-        Dict mapping target name to split PDF path
-    """
-    reader = PdfReader(str(pdf_path))
-    total_pages = len(reader.pages)
-
-    # Sort by weight descending (fastest/highest-weight first for stacking)
-    sorted_targets = sorted(
-        [(name, t) for name, t in targets.items() if t.weight > 0],
-        key=lambda x: x[1].weight,
-        reverse=True
-    )
-
-    if not sorted_targets:
-        return {}
-
-    total_weight = sum(t.weight for _, t in sorted_targets)
-
-    result = {}
-    current_page = 0
-
-    for i, (target_name, target) in enumerate(sorted_targets):
-        # Last target gets remaining pages (handles rounding)
-        if i == len(sorted_targets) - 1:
-            page_count = total_pages - current_page
-        else:
-            page_count = round(total_pages * target.weight / total_weight)
-
-        if page_count <= 0:
-            continue
-
-        # Create split PDF
-        writer = PdfWriter()
-        end_page = min(current_page + page_count, total_pages)
-        for j in range(current_page, end_page):
-            writer.add_page(reader.pages[j])
-
-        split_path = output_dir / f"split_{profile_name}_{target_name}.pdf"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        with open(split_path, "wb") as f:
-            writer.write(f)
-
-        result[target_name] = split_path
-        current_page = end_page
-
-        if current_page >= total_pages:
-            break
-
-    return result
-
-
-def _get_transform_description(transform: Transform) -> str:
-    """Get a short description of a transform for debug filenames."""
-    try:
-        handler = get_transform(transform)
-        return handler.describe()
-    except ValueError:
-        return transform.type
-
-
-def _save_debug_pdf(
-    pages: list,
-    output_dir: Path,
-    source_name: str,
-    profile_name: str,
-    step_num: int,
-    step_desc: str,
-) -> None:
-    """Save intermediate PDF for debugging."""
-    debug_filename = f"{Path(source_name).stem}_{profile_name}_step{step_num}_{step_desc}.pdf"
-    debug_path = output_dir / debug_filename
-
-    writer = PdfWriter()
-    for page in pages:
-        writer.add_page(page)
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    with open(debug_path, "wb") as f:
-        writer.write(f)
-
-    print(f"    [debug] Saved: {debug_path}")
-
-
-def apply_transforms(
-    pages: list,
-    transforms: list[Transform],
-    dry_run: bool = False,
-    pdf_path: Path | None = None,
-    original_page_indices: list[int] | None = None,
-    debug: bool = False,
-    debug_output_dir: Path | None = None,
-    debug_source_name: str = "",
-    debug_profile_name: str = "",
-) -> list:
-    """
-    Apply transformations to a list of pages.
-
-    Args:
-        pages: List of pypdf PageObjects
-        transforms: List of transforms to apply
-        dry_run: If True, only describe what would be done
-        pdf_path: Path to source PDF (needed for auto rotation)
-        original_page_indices: 0-indexed page numbers from source PDF (for auto rotation)
-        debug: If True, save intermediate PDFs after each transform
-        debug_output_dir: Directory for debug output files
-        debug_source_name: Source filename for debug output naming
-        debug_profile_name: Profile name for debug output naming
-
-    Returns:
-        Transformed pages
-    """
-    # Save initial state (after page selection) if debug enabled
-    if debug and not dry_run and debug_output_dir:
-        _save_debug_pdf(
-            pages, debug_output_dir, debug_source_name,
-            debug_profile_name, 0, "selected"
-        )
-
-    for step_num, transform in enumerate(transforms, start=1):
-        # Skip disabled transforms
-        if not transform.enabled:
-            continue
-
-        # Get handler from registry
-        handler = get_transform(transform)
-        step_desc = handler.describe()
-
-        # Build context
-        context = TransformContext(
-            pdf_path=pdf_path,
-            original_page_indices=original_page_indices,
-            total_pages=len(pages),
-            dry_run=dry_run,
-        )
-
-        if dry_run:
-            print(f"    [dry-run] {step_desc}")
-        else:
-            # Apply transform
-            result = handler.apply(pages, context)
-            pages = result.pages
-
-        # Save after each transform if debug enabled
-        if debug and not dry_run and debug_output_dir:
-            _save_debug_pdf(
-                pages, debug_output_dir, debug_source_name,
-                debug_profile_name, step_num, step_desc
-            )
-
-    return pages
-
-
 def process_single_pdf(
     pdf_path: Path,
     profile_name: str,
@@ -347,10 +152,11 @@ def process_single_pdf(
     pages = [reader.pages[i] for i in page_indices]
 
     # Apply transforms (pass pdf_path and original indices for auto rotation)
-    pages = apply_transforms(
+    executor = TransformExecutor()
+    pages = executor.apply(
         pages,
         profile.transforms,
-        dry_run,
+        dry_run=dry_run,
         pdf_path=pdf_path,
         original_page_indices=page_indices,
         debug=profile.debug,
@@ -469,8 +275,8 @@ def process(
                 if config.settings.on_error == ErrorHandling.STOP:
                     raise
 
-    # Track merged files for cleanup (outside dry_run block for scope)
-    merged_files: list[Path] = []
+    # Track temporary files for cleanup
+    temporary_files: list[Path] = []
 
     # Print outputs
     if not dry_run:
@@ -482,78 +288,20 @@ def process(
                 files_by_profile[profile_name] = []
             files_by_profile[profile_name].append((output_path, profile, source_path))
 
-        for profile_name, profile_files in files_by_profile.items():
-            if not profile_files:
-                continue
-
-            profile = profile_files[0][1]  # All files have same profile
-            if not profile.print.enabled or not profile.print.targets:
-                continue
-
-            # Apply per-profile sorting if configured (and no global sort)
-            if profile.sort:
-                # Sort by source file
-                if profile.sort == SortOrder.NAME_ASC:
-                    profile_files = sorted(profile_files, key=lambda x: x[2].name.lower())
-                elif profile.sort == SortOrder.NAME_DESC:
-                    profile_files = sorted(profile_files, key=lambda x: x[2].name.lower(), reverse=True)
-                elif profile.sort == SortOrder.TIME_ASC:
-                    profile_files = sorted(profile_files, key=lambda x: x[2].stat().st_mtime)
-                elif profile.sort == SortOrder.TIME_DESC:
-                    profile_files = sorted(profile_files, key=lambda x: x[2].stat().st_mtime, reverse=True)
-                print(f"Sorted profile '{profile_name}' files by: {profile.sort.value}")
-
-            targets = profile.print.targets
-            merge_output_dir = output_dir if output_dir else profile.output_dir
-
-            try:
-                if profile.print.merge and len(profile_files) > 1:
-                    # Merge all PDFs for this profile before printing
-                    pdf_paths = [pf[0] for pf in profile_files]
-                    merged_path = merge_output_dir / f"merged_{profile_name}.pdf"
-
-                    print(f"Merging {len(pdf_paths)} files for profile '{profile_name}'...")
-                    merge_pdfs(pdf_paths, merged_path)
-                    merged_files.append(merged_path)
-                    files_to_print = [merged_path]
-                else:
-                    files_to_print = [pf[0] for pf in profile_files]
-
-                if len(targets) > 1 and profile.print.merge:
-                    # Multi-printer page distribution
-                    for file_path in files_to_print:
-                        print(f"Splitting {file_path.name} across {len(targets)} printers...")
-                        split_pdfs = split_pages_by_weight(
-                            file_path, targets, merge_output_dir, profile_name
-                        )
-                        for target_name, split_path in split_pdfs.items():
-                            target = targets[target_name]
-                            print(f"  Printing {split_path.name} to {target.printer}...")
-                            print_pdf(
-                                split_path,
-                                target.printer,
-                                target.copies,
-                                target.args,
-                                dry_run=dry_run,
-                            )
-                            merged_files.append(split_path)  # Track for cleanup
-                else:
-                    # Single target or copy distribution (each file to all targets)
-                    for file_path in files_to_print:
-                        for target_name, target in targets.items():
-                            print(f"Printing {file_path.name} to {target.printer}...")
-                            print_pdf(
-                                file_path,
-                                target.printer,
-                                target.copies,
-                                target.args,
-                                dry_run=dry_run,
-                            )
-            except PrinterError as e:
-                print(f"  Print error: {e}")
-                fail_count += 1
-                if config.settings.on_error == ErrorHandling.STOP:
-                    raise
+        # Use PrintPipeline for print orchestration
+        pipeline = PrintPipeline(dry_run=dry_run)
+        try:
+            print_result = pipeline.print_outputs(
+                files_by_profile,
+                output_dir,
+                config.settings.on_error,
+            )
+            temporary_files = print_result.temporary_files
+            fail_count += print_result.fail_count
+        except PrinterError:
+            # Error already logged by pipeline, re-raise if on_error is STOP
+            if config.settings.on_error == ErrorHandling.STOP:
+                raise
 
     # Cleanup
     if not dry_run:
@@ -574,13 +322,13 @@ def process(
                     except OSError as e:
                         print(f"Failed to cleanup {output_path}: {e}")
 
-            # Also cleanup merged files
-            for merged_path in merged_files:
+            # Also cleanup temporary files (merged/split)
+            for temp_path in temporary_files:
                 try:
-                    os.remove(merged_path)
-                    print(f"Cleaned up merged: {merged_path}")
+                    os.remove(temp_path)
+                    print(f"Cleaned up temporary: {temp_path}")
                 except OSError as e:
-                    print(f"Failed to cleanup {merged_path}: {e}")
+                    print(f"Failed to cleanup {temp_path}: {e}")
 
     # Summary
     print(f"\nProcessing complete: {success_count} succeeded, {fail_count} failed")

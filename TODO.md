@@ -95,12 +95,7 @@ Architecture improvements to enhance maintainability and extensibility.
 - [x] **Improved ConfigError** - Added context fields (profile, transform_idx, field, suggestion) for better error messages
 - [x] **Phase 2: Validation** - Added `validate_page_spec_syntax()` for early page spec validation, `--validate --strict` mode for external resources (printers, paths)
 - [x] **Phase 3: Transform Registry** - Refactored transforms into `transforms/` package with decorator-based registration, `BaseTransform` ABC, `TransformResult` for unified return types, backwards-compatible exports
-
-### Phase 4: Separation of Concerns (Higher Risk)
-
-- [ ] Extract PrintPipeline from processor.py
-- [ ] Create TransformExecutor class
-- [ ] Reduce processor.py to pure orchestration
+- [x] **Phase 4: Separation of Concerns** - Extracted `TransformExecutor` and `PrintPipeline` into new `pipeline/` package, processor.py reduced to pure orchestration
 
 ### Quick Reference
 
@@ -108,4 +103,4 @@ Architecture improvements to enhance maintainability and extensibility.
 |-------------|--------|--------|--------|
 | Early Validation (Phase 2) | Medium | Low | **Done** |
 | Transform Registry (Phase 3) | High | Medium | **Done** |
-| Extract PrintPipeline (Phase 4) | High | Medium | Pending |
+| Extract PrintPipeline (Phase 4) | High | Medium | **Done** |
