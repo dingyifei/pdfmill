@@ -169,12 +169,12 @@ class TestRotatePage:
             rotate_page(mock_page, "auto", pdf_path="test.pdf")
 
     def test_auto_with_ocr_no_rotation_needed(self, mock_page):
-        with patch("pdfmill.transforms.detect_page_orientation", return_value=0):
+        with patch("pdfmill.transforms.rotate.detect_page_orientation", return_value=0):
             rotate_page(mock_page, "auto", pdf_path="test.pdf", page_num=0)
             mock_page.add_transformation.assert_not_called()
 
     def test_auto_with_ocr_rotation_detected(self, mock_page):
-        with patch("pdfmill.transforms.detect_page_orientation", return_value=90):
+        with patch("pdfmill.transforms.rotate.detect_page_orientation", return_value=90):
             rotate_page(mock_page, "auto", pdf_path="test.pdf", page_num=0)
             mock_page.add_transformation.assert_called_once()
 
@@ -488,11 +488,11 @@ class TestStampPage:
     )
     def test_stamp_merges_overlay(self, mock_page):
         """Test that stamp_page calls merge_page."""
-        with patch("pdfmill.transforms._create_text_overlay") as mock_create:
+        with patch("pdfmill.transforms.stamp._create_text_overlay") as mock_create:
             # Mock the overlay creation to return minimal PDF bytes
             mock_create.return_value = _create_minimal_pdf_bytes()
 
-            with patch("pdfmill.transforms.PdfReader") as mock_reader:
+            with patch("pdfmill.transforms.stamp.PdfReader") as mock_reader:
                 mock_overlay_page = MagicMock()
                 mock_reader.return_value.pages = [mock_overlay_page]
 
@@ -502,10 +502,10 @@ class TestStampPage:
 
     def test_stamp_returns_page(self, mock_page):
         """Test that stamp_page returns the page."""
-        with patch("pdfmill.transforms._create_text_overlay") as mock_create:
+        with patch("pdfmill.transforms.stamp._create_text_overlay") as mock_create:
             mock_create.return_value = _create_minimal_pdf_bytes()
 
-            with patch("pdfmill.transforms.PdfReader") as mock_reader:
+            with patch("pdfmill.transforms.stamp.PdfReader") as mock_reader:
                 mock_overlay_page = MagicMock()
                 mock_reader.return_value.pages = [mock_overlay_page]
 

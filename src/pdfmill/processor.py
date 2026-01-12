@@ -17,7 +17,7 @@ from pdfmill.config import (
     Transform,
 )
 from pdfmill.selector import select_pages, PageSelectionError
-from pdfmill.transforms import rotate_page, crop_page, resize_page, stamp_page, split_page, combine_pages, render_page, TransformError
+from pdfmill.transforms import get_transform, TransformContext, TransformError
 from pdfmill.printer import print_pdf, PrinterError
 
 
@@ -208,25 +208,11 @@ def split_pages_by_weight(
 
 def _get_transform_description(transform: Transform) -> str:
     """Get a short description of a transform for debug filenames."""
-    if transform.type == "rotate" and transform.rotate:
-        angle = transform.rotate.angle
-        return f"rotate{angle}"
-    elif transform.type == "crop" and transform.crop:
-        return "crop"
-    elif transform.type == "size" and transform.size:
-        size = transform.size
-        return f"size_{size.fit}"
-    elif transform.type == "stamp" and transform.stamp:
-        return "stamp"
-    elif transform.type == "split" and transform.split:
-        n = len(transform.split.regions)
-        return f"split{n}"
-    elif transform.type == "combine" and transform.combine:
-        n = transform.combine.pages_per_output
-        return f"combine{n}"
-    elif transform.type == "render" and transform.render:
-        return f"render_{transform.render.dpi}dpi"
-    return transform.type
+    try:
+        handler = get_transform(transform)
+        return handler.describe()
+    except ValueError:
+        return transform.type
 
 
 def _save_debug_pdf(
@@ -292,108 +278,24 @@ def apply_transforms(
         if not transform.enabled:
             continue
 
-        step_desc = _get_transform_description(transform)
+        # Get handler from registry
+        handler = get_transform(transform)
+        step_desc = handler.describe()
 
-        if transform.type == "rotate" and transform.rotate:
-            rot = transform.rotate
-            pages_to_rotate = rot.pages if rot.pages else list(range(len(pages)))
+        # Build context
+        context = TransformContext(
+            pdf_path=pdf_path,
+            original_page_indices=original_page_indices,
+            total_pages=len(pages),
+            dry_run=dry_run,
+        )
 
-            for idx in pages_to_rotate:
-                if idx < len(pages):
-                    if dry_run:
-                        print(f"    [dry-run] Rotate page {idx + 1} by {rot.angle}")
-                    else:
-                        # For auto rotation, we need the original page number in the source PDF
-                        orig_page_num = None
-                        if original_page_indices and idx < len(original_page_indices):
-                            orig_page_num = original_page_indices[idx]
-                        rotate_page(
-                            pages[idx],
-                            rot.angle,
-                            pdf_path=str(pdf_path) if pdf_path else None,
-                            page_num=orig_page_num,
-                        )
-
-        elif transform.type == "crop" and transform.crop:
-            crop = transform.crop
-            for i, page in enumerate(pages):
-                if dry_run:
-                    print(f"    [dry-run] Crop page {i + 1}: {crop.lower_left} to {crop.upper_right}")
-                else:
-                    crop_page(page, crop.lower_left, crop.upper_right)
-
-        elif transform.type == "size" and transform.size:
-            size = transform.size
-            for i, page in enumerate(pages):
-                if dry_run:
-                    print(f"    [dry-run] Resize page {i + 1} to {size.width} x {size.height} ({size.fit})")
-                else:
-                    resize_page(page, size.width, size.height, size.fit)
-        elif transform.type == "split" and transform.split:
-            # Split: 1 page -> N pages (one per region)
-            split_cfg = transform.split
-            regions = [(r.lower_left, r.upper_right) for r in split_cfg.regions]
-            if dry_run:
-                print(f"    [dry-run] Split {len(pages)} page(s) into {len(regions)} regions each")
-                print(f"              Result: {len(pages) * len(regions)} pages")
-            else:
-                new_pages = []
-                for page in pages:
-                    new_pages.extend(split_page(page, regions))
-                pages = new_pages
-
-        elif transform.type == "combine" and transform.combine:
-            # Combine: N pages -> 1 page (batched)
-            combine_cfg = transform.combine
-            batch_size = combine_cfg.pages_per_output
-            layout = [
-                {
-                    "page": item.page,
-                    "position": item.position,
-                    "scale": item.scale,
-                }
-                for item in combine_cfg.layout
-            ]
-            if dry_run:
-                output_count = (len(pages) + batch_size - 1) // batch_size
-                print(f"    [dry-run] Combine {len(pages)} page(s) into {output_count} page(s)")
-                print(f"              ({batch_size} pages per output, size {combine_cfg.page_size})")
-            else:
-                new_pages = []
-                for i in range(0, len(pages), batch_size):
-                    batch = pages[i:i + batch_size]
-                    combined = combine_pages(batch, combine_cfg.page_size, layout)
-                    new_pages.append(combined)
-                pages = new_pages
-        elif transform.type == "render" and transform.render:
-            render = transform.render
-            for i, page in enumerate(pages):
-                if dry_run:
-                    print(f"    [dry-run] Render page {i + 1} at {render.dpi} DPI")
-                else:
-                    # render_page returns a new page, so we need to replace it
-                    pages[i] = render_page(page, render.dpi)
-
-        elif transform.type == "stamp" and transform.stamp:
-            stamp = transform.stamp
-            total_pages = len(pages)
-            for i, page in enumerate(pages):
-                if dry_run:
-                    print(f"    [dry-run] Stamp page {i + 1}: '{stamp.text}' at {stamp.position}")
-                else:
-                    stamp_page(
-                        page,
-                        text=stamp.text,
-                        position=stamp.position,
-                        x=stamp.x,
-                        y=stamp.y,
-                        font_size=stamp.font_size,
-                        font_name=stamp.font_name,
-                        margin=stamp.margin,
-                        page_num=i + 1,
-                        total_pages=total_pages,
-                        datetime_format=stamp.datetime_format,
-                    )
+        if dry_run:
+            print(f"    [dry-run] {step_desc}")
+        else:
+            # Apply transform
+            result = handler.apply(pages, context)
+            pages = result.pages
 
         # Save after each transform if debug enabled
         if debug and not dry_run and debug_output_dir:

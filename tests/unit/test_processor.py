@@ -104,42 +104,62 @@ class TestApplyTransforms:
         pages = [MagicMock(), MagicMock()]
         transforms = [Transform(type="rotate", rotate=RotateTransform(angle=90))]
 
-        with patch("pdfmill.processor.rotate_page") as mock_rotate:
+        mock_handler = MagicMock()
+        mock_handler.apply.return_value = MagicMock(pages=pages)
+        mock_handler.describe.return_value = "rotate90"
+
+        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
             apply_transforms(pages, transforms)
-            assert mock_rotate.call_count == 2
+            mock_handler.apply.assert_called_once()
 
     def test_rotate_specific_pages(self):
         pages = [MagicMock(), MagicMock(), MagicMock()]
         transforms = [Transform(type="rotate", rotate=RotateTransform(angle=90, pages=[0, 2]))]
 
-        with patch("pdfmill.processor.rotate_page") as mock_rotate:
+        mock_handler = MagicMock()
+        mock_handler.apply.return_value = MagicMock(pages=pages)
+        mock_handler.describe.return_value = "rotate90"
+
+        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
             apply_transforms(pages, transforms)
-            assert mock_rotate.call_count == 2
+            mock_handler.apply.assert_called_once()
 
     def test_crop_transform(self):
         pages = [MagicMock(), MagicMock()]
         transforms = [Transform(type="crop", crop=CropTransform(lower_left=(10, 20), upper_right=(100, 200)))]
 
-        with patch("pdfmill.processor.crop_page") as mock_crop:
+        mock_handler = MagicMock()
+        mock_handler.apply.return_value = MagicMock(pages=pages)
+        mock_handler.describe.return_value = "crop"
+
+        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
             apply_transforms(pages, transforms)
-            assert mock_crop.call_count == 2
+            mock_handler.apply.assert_called_once()
 
     def test_size_transform(self):
         pages = [MagicMock()]
         transforms = [Transform(type="size", size=SizeTransform(width="4in", height="6in", fit="contain"))]
 
-        with patch("pdfmill.processor.resize_page") as mock_resize:
+        mock_handler = MagicMock()
+        mock_handler.apply.return_value = MagicMock(pages=pages)
+        mock_handler.describe.return_value = "size_contain"
+
+        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
             apply_transforms(pages, transforms)
-            mock_resize.assert_called_once()
+            mock_handler.apply.assert_called_once()
 
     def test_render_transform(self):
         pages = [MagicMock(), MagicMock()]
         transforms = [Transform(type="render", render=RenderTransform(dpi=300))]
 
-        with patch("pdfmill.processor.render_page") as mock_render:
-            mock_render.side_effect = lambda page, dpi: MagicMock()  # Returns new page
+        new_pages = [MagicMock(), MagicMock()]
+        mock_handler = MagicMock()
+        mock_handler.apply.return_value = MagicMock(pages=new_pages)
+        mock_handler.describe.return_value = "render_300dpi"
+
+        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
             apply_transforms(pages, transforms)
-            assert mock_render.call_count == 2
+            mock_handler.apply.assert_called_once()
 
     def test_render_transform_replaces_pages(self):
         original_pages = [MagicMock(), MagicMock()]
@@ -147,10 +167,13 @@ class TestApplyTransforms:
         new_page_2 = MagicMock()
         transforms = [Transform(type="render", render=RenderTransform(dpi=150))]
 
-        with patch("pdfmill.processor.render_page") as mock_render:
-            mock_render.side_effect = [new_page_1, new_page_2]
+        mock_handler = MagicMock()
+        mock_handler.apply.return_value = MagicMock(pages=[new_page_1, new_page_2])
+        mock_handler.describe.return_value = "render_150dpi"
+
+        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
             result = apply_transforms(original_pages, transforms)
-            # render_page returns new pages, so they should be replaced
+            # Handler returns new pages, so they should be replaced
             assert result[0] is new_page_1
             assert result[1] is new_page_2
 
@@ -158,22 +181,27 @@ class TestApplyTransforms:
         pages = [MagicMock()]
         transforms = [Transform(type="render", render=RenderTransform(dpi=300))]
 
-        with patch("pdfmill.processor.render_page") as mock_render:
+        mock_handler = MagicMock()
+        mock_handler.describe.return_value = "render_300dpi"
+
+        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
             apply_transforms(pages, transforms, dry_run=True)
-            mock_render.assert_not_called()
+            mock_handler.apply.assert_not_called()
 
         captured = capsys.readouterr()
         assert "[dry-run]" in captured.out
-        assert "Render" in captured.out
-        assert "300" in captured.out
+        assert "render_300dpi" in captured.out
 
     def test_dry_run_no_transform(self, capsys):
         pages = [MagicMock()]
         transforms = [Transform(type="rotate", rotate=RotateTransform(angle=90))]
 
-        with patch("pdfmill.processor.rotate_page") as mock_rotate:
+        mock_handler = MagicMock()
+        mock_handler.describe.return_value = "rotate90"
+
+        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
             apply_transforms(pages, transforms, dry_run=True)
-            mock_rotate.assert_not_called()
+            mock_handler.apply.assert_not_called()
 
         captured = capsys.readouterr()
         assert "[dry-run]" in captured.out
@@ -185,11 +213,14 @@ class TestApplyTransforms:
             Transform(type="crop", crop=CropTransform()),
         ]
 
-        with patch("pdfmill.processor.rotate_page") as mock_rotate:
-            with patch("pdfmill.processor.crop_page") as mock_crop:
-                apply_transforms(pages, transforms)
-                mock_rotate.assert_called_once()
-                mock_crop.assert_called_once()
+        mock_handler = MagicMock()
+        mock_handler.apply.return_value = MagicMock(pages=pages)
+        mock_handler.describe.return_value = "transform"
+
+        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
+            apply_transforms(pages, transforms)
+            # Two transforms, so apply should be called twice
+            assert mock_handler.apply.call_count == 2
 
     def test_returns_pages(self):
         pages = [MagicMock()]
@@ -704,10 +735,14 @@ class TestEnabledField:
             Transform(type="rotate", rotate=RotateTransform(angle=180), enabled=False),
         ]
 
-        with patch("pdfmill.processor.rotate_page") as mock_rotate:
+        mock_handler = MagicMock()
+        mock_handler.apply.return_value = MagicMock(pages=pages)
+        mock_handler.describe.return_value = "rotate90"
+
+        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
             apply_transforms(pages, transforms)
-            # Only the enabled transform should be called (once per page)
-            assert mock_rotate.call_count == 2
+            # Only the enabled transform should be called
+            mock_handler.apply.assert_called_once()
 
     def test_all_disabled_transforms_skipped(self):
         """Test that all disabled transforms are skipped."""
@@ -717,11 +752,13 @@ class TestEnabledField:
             Transform(type="crop", crop=CropTransform(), enabled=False),
         ]
 
-        with patch("pdfmill.processor.rotate_page") as mock_rotate:
-            with patch("pdfmill.processor.crop_page") as mock_crop:
-                apply_transforms(pages, transforms)
-                mock_rotate.assert_not_called()
-                mock_crop.assert_not_called()
+        mock_handler = MagicMock()
+        mock_handler.apply.return_value = MagicMock(pages=pages)
+        mock_handler.describe.return_value = "transform"
+
+        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
+            apply_transforms(pages, transforms)
+            mock_handler.apply.assert_not_called()
 
     def test_mixed_enabled_disabled_transforms(self):
         """Test processing with mix of enabled and disabled transforms."""
@@ -732,13 +769,14 @@ class TestEnabledField:
             Transform(type="size", size=SizeTransform(width="4in", height="6in"), enabled=True),
         ]
 
-        with patch("pdfmill.processor.rotate_page") as mock_rotate:
-            with patch("pdfmill.processor.crop_page") as mock_crop:
-                with patch("pdfmill.processor.resize_page") as mock_resize:
-                    apply_transforms(pages, transforms)
-                    mock_rotate.assert_called_once()
-                    mock_crop.assert_not_called()
-                    mock_resize.assert_called_once()
+        mock_handler = MagicMock()
+        mock_handler.apply.return_value = MagicMock(pages=pages)
+        mock_handler.describe.return_value = "transform"
+
+        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
+            apply_transforms(pages, transforms)
+            # 2 enabled transforms
+            assert mock_handler.apply.call_count == 2
 
     def test_disabled_profile_skipped(self, temp_multi_page_pdf, temp_dir, capsys):
         """Test that disabled profiles are skipped."""
@@ -815,6 +853,10 @@ class TestEnabledField:
             Transform(type="rotate", rotate=RotateTransform(angle=90)),  # No enabled field
         ]
 
-        with patch("pdfmill.processor.rotate_page") as mock_rotate:
+        mock_handler = MagicMock()
+        mock_handler.apply.return_value = MagicMock(pages=pages)
+        mock_handler.describe.return_value = "rotate90"
+
+        with patch("pdfmill.processor.get_transform", return_value=mock_handler):
             apply_transforms(pages, transforms)
-            mock_rotate.assert_called_once()
+            mock_handler.apply.assert_called_once()

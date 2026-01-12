@@ -93,13 +93,7 @@ Architecture improvements to enhance maintainability and extensibility.
 - [x] **Enums for constrained values** - Added `StampPosition`, `SortOrder`, `FilterMatch`, `ErrorHandling`, `FitMode` enums in `config.py`
 - [x] **Improved ConfigError** - Added context fields (profile, transform_idx, field, suggestion) for better error messages
 - [x] **Phase 2: Validation** - Added `validate_page_spec_syntax()` for early page spec validation, `--validate --strict` mode for external resources (printers, paths)
-
-### Phase 3: Transform Registry (Higher Risk)
-
-- [ ] Define BaseTransform protocol/ABC
-- [ ] Implement TransformRegistry for plugin-style transforms
-- [ ] Migrate existing transforms to class-based
-- [ ] Eliminate 150-line elif dispatch chain in processor.py
+- [x] **Phase 3: Transform Registry** - Refactored transforms into `transforms/` package with decorator-based registration, `BaseTransform` ABC, `TransformResult` for unified return types, backwards-compatible exports
 
 ### Phase 4: Separation of Concerns (Higher Risk)
 
@@ -112,6 +106,5 @@ Architecture improvements to enhance maintainability and extensibility.
 | Improvement | Impact | Effort | Status |
 |-------------|--------|--------|--------|
 | Early Validation (Phase 2) | Medium | Low | **Done** |
-| Transform Registry (Phase 3) | High | Medium | Pending |
+| Transform Registry (Phase 3) | High | Medium | **Done** |
 | Extract PrintPipeline (Phase 4) | High | Medium | Pending |
-| Transform Context | Low | Low | Pending |
