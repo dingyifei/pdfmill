@@ -5,12 +5,15 @@ from pathlib import Path
 from tkinter import filedialog, ttk
 
 from pdfmill.config import (
+    ErrorHandling,
     FilterConfig,
+    FilterMatch,
     InputConfig,
     OutputProfile,
     PrintConfig,
     PrintTarget,
     Settings,
+    SortOrder,
     Transform,
 )
 from pdfmill.gui.constants import ON_ERROR_OPTIONS, SORT_OPTIONS
@@ -51,7 +54,7 @@ class SettingsFrame(ttk.LabelFrame):
 
     def to_settings(self) -> Settings:
         return Settings(
-            on_error=self.on_error_var.get(),
+            on_error=ErrorHandling(self.on_error_var.get()),
             cleanup_source=self.cleanup_source_var.get(),
             cleanup_output_after_print=self.cleanup_output_var.get(),
         )
@@ -125,13 +128,14 @@ class InputFrame(ttk.LabelFrame):
         if keywords_str:
             keywords = [k.strip() for k in keywords_str.split(",") if k.strip()]
             if keywords:
-                filter_config = FilterConfig(keywords=keywords, match=self.match_var.get())
+                filter_config = FilterConfig(keywords=keywords, match=FilterMatch(self.match_var.get()))
 
+        sort_str = self.sort_var.get()
         return InputConfig(
             path=Path(self.path_var.get()),
             pattern=self.pattern_var.get(),
             filter=filter_config,
-            sort=self.sort_var.get() or None,
+            sort=SortOrder(sort_str) if sort_str else None,
         )
 
 
@@ -395,7 +399,7 @@ class OutputProfileEditor(ttk.Frame):
                 targets=dict(self.print_targets),
             ),
             debug=self.debug_var.get(),
-            sort=self.sort_var.get() or None,
+            sort=SortOrder(self.sort_var.get()) if self.sort_var.get() else None,
         )
 
 

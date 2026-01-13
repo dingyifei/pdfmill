@@ -8,12 +8,14 @@ from pdfmill.config import (
     CombineLayoutItem,
     CombineTransform,
     CropTransform,
+    FitMode,
     PrintTarget,
     RenderTransform,
     RotateTransform,
     SizeTransform,
     SplitRegion,
     SplitTransform,
+    StampPosition,
     StampTransform,
     Transform,
 )
@@ -354,7 +356,7 @@ class TransformDialog(tk.Toplevel):
                 size=SizeTransform(
                     width=self.size_w_var.get(),
                     height=self.size_h_var.get(),
-                    fit=self.fit_var.get(),
+                    fit=FitMode(self.fit_var.get()),
                 ),
                 enabled=enabled,
             )
@@ -363,7 +365,7 @@ class TransformDialog(tk.Toplevel):
                 type="stamp",
                 stamp=StampTransform(
                     text=self.stamp_text_var.get(),
-                    position=self.stamp_pos_var.get(),
+                    position=StampPosition(self.stamp_pos_var.get()),
                     x=self.stamp_x_var.get(),
                     y=self.stamp_y_var.get(),
                     font_size=self.stamp_fontsize_var.get(),
