@@ -2,10 +2,11 @@
 
 from pypdf import PageObject, Transformation
 
-from pdfmill.config import CombineTransform as CombineConfig, Transform
+from pdfmill.config import CombineTransform as CombineConfig
+from pdfmill.config import Transform
+from pdfmill.transforms._utils import parse_coordinate, parse_dimension
 from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
 from pdfmill.transforms.registry import register_transform
-from pdfmill.transforms._utils import parse_coordinate, parse_dimension
 
 
 def combine_pages(

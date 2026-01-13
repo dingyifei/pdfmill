@@ -52,9 +52,7 @@ class ValidationResult:
         profile: str | None = None,
         suggestion: str | None = None,
     ) -> None:
-        self.issues.append(
-            ValidationIssue("error", profile, field, message, suggestion)
-        )
+        self.issues.append(ValidationIssue("error", profile, field, message, suggestion))
 
     def add_warning(
         self,
@@ -63,9 +61,7 @@ class ValidationResult:
         profile: str | None = None,
         suggestion: str | None = None,
     ) -> None:
-        self.issues.append(
-            ValidationIssue("warning", profile, field, message, suggestion)
-        )
+        self.issues.append(ValidationIssue("warning", profile, field, message, suggestion))
 
 
 def validate_strict(config: "Config") -> ValidationResult:
@@ -116,9 +112,7 @@ def _validate_input_path(config: "Config", result: ValidationResult) -> None:
         )
 
 
-def _validate_output_dir(
-    profile_name: str, profile: "OutputProfile", result: ValidationResult
-) -> None:
+def _validate_output_dir(profile_name: str, profile: "OutputProfile", result: ValidationResult) -> None:
     """Validate output_dir is writable."""
     output_dir = profile.output_dir
 
@@ -155,9 +149,7 @@ def _validate_output_dir(
             )
 
 
-def _validate_printers(
-    profile_name: str, profile: "OutputProfile", result: ValidationResult
-) -> None:
+def _validate_printers(profile_name: str, profile: "OutputProfile", result: ValidationResult) -> None:
     """Validate configured printers exist on the system."""
     if not profile.print.enabled:
         return
@@ -181,9 +173,7 @@ def _validate_printers(
     for target_name, target in profile.print.targets.items():
         if target.printer and target.printer not in available_printers:
             # Try case-insensitive match
-            matches = [
-                p for p in available_printers if p.lower() == target.printer.lower()
-            ]
+            matches = [p for p in available_printers if p.lower() == target.printer.lower()]
             if matches:
                 result.add_warning(
                     field=f"print.targets.{target_name}.printer",

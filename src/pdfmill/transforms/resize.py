@@ -2,14 +2,15 @@
 
 from pypdf import PageObject, Transformation
 
-from pdfmill.config import FitMode, SizeTransform as SizeConfig, Transform
-from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
-from pdfmill.transforms.registry import register_transform
+from pdfmill.config import FitMode, Transform
+from pdfmill.config import SizeTransform as SizeConfig
 from pdfmill.transforms._utils import (
     TransformError,
     get_page_dimensions,
     parse_dimension,
 )
+from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
+from pdfmill.transforms.registry import register_transform
 
 
 def resize_page(
@@ -69,9 +70,7 @@ def resize_page(
         offset_y = (target_height - scaled_height) / 2
 
         # Apply scale and translation to center the content
-        transform = (
-            Transformation().scale(sx=scale, sy=scale).translate(tx=offset_x, ty=offset_y)
-        )
+        transform = Transformation().scale(sx=scale, sy=scale).translate(tx=offset_x, ty=offset_y)
         page.add_transformation(transform)
 
         # Set final mediabox to target size

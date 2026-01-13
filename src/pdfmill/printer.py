@@ -2,7 +2,6 @@
 
 import os
 import platform
-import shutil
 import subprocess
 import sys
 import urllib.request
@@ -171,9 +170,8 @@ def list_printers() -> list[str]:
     """
     try:
         import win32print
-        printers = win32print.EnumPrinters(
-            win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
-        )
+
+        printers = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS)
         return [printer[2] for printer in printers]
     except ImportError:
         raise PrinterError("win32print not available. Printing only works on Windows.")
@@ -287,7 +285,7 @@ def print_pdf(
         return True
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             cmd,
             check=True,
             capture_output=True,

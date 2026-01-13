@@ -14,8 +14,8 @@ Backwards-compatible function exports are available:
     from pdfmill.transforms import rotate_page, crop_page, resize_page
 """
 
-# Import all transform modules to trigger registration
-from pdfmill.transforms import (
+# Import all transform modules to trigger registration (side-effect imports)
+from pdfmill.transforms import (  # noqa: F401
     combine,
     crop,
     render,
@@ -24,27 +24,6 @@ from pdfmill.transforms import (
     split,
     stamp,
 )
-
-# Core exports
-from pdfmill.transforms.base import (
-    BaseTransform,
-    TransformContext,
-    TransformResult,
-)
-from pdfmill.transforms.registry import (
-    get_transform,
-    list_transforms,
-    register_transform,
-)
-
-# Backwards-compatible function exports
-from pdfmill.transforms.combine import combine_pages
-from pdfmill.transforms.crop import crop_page
-from pdfmill.transforms.render import render_page
-from pdfmill.transforms.resize import resize_page
-from pdfmill.transforms.rotate import rotate_page
-from pdfmill.transforms.split import split_page
-from pdfmill.transforms.stamp import stamp_page
 
 # Utility exports (for external use)
 from pdfmill.transforms._utils import (
@@ -57,10 +36,31 @@ from pdfmill.transforms._utils import (
     parse_dimension,
 )
 
+# Core exports
+from pdfmill.transforms.base import (
+    BaseTransform,
+    TransformContext,
+    TransformResult,
+)
+
+# Backwards-compatible function exports
+from pdfmill.transforms.combine import combine_pages
+from pdfmill.transforms.crop import crop_page
+from pdfmill.transforms.registry import (
+    get_transform,
+    list_transforms,
+    register_transform,
+)
+from pdfmill.transforms.render import render_page
+from pdfmill.transforms.resize import resize_page
+from pdfmill.transforms.rotate import rotate_page
+from pdfmill.transforms.split import split_page
+
 # Internal functions exported for tests
 from pdfmill.transforms.stamp import (
     _calculate_stamp_position,
     _format_stamp_text,
+    stamp_page,
 )
 
 __all__ = [

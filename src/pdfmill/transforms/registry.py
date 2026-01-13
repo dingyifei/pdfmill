@@ -1,18 +1,19 @@
 """Transform registry for pdfmill."""
 
-from typing import TYPE_CHECKING, Callable, Type
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pdfmill.config import Transform
     from pdfmill.transforms.base import BaseTransform
 
 # Global registry mapping transform names to handler classes
-_registry: dict[str, Type["BaseTransform"]] = {}
+_registry: dict[str, type["BaseTransform"]] = {}
 
 
 def register_transform(
     name: str,
-) -> Callable[[Type["BaseTransform"]], Type["BaseTransform"]]:
+) -> Callable[[type["BaseTransform"]], type["BaseTransform"]]:
     """Decorator to register a transform class.
 
     Usage:
@@ -27,7 +28,7 @@ def register_transform(
         Decorator function
     """
 
-    def decorator(cls: Type["BaseTransform"]) -> Type["BaseTransform"]:
+    def decorator(cls: type["BaseTransform"]) -> type["BaseTransform"]:
         if name in _registry:
             raise ValueError(f"Transform '{name}' is already registered")
         cls.name = name
@@ -51,10 +52,7 @@ def get_transform(transform_config: "Transform") -> "BaseTransform":
     """
     if transform_config.type not in _registry:
         registered = ", ".join(sorted(_registry.keys()))
-        raise ValueError(
-            f"Unknown transform type: '{transform_config.type}'. "
-            f"Registered transforms: {registered}"
-        )
+        raise ValueError(f"Unknown transform type: '{transform_config.type}'. Registered transforms: {registered}")
 
     transform_cls = _registry[transform_config.type]
     return transform_cls.from_config(transform_config)

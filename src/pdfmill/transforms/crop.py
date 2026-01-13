@@ -2,10 +2,11 @@
 
 from pypdf import PageObject, Transformation
 
-from pdfmill.config import CropTransform as CropConfig, Transform
+from pdfmill.config import CropTransform as CropConfig
+from pdfmill.config import Transform
+from pdfmill.transforms._utils import TransformError, parse_coordinate
 from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
 from pdfmill.transforms.registry import register_transform
-from pdfmill.transforms._utils import TransformError, parse_coordinate
 
 
 def crop_page(
@@ -37,13 +38,9 @@ def crop_page(
     ur_y = parse_coordinate(upper_right[1])
 
     if ll_x >= ur_x:
-        raise TransformError(
-            f"Invalid crop: left ({ll_x}) must be less than right ({ur_x})"
-        )
+        raise TransformError(f"Invalid crop: left ({ll_x}) must be less than right ({ur_x})")
     if ll_y >= ur_y:
-        raise TransformError(
-            f"Invalid crop: bottom ({ll_y}) must be less than top ({ur_y})"
-        )
+        raise TransformError(f"Invalid crop: bottom ({ll_y}) must be less than top ({ur_y})")
 
     # Calculate cropped dimensions
     crop_width = ur_x - ll_x

@@ -4,10 +4,11 @@ from copy import deepcopy
 
 from pypdf import PageObject
 
-from pdfmill.config import SplitTransform as SplitConfig, Transform
+from pdfmill.config import SplitTransform as SplitConfig
+from pdfmill.config import Transform
 from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
-from pdfmill.transforms.registry import register_transform
 from pdfmill.transforms.crop import crop_page
+from pdfmill.transforms.registry import register_transform
 
 
 def split_page(
@@ -67,9 +68,7 @@ class SplitTransformHandler(BaseTransform):
         context: TransformContext,
     ) -> TransformResult:
         # Convert config regions to coordinate tuples
-        regions = [
-            (r.lower_left, r.upper_right) for r in self.config.regions
-        ]
+        regions = [(r.lower_left, r.upper_right) for r in self.config.regions]
 
         new_pages = []
         for page in pages:

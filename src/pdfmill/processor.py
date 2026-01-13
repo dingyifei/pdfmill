@@ -14,10 +14,10 @@ from pdfmill.config import (
     OutputProfile,
     SortOrder,
 )
-from pdfmill.selector import select_pages, PageSelectionError
-from pdfmill.transforms import TransformError
+from pdfmill.pipeline import PrintPipeline, TransformExecutor
 from pdfmill.printer import PrinterError
-from pdfmill.pipeline import TransformExecutor, PrintPipeline
+from pdfmill.selector import PageSelectionError, select_pages
+from pdfmill.transforms import TransformError
 
 
 class ProcessingError(Exception):

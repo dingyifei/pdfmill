@@ -5,14 +5,15 @@ from datetime import datetime
 
 from pypdf import PageObject, PdfReader
 
-from pdfmill.config import StampPosition, StampTransform as StampConfig, Transform
-from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
-from pdfmill.transforms.registry import register_transform
+from pdfmill.config import StampPosition, Transform
+from pdfmill.config import StampTransform as StampConfig
 from pdfmill.transforms._utils import (
     TransformError,
     get_page_dimensions,
     parse_coordinate,
 )
+from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
+from pdfmill.transforms.registry import register_transform
 
 
 def _create_text_overlay(
@@ -42,9 +43,7 @@ def _create_text_overlay(
     try:
         from reportlab.pdfgen import canvas
     except ImportError:
-        raise TransformError(
-            "reportlab is required for stamp transform. Install with: pip install reportlab"
-        )
+        raise TransformError("reportlab is required for stamp transform. Install with: pip install reportlab")
 
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=(width, height))
@@ -100,9 +99,7 @@ def _calculate_stamp_position(
     else:
         # This should never happen with proper enum usage
         valid = ", ".join(p.value for p in StampPosition)
-        raise TransformError(
-            f"Unknown stamp position: {position}. Valid options: {valid}"
-        )
+        raise TransformError(f"Unknown stamp position: {position}. Valid options: {valid}")
 
 
 def _format_stamp_text(

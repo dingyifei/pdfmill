@@ -2,15 +2,16 @@
 
 from pypdf import PageObject, Transformation
 
-from pdfmill.config import RotateTransform as RotateConfig, Transform
-from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
-from pdfmill.transforms.registry import register_transform
+from pdfmill.config import RotateTransform as RotateConfig
+from pdfmill.config import Transform
 from pdfmill.transforms._utils import (
     TransformError,
     detect_page_orientation,
     get_page_dimensions,
     is_landscape,
 )
+from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
+from pdfmill.transforms.registry import register_transform
 
 
 def rotate_page(
@@ -52,17 +53,13 @@ def rotate_page(
                 actual_angle = 90
         elif angle_lower == "auto":
             if pdf_path is None or page_num is None:
-                raise TransformError(
-                    "pdf_path and page_num are required for auto rotation"
-                )
+                raise TransformError("pdf_path and page_num are required for auto rotation")
             actual_angle = detect_page_orientation(pdf_path, page_num)
         else:
             raise TransformError(f"Unknown rotation orientation: {angle}")
     else:
         if angle not in (0, 90, 180, 270):
-            raise TransformError(
-                f"Rotation angle must be 0, 90, 180, or 270, got {angle}"
-            )
+            raise TransformError(f"Rotation angle must be 0, 90, 180, or 270, got {angle}")
         actual_angle = angle
 
     if actual_angle == 0:
@@ -120,18 +117,13 @@ class RotateTransformHandler(BaseTransform):
         context: TransformContext,
     ) -> TransformResult:
         # Determine which pages to rotate
-        pages_to_rotate = (
-            self.config.pages if self.config.pages else list(range(len(pages)))
-        )
+        pages_to_rotate = self.config.pages if self.config.pages else list(range(len(pages)))
 
         for idx in pages_to_rotate:
             if idx < len(pages):
                 # Get original page number for OCR-based auto rotation
                 orig_page_num = None
-                if (
-                    context.original_page_indices
-                    and idx < len(context.original_page_indices)
-                ):
+                if context.original_page_indices and idx < len(context.original_page_indices):
                     orig_page_num = context.original_page_indices[idx]
 
                 rotate_page(

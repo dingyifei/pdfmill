@@ -1,7 +1,7 @@
 """Page selection logic for pdfmill."""
 
 import re
-from typing import Sequence
+from collections.abc import Sequence
 
 
 class PageSelectionError(Exception):
@@ -119,9 +119,7 @@ def _select_from_list(pages: Sequence[int], total_pages: int) -> list[int]:
             idx = page - 1
 
         if idx < 0 or idx >= total_pages:
-            raise PageSelectionError(
-                f"Page {page} is out of range for {total_pages} page PDF"
-            )
+            raise PageSelectionError(f"Page {page} is out of range for {total_pages} page PDF")
         result.append(idx)
     return result
 
@@ -144,8 +142,7 @@ def validate_page_spec_syntax(spec: str | list[int]) -> None:
         for i, item in enumerate(spec):
             if not isinstance(item, int):
                 raise PageSelectionError(
-                    f"Page list must contain only integers, "
-                    f"got {type(item).__name__} at index {i}"
+                    f"Page list must contain only integers, got {type(item).__name__} at index {i}"
                 )
         return
 
@@ -156,8 +153,7 @@ def validate_page_spec_syntax(spec: str | list[int]) -> None:
     # Must be a string from here
     if not isinstance(spec, str):
         raise PageSelectionError(
-            f"Page specification must be a string, int, or list of ints, "
-            f"got {type(spec).__name__}"
+            f"Page specification must be a string, int, or list of ints, got {type(spec).__name__}"
         )
 
     spec_str = spec.strip().lower()
@@ -186,10 +182,7 @@ def validate_page_spec_syntax(spec: str | list[int]) -> None:
             if offset_str:
                 int(offset_str)
         except ValueError:
-            raise PageSelectionError(
-                f"Invalid range specification: '{spec}'. "
-                f"Range values must be integers"
-            )
+            raise PageSelectionError(f"Invalid range specification: '{spec}'. Range values must be integers")
         return
 
     # Check simple range: "1-3", "3-", "-2"
@@ -207,10 +200,7 @@ def validate_page_spec_syntax(spec: str | list[int]) -> None:
             if end_str:
                 int(end_str)
         except ValueError:
-            raise PageSelectionError(
-                f"Invalid range specification: '{spec}'. "
-                f"Range values must be integers"
-            )
+            raise PageSelectionError(f"Invalid range specification: '{spec}'. Range values must be integers")
         return
 
     # Check single page number

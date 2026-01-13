@@ -11,7 +11,7 @@ from pdfmill.config import (
     PrintTarget,
     SortOrder,
 )
-from pdfmill.printer import print_pdf, PrinterError
+from pdfmill.printer import PrinterError, print_pdf
 
 
 @dataclass
@@ -216,9 +216,7 @@ class PrintPipeline:
             # Multi-printer page distribution
             for file_path in files_to_print:
                 print(f"Splitting {file_path.name} across {len(targets)} printers...")
-                split_pdfs = self.split_pages_by_weight(
-                    file_path, targets, merge_output_dir, profile_name
-                )
+                split_pdfs = self.split_pages_by_weight(file_path, targets, merge_output_dir, profile_name)
                 for target_name, split_path in split_pdfs.items():
                     target = targets[target_name]
                     print(f"  Printing {split_path.name} to {target.printer}...")
@@ -233,7 +231,7 @@ class PrintPipeline:
         else:
             # Single target or copy distribution (each file to all targets)
             for file_path in files_to_print:
-                for target_name, target in targets.items():
+                for _target_name, target in targets.items():
                     print(f"Printing {file_path.name} to {target.printer}...")
                     print_pdf(
                         file_path,

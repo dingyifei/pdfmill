@@ -5,7 +5,7 @@ from pathlib import Path
 from pypdf import PageObject, PdfWriter
 
 from pdfmill.config import Transform
-from pdfmill.transforms import get_transform, TransformContext
+from pdfmill.transforms import TransformContext, get_transform
 
 
 class TransformExecutor:
@@ -42,10 +42,7 @@ class TransformExecutor:
         """
         # Save initial state (after page selection) if debug enabled
         if debug and not dry_run and debug_output_dir:
-            self._save_debug_pdf(
-                pages, debug_output_dir, debug_source_name,
-                debug_profile_name, 0, "selected"
-            )
+            self._save_debug_pdf(pages, debug_output_dir, debug_source_name, debug_profile_name, 0, "selected")
 
         for step_num, transform in enumerate(transforms, start=1):
             # Skip disabled transforms
@@ -74,8 +71,7 @@ class TransformExecutor:
             # Save after each transform if debug enabled
             if debug and not dry_run and debug_output_dir:
                 self._save_debug_pdf(
-                    pages, debug_output_dir, debug_source_name,
-                    debug_profile_name, step_num, step_desc
+                    pages, debug_output_dir, debug_source_name, debug_profile_name, step_num, step_desc
                 )
 
         return pages

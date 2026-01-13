@@ -4,10 +4,11 @@ import io
 
 from pypdf import PageObject, PdfReader, PdfWriter
 
-from pdfmill.config import RenderTransform as RenderConfig, Transform
+from pdfmill.config import RenderTransform as RenderConfig
+from pdfmill.config import Transform
+from pdfmill.transforms._utils import TransformError
 from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
 from pdfmill.transforms.registry import register_transform
-from pdfmill.transforms._utils import TransformError
 
 
 def render_page(page: PageObject, dpi: int = 150) -> PageObject:
@@ -31,18 +32,12 @@ def render_page(page: PageObject, dpi: int = 150) -> PageObject:
     try:
         from pdf2image import convert_from_bytes
     except ImportError:
-        raise TransformError(
-            "pdf2image is required for render transform. "
-            "Install with: pip install pdf2image"
-        )
+        raise TransformError("pdf2image is required for render transform. Install with: pip install pdf2image")
 
     try:
-        from PIL import Image
+        from PIL import Image  # noqa: F401
     except ImportError:
-        raise TransformError(
-            "Pillow is required for render transform. "
-            "Install with: pip install Pillow"
-        )
+        raise TransformError("Pillow is required for render transform. Install with: pip install Pillow")
 
     # Write the single page to a temporary PDF in memory
     writer = PdfWriter()

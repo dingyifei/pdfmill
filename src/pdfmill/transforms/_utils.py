@@ -36,9 +36,7 @@ def parse_dimension(value: str) -> float:
     value = value.strip().lower()
     match = re.match(r"^([\d.]+)\s*(mm|in|pt|cm)$", value)
     if not match:
-        raise TransformError(
-            f"Invalid dimension format: {value}. Use format like '100mm', '4in', '288pt'"
-        )
+        raise TransformError(f"Invalid dimension format: {value}. Use format like '100mm', '4in', '288pt'")
 
     number = float(match.group(1))
     unit = match.group(2)
@@ -94,17 +92,12 @@ def detect_page_orientation(pdf_path: str, page_num: int = 0) -> int:
     try:
         from pdf2image import convert_from_path
     except ImportError:
-        raise TransformError(
-            "pdf2image is required for auto rotation. Install with: pip install pdf2image"
-        )
+        raise TransformError("pdf2image is required for auto rotation. Install with: pip install pdf2image")
 
     try:
         import pytesseract
     except ImportError:
-        raise TransformError(
-            "pytesseract is required for auto rotation. "
-            "Install with: pip install pytesseract"
-        )
+        raise TransformError("pytesseract is required for auto rotation. Install with: pip install pytesseract")
 
     try:
         # Render PDF page to image at 150 DPI for good OCR accuracy
@@ -128,9 +121,6 @@ def detect_page_orientation(pdf_path: str, page_num: int = 0) -> int:
         return detected_rotation
 
     except pytesseract.TesseractNotFoundError:
-        raise TransformError(
-            "Tesseract OCR is not installed. Install from: "
-            "https://github.com/tesseract-ocr/tesseract"
-        )
+        raise TransformError("Tesseract OCR is not installed. Install from: https://github.com/tesseract-ocr/tesseract")
     except Exception as e:
         raise TransformError(f"OCR orientation detection failed: {e}")
