@@ -1,6 +1,9 @@
 """Combine transform for pdfmill."""
 
-from pypdf import PageObject, Transformation
+import io
+import logging
+
+from pypdf import PageObject, PdfReader, PdfWriter, Transformation
 
 from pdfmill.config import CombineTransform as CombineConfig
 from pdfmill.config import Transform
@@ -46,25 +49,51 @@ def combine_pages(
     # Create a blank output page
     output_page = PageObject.create_blank_page(width=width, height=height)
 
+    # Serialize each source page to bytes once.
+    # This is necessary because pypdf's merge_transformed_page can modify
+    # the source page's content stream. When the same page is used multiple
+    # times in the layout, we need independent copies.
+    page_bytes_cache: dict[int, bytes] = {}
     for item in layout:
         page_idx = item.get("page", 0)
-        if page_idx >= len(pages):
-            continue  # Skip if page doesn't exist
+        if page_idx >= len(pages) or page_idx in page_bytes_cache:
+            continue
+        temp_writer = PdfWriter()
+        temp_writer.add_page(pages[page_idx])
+        buffer = io.BytesIO()
+        temp_writer.write(buffer)
+        page_bytes_cache[page_idx] = buffer.getvalue()
 
-        source_page = pages[page_idx]
-        position = item.get("position", (0, 0))
-        scale = item.get("scale", 1.0)
+    # Temporarily suppress pypdf warnings about xref entries
+    pypdf_logger = logging.getLogger("pypdf")
+    original_level = pypdf_logger.level
+    pypdf_logger.setLevel(logging.ERROR)
 
-        # Parse position coordinates
-        x = parse_coordinate(position[0])
-        y = parse_coordinate(position[1])
+    try:
+        for item in layout:
+            page_idx = item.get("page", 0)
+            if page_idx >= len(pages):
+                continue  # Skip if page doesn't exist
 
-        # Build transformation: scale then translate
-        # Note: transformations are applied in reverse order in the matrix
-        transform = Transformation().scale(sx=scale, sy=scale).translate(tx=x, ty=y)
+            # Get a fresh copy of the source page
+            reader = PdfReader(io.BytesIO(page_bytes_cache[page_idx]))
+            source_page = reader.pages[0]
 
-        # Merge the source page onto the output with the transformation
-        output_page.merge_transformed_page(source_page, transform)
+            position = item.get("position", (0, 0))
+            scale = item.get("scale", 1.0)
+
+            # Parse position coordinates
+            x = parse_coordinate(position[0])
+            y = parse_coordinate(position[1])
+
+            # Build transformation: scale then translate
+            # Note: transformations are applied in reverse order in the matrix
+            transform = Transformation().scale(sx=scale, sy=scale).translate(tx=x, ty=y)
+
+            # Merge the source page onto the output with the transformation
+            output_page.merge_transformed_page(source_page, transform)
+    finally:
+        pypdf_logger.setLevel(original_level)
 
     return output_page
 
