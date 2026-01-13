@@ -464,26 +464,35 @@ class PdfMillApp(tk.Tk):
         import io
         import sys
 
+        from pdfmill.logging_config import setup_logging
+
         old_stdout = sys.stdout
         old_stderr = sys.stderr
-        sys.stdout = io.StringIO()
-        sys.stderr = io.StringIO()
+        captured_stdout = io.StringIO()
+        captured_stderr = io.StringIO()
+        sys.stdout = captured_stdout
+        sys.stderr = captured_stderr
+
+        # Reconfigure logging to use captured streams
+        setup_logging(stdout_stream=captured_stdout, stderr_stream=captured_stderr)
 
         try:
             from pdfmill.processor import process
 
             process(config=config, input_path=input_path, dry_run=dry_run)
 
-            output = sys.stdout.getvalue() + sys.stderr.getvalue()
+            output = captured_stdout.getvalue() + captured_stderr.getvalue()
             self.output_queue.put(("output", output))
             self.output_queue.put(("complete", _("Pipeline completed successfully")))
         except Exception as e:
-            output = sys.stdout.getvalue() + sys.stderr.getvalue()
+            output = captured_stdout.getvalue() + captured_stderr.getvalue()
             self.output_queue.put(("output", output))
             self.output_queue.put(("error", str(e)))
         finally:
             sys.stdout = old_stdout
             sys.stderr = old_stderr
+            # Restore logging to use real stdout/stderr
+            setup_logging()
             self.running = False
 
     def _poll_output(self):

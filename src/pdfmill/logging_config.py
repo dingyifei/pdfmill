@@ -60,6 +60,8 @@ def setup_logging(
     verbosity: int = 0,
     quiet: bool = False,
     log_file: Path | None = None,
+    stdout_stream=None,
+    stderr_stream=None,
 ) -> None:
     """Configure logging for pdfmill CLI.
 
@@ -67,9 +69,15 @@ def setup_logging(
         verbosity: 0=normal, 1=verbose (-v), 2=debug (-vv)
         quiet: If True, suppress all output except errors
         log_file: Optional file path for logging
+        stdout_stream: Custom stdout stream (default: sys.stdout)
+        stderr_stream: Custom stderr stream (default: sys.stderr)
     """
     logger = logging.getLogger(LOGGER_NAME)
     logger.handlers.clear()
+
+    # Use provided streams or default to sys.stdout/stderr
+    stdout = stdout_stream if stdout_stream is not None else sys.stdout
+    stderr = stderr_stream if stderr_stream is not None else sys.stderr
 
     # Determine console level
     if quiet:
@@ -85,14 +93,14 @@ def setup_logging(
     logger.setLevel(logging.DEBUG)
 
     # Stdout handler for INFO and DEBUG (below WARNING)
-    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler = logging.StreamHandler(stdout)
     stdout_handler.setLevel(console_level)
     stdout_handler.setFormatter(ConsoleFormatter())
     stdout_handler.addFilter(InfoFilter())
     logger.addHandler(stdout_handler)
 
     # Stderr handler for WARNING and above
-    stderr_handler = logging.StreamHandler(sys.stderr)
+    stderr_handler = logging.StreamHandler(stderr)
     stderr_handler.setLevel(logging.WARNING)
     stderr_handler.setFormatter(ConsoleFormatter())
     logger.addHandler(stderr_handler)
