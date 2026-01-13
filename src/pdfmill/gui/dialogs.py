@@ -23,6 +23,7 @@ from pdfmill.gui.constants import (
     STAMP_POSITIONS,
     TRANSFORM_TYPES,
 )
+from pdfmill.gui.i18n import _
 
 
 class TransformDialog(tk.Toplevel):
@@ -30,7 +31,7 @@ class TransformDialog(tk.Toplevel):
 
     def __init__(self, parent, transform: Transform | None = None):
         super().__init__(parent)
-        self.title("Edit Transform")
+        self.title(_("Edit Transform"))
         self.geometry("500x500")
         self.resizable(True, True)
         self.transient(parent)
@@ -68,133 +69,133 @@ class TransformDialog(tk.Toplevel):
         # Enabled checkbox
         row = ttk.Frame(self, padding=10)
         row.pack(fill="x")
-        ttk.Checkbutton(row, text="Enabled", variable=self.enabled_var).pack(side="left")
+        ttk.Checkbutton(row, text=_("Enabled"), variable=self.enabled_var).pack(side="left")
 
         # Type selector
         row = ttk.Frame(self, padding=10)
         row.pack(fill="x")
-        ttk.Label(row, text="Type:").pack(side="left")
+        ttk.Label(row, text=_("Type:")).pack(side="left")
         type_combo = ttk.Combobox(row, textvariable=self.type_var, values=TRANSFORM_TYPES, state="readonly", width=15)
         type_combo.pack(side="left", padx=5)
         type_combo.bind("<<ComboboxSelected>>", lambda e: self._update_fields())
 
         # Rotate frame
-        self.rotate_frame = ttk.LabelFrame(self, text="Rotate Options", padding=10)
+        self.rotate_frame = ttk.LabelFrame(self, text=_("Rotate Options"), padding=10)
         row = ttk.Frame(self.rotate_frame)
         row.pack(fill="x")
-        ttk.Label(row, text="Angle:").pack(side="left")
+        ttk.Label(row, text=_("Angle:")).pack(side="left")
         ttk.Combobox(row, textvariable=self.angle_var, values=ROTATE_ANGLES, width=15).pack(side="left", padx=5)
 
         # Crop frame
-        self.crop_frame = ttk.LabelFrame(self, text="Crop Options", padding=10)
+        self.crop_frame = ttk.LabelFrame(self, text=_("Crop Options"), padding=10)
         row = ttk.Frame(self.crop_frame)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Lower Left X:").pack(side="left")
+        ttk.Label(row, text=_("Lower Left X:")).pack(side="left")
         ttk.Entry(row, textvariable=self.crop_ll_x_var, width=10).pack(side="left", padx=5)
-        ttk.Label(row, text="Y:").pack(side="left")
+        ttk.Label(row, text=_("Y:")).pack(side="left")
         ttk.Entry(row, textvariable=self.crop_ll_y_var, width=10).pack(side="left", padx=5)
         row = ttk.Frame(self.crop_frame)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Upper Right X:").pack(side="left")
+        ttk.Label(row, text=_("Upper Right X:")).pack(side="left")
         ttk.Entry(row, textvariable=self.crop_ur_x_var, width=10).pack(side="left", padx=5)
-        ttk.Label(row, text="Y:").pack(side="left")
+        ttk.Label(row, text=_("Y:")).pack(side="left")
         ttk.Entry(row, textvariable=self.crop_ur_y_var, width=10).pack(side="left", padx=5)
 
         # Size frame
-        self.size_frame = ttk.LabelFrame(self, text="Size Options", padding=10)
+        self.size_frame = ttk.LabelFrame(self, text=_("Size Options"), padding=10)
         row = ttk.Frame(self.size_frame)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Width:").pack(side="left")
+        ttk.Label(row, text=_("Width:")).pack(side="left")
         ttk.Entry(row, textvariable=self.size_w_var, width=10).pack(side="left", padx=5)
-        ttk.Label(row, text="Height:").pack(side="left")
+        ttk.Label(row, text=_("Height:")).pack(side="left")
         ttk.Entry(row, textvariable=self.size_h_var, width=10).pack(side="left", padx=5)
         row = ttk.Frame(self.size_frame)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Fit:").pack(side="left")
+        ttk.Label(row, text=_("Fit:")).pack(side="left")
         ttk.Combobox(row, textvariable=self.fit_var, values=FIT_MODES, state="readonly", width=10).pack(
             side="left", padx=5
         )
 
         # Stamp frame
-        self.stamp_frame = ttk.LabelFrame(self, text="Stamp Options", padding=10)
+        self.stamp_frame = ttk.LabelFrame(self, text=_("Stamp Options"), padding=10)
         row = ttk.Frame(self.stamp_frame)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Text:").pack(side="left")
+        ttk.Label(row, text=_("Text:")).pack(side="left")
         ttk.Entry(row, textvariable=self.stamp_text_var, width=25).pack(side="left", padx=5)
         row = ttk.Frame(self.stamp_frame)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Position:").pack(side="left")
+        ttk.Label(row, text=_("Position:")).pack(side="left")
         pos_combo = ttk.Combobox(row, textvariable=self.stamp_pos_var, values=STAMP_POSITIONS, width=12)
         pos_combo.pack(side="left", padx=5)
         pos_combo.bind("<<ComboboxSelected>>", lambda e: self._update_stamp_xy_state())
         row = ttk.Frame(self.stamp_frame)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="X:").pack(side="left")
+        ttk.Label(row, text=_("X:")).pack(side="left")
         self.stamp_x_entry = ttk.Entry(row, textvariable=self.stamp_x_var, width=8)
         self.stamp_x_entry.pack(side="left", padx=5)
-        ttk.Label(row, text="Y:").pack(side="left")
+        ttk.Label(row, text=_("Y:")).pack(side="left")
         self.stamp_y_entry = ttk.Entry(row, textvariable=self.stamp_y_var, width=8)
         self.stamp_y_entry.pack(side="left", padx=5)
-        ttk.Label(row, text="(for custom position)").pack(side="left", padx=5)
+        ttk.Label(row, text=_("(for custom position)")).pack(side="left", padx=5)
         row = ttk.Frame(self.stamp_frame)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Font Size:").pack(side="left")
+        ttk.Label(row, text=_("Font Size:")).pack(side="left")
         ttk.Spinbox(row, textvariable=self.stamp_fontsize_var, from_=6, to=72, width=5).pack(side="left", padx=5)
-        ttk.Label(row, text="Margin:").pack(side="left")
+        ttk.Label(row, text=_("Margin:")).pack(side="left")
         ttk.Entry(row, textvariable=self.stamp_margin_var, width=8).pack(side="left", padx=5)
         # Help text
         help_text = ttk.Label(
             self.stamp_frame,
-            text="Placeholders: {page}, {total}, {datetime}, {date}, {time}",
+            text=_("Placeholders: {page}, {total}, {datetime}, {date}, {time}"),
             font=("TkDefaultFont", 8),
         )
         help_text.pack(anchor="w", pady=(5, 0))
 
         # Split frame
-        self.split_frame = ttk.LabelFrame(self, text="Split Options", padding=10)
-        ttk.Label(self.split_frame, text="Regions (each becomes a separate page):").pack(anchor="w")
+        self.split_frame = ttk.LabelFrame(self, text=_("Split Options"), padding=10)
+        ttk.Label(self.split_frame, text=_("Regions (each becomes a separate page):")).pack(anchor="w")
         self.split_list = tk.Listbox(self.split_frame, height=5)
         self.split_list.pack(fill="both", expand=True, pady=5)
         btn_row = ttk.Frame(self.split_frame)
         btn_row.pack(fill="x")
-        ttk.Button(btn_row, text="Add Region", command=self._add_split_region).pack(side="left", padx=2)
-        ttk.Button(btn_row, text="Edit Region", command=self._edit_split_region).pack(side="left", padx=2)
-        ttk.Button(btn_row, text="Remove", command=self._remove_split_region).pack(side="left", padx=2)
+        ttk.Button(btn_row, text=_("Add Region"), command=self._add_split_region).pack(side="left", padx=2)
+        ttk.Button(btn_row, text=_("Edit Region"), command=self._edit_split_region).pack(side="left", padx=2)
+        ttk.Button(btn_row, text=_("Remove"), command=self._remove_split_region).pack(side="left", padx=2)
 
         # Combine frame
-        self.combine_frame = ttk.LabelFrame(self, text="Combine Options", padding=10)
+        self.combine_frame = ttk.LabelFrame(self, text=_("Combine Options"), padding=10)
         row = ttk.Frame(self.combine_frame)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Output Page Size - Width:").pack(side="left")
+        ttk.Label(row, text=_("Output Page Size - Width:")).pack(side="left")
         ttk.Entry(row, textvariable=self.combine_page_w_var, width=8).pack(side="left", padx=5)
-        ttk.Label(row, text="Height:").pack(side="left")
+        ttk.Label(row, text=_("Height:")).pack(side="left")
         ttk.Entry(row, textvariable=self.combine_page_h_var, width=8).pack(side="left", padx=5)
         row = ttk.Frame(self.combine_frame)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Pages per output:").pack(side="left")
+        ttk.Label(row, text=_("Pages per output:")).pack(side="left")
         ttk.Spinbox(row, textvariable=self.combine_pages_per_var, from_=1, to=16, width=5).pack(side="left", padx=5)
-        ttk.Label(self.combine_frame, text="Layout (where to place each input page):").pack(anchor="w", pady=(5, 0))
+        ttk.Label(self.combine_frame, text=_("Layout (where to place each input page):")).pack(anchor="w", pady=(5, 0))
         self.combine_list = tk.Listbox(self.combine_frame, height=5)
         self.combine_list.pack(fill="both", expand=True, pady=5)
         btn_row = ttk.Frame(self.combine_frame)
         btn_row.pack(fill="x")
-        ttk.Button(btn_row, text="Add Placement", command=self._add_combine_item).pack(side="left", padx=2)
-        ttk.Button(btn_row, text="Edit Placement", command=self._edit_combine_item).pack(side="left", padx=2)
-        ttk.Button(btn_row, text="Remove", command=self._remove_combine_item).pack(side="left", padx=2)
+        ttk.Button(btn_row, text=_("Add Placement"), command=self._add_combine_item).pack(side="left", padx=2)
+        ttk.Button(btn_row, text=_("Edit Placement"), command=self._edit_combine_item).pack(side="left", padx=2)
+        ttk.Button(btn_row, text=_("Remove"), command=self._remove_combine_item).pack(side="left", padx=2)
 
         # Render frame
-        self.render_frame = ttk.LabelFrame(self, text="Render Options", padding=10)
+        self.render_frame = ttk.LabelFrame(self, text=_("Render Options"), padding=10)
         row = ttk.Frame(self.render_frame)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="DPI:").pack(side="left")
+        ttk.Label(row, text=_("DPI:")).pack(side="left")
         ttk.Spinbox(row, textvariable=self.render_dpi_var, from_=72, to=600, width=10).pack(side="left", padx=5)
-        ttk.Label(row, text="(72-600, default 150)").pack(side="left")
+        ttk.Label(row, text=_("(72-600, default 150)")).pack(side="left")
 
         # Buttons
         btn_frame = ttk.Frame(self, padding=10)
         btn_frame.pack(fill="x", side="bottom")
-        ttk.Button(btn_frame, text="OK", command=self._ok).pack(side="right", padx=5)
-        ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(side="right")
+        ttk.Button(btn_frame, text=_("OK"), command=self._ok).pack(side="right", padx=5)
+        ttk.Button(btn_frame, text=_("Cancel"), command=self.destroy).pack(side="right")
 
         # Load existing transform
         if transform:
@@ -396,7 +397,7 @@ class RegionDialog(tk.Toplevel):
 
     def __init__(self, parent, region: SplitRegion | None = None):
         super().__init__(parent)
-        self.title("Edit Region")
+        self.title(_("Edit Region"))
         self.geometry("350x200")
         self.resizable(False, False)
         self.transient(parent)
@@ -415,26 +416,26 @@ class RegionDialog(tk.Toplevel):
             self.ur_x_var.set(str(region.upper_right[0]))
             self.ur_y_var.set(str(region.upper_right[1]))
 
-        ttk.Label(self, text="Define the crop region (supports units: mm, in, pt, cm)").pack(pady=10, padx=10)
+        ttk.Label(self, text=_("Define the crop region (supports units: mm, in, pt, cm)")).pack(pady=10, padx=10)
 
         row = ttk.Frame(self, padding=5)
         row.pack(fill="x", padx=10)
-        ttk.Label(row, text="Lower Left X:").pack(side="left")
+        ttk.Label(row, text=_("Lower Left X:")).pack(side="left")
         ttk.Entry(row, textvariable=self.ll_x_var, width=10).pack(side="left", padx=5)
-        ttk.Label(row, text="Y:").pack(side="left")
+        ttk.Label(row, text=_("Y:")).pack(side="left")
         ttk.Entry(row, textvariable=self.ll_y_var, width=10).pack(side="left", padx=5)
 
         row = ttk.Frame(self, padding=5)
         row.pack(fill="x", padx=10)
-        ttk.Label(row, text="Upper Right X:").pack(side="left")
+        ttk.Label(row, text=_("Upper Right X:")).pack(side="left")
         ttk.Entry(row, textvariable=self.ur_x_var, width=10).pack(side="left", padx=5)
-        ttk.Label(row, text="Y:").pack(side="left")
+        ttk.Label(row, text=_("Y:")).pack(side="left")
         ttk.Entry(row, textvariable=self.ur_y_var, width=10).pack(side="left", padx=5)
 
         btn_frame = ttk.Frame(self, padding=10)
         btn_frame.pack(fill="x", side="bottom")
-        ttk.Button(btn_frame, text="OK", command=self._ok).pack(side="right", padx=5)
-        ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(side="right")
+        ttk.Button(btn_frame, text=_("OK"), command=self._ok).pack(side="right", padx=5)
+        ttk.Button(btn_frame, text=_("Cancel"), command=self.destroy).pack(side="right")
 
     def _ok(self):
         self.result = SplitRegion(
@@ -449,7 +450,7 @@ class CombineItemDialog(tk.Toplevel):
 
     def __init__(self, parent, item: CombineLayoutItem | None = None):
         super().__init__(parent)
-        self.title("Edit Placement")
+        self.title(_("Edit Placement"))
         self.geometry("400x220")
         self.resizable(False, False)
         self.transient(parent)
@@ -468,30 +469,30 @@ class CombineItemDialog(tk.Toplevel):
             self.pos_y_var.set(str(item.position[1]))
             self.scale_var.set(item.scale)
 
-        ttk.Label(self, text="Define where to place an input page on the output").pack(pady=10, padx=10)
+        ttk.Label(self, text=_("Define where to place an input page on the output")).pack(pady=10, padx=10)
 
         row = ttk.Frame(self, padding=5)
         row.pack(fill="x", padx=10)
-        ttk.Label(row, text="Input Page (0-indexed):").pack(side="left")
+        ttk.Label(row, text=_("Input Page (0-indexed):")).pack(side="left")
         ttk.Spinbox(row, textvariable=self.page_var, from_=0, to=15, width=5).pack(side="left", padx=5)
 
         row = ttk.Frame(self, padding=5)
         row.pack(fill="x", padx=10)
-        ttk.Label(row, text="Position X:").pack(side="left")
+        ttk.Label(row, text=_("Position X:")).pack(side="left")
         ttk.Entry(row, textvariable=self.pos_x_var, width=10).pack(side="left", padx=5)
-        ttk.Label(row, text="Y:").pack(side="left")
+        ttk.Label(row, text=_("Y:")).pack(side="left")
         ttk.Entry(row, textvariable=self.pos_y_var, width=10).pack(side="left", padx=5)
 
         row = ttk.Frame(self, padding=5)
         row.pack(fill="x", padx=10)
-        ttk.Label(row, text="Scale:").pack(side="left")
+        ttk.Label(row, text=_("Scale:")).pack(side="left")
         ttk.Entry(row, textvariable=self.scale_var, width=8).pack(side="left", padx=5)
-        ttk.Label(row, text="(1.0 = 100%)").pack(side="left")
+        ttk.Label(row, text=_("(1.0 = 100%)")).pack(side="left")
 
         btn_frame = ttk.Frame(self, padding=10)
         btn_frame.pack(fill="x", side="bottom")
-        ttk.Button(btn_frame, text="OK", command=self._ok).pack(side="right", padx=5)
-        ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(side="right")
+        ttk.Button(btn_frame, text=_("OK"), command=self._ok).pack(side="right", padx=5)
+        ttk.Button(btn_frame, text=_("Cancel"), command=self.destroy).pack(side="right")
 
     def _ok(self):
         self.result = CombineLayoutItem(
@@ -507,7 +508,7 @@ class PrintTargetDialog(tk.Toplevel):
 
     def __init__(self, parent, printers: list[str], name: str = "", target: PrintTarget | None = None):
         super().__init__(parent)
-        self.title("Edit Print Target")
+        self.title(_("Edit Print Target"))
         self.geometry("400x250")
         self.resizable(False, False)
         self.transient(parent)
@@ -525,13 +526,13 @@ class PrintTargetDialog(tk.Toplevel):
         # Name
         row = ttk.Frame(self, padding=5)
         row.pack(fill="x", padx=10)
-        ttk.Label(row, text="Target Name:").pack(side="left")
+        ttk.Label(row, text=_("Target Name:")).pack(side="left")
         ttk.Entry(row, textvariable=self.name_var, width=20).pack(side="left", padx=5)
 
         # Printer
         row = ttk.Frame(self, padding=5)
         row.pack(fill="x", padx=10)
-        ttk.Label(row, text="Printer:").pack(side="left")
+        ttk.Label(row, text=_("Printer:")).pack(side="left")
         combo = ttk.Combobox(row, textvariable=self.printer_var, values=printers, width=30)
         combo.pack(side="left", padx=5)
         if not printers:
@@ -540,26 +541,26 @@ class PrintTargetDialog(tk.Toplevel):
         # Weight
         row = ttk.Frame(self, padding=5)
         row.pack(fill="x", padx=10)
-        ttk.Label(row, text="Weight:").pack(side="left")
+        ttk.Label(row, text=_("Weight:")).pack(side="left")
         ttk.Spinbox(row, textvariable=self.weight_var, from_=1, to=1000, width=10).pack(side="left", padx=5)
 
         # Copies
         row = ttk.Frame(self, padding=5)
         row.pack(fill="x", padx=10)
-        ttk.Label(row, text="Copies:").pack(side="left")
+        ttk.Label(row, text=_("Copies:")).pack(side="left")
         ttk.Spinbox(row, textvariable=self.copies_var, from_=1, to=100, width=10).pack(side="left", padx=5)
 
         # Args
         row = ttk.Frame(self, padding=5)
         row.pack(fill="x", padx=10)
-        ttk.Label(row, text="Extra Args:").pack(side="left")
+        ttk.Label(row, text=_("Extra Args:")).pack(side="left")
         ttk.Entry(row, textvariable=self.args_var, width=30).pack(side="left", padx=5)
 
         # Buttons
         btn_frame = ttk.Frame(self, padding=10)
         btn_frame.pack(fill="x", side="bottom")
-        ttk.Button(btn_frame, text="OK", command=self._ok).pack(side="right", padx=5)
-        ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(side="right")
+        ttk.Button(btn_frame, text=_("OK"), command=self._ok).pack(side="right", padx=5)
+        ttk.Button(btn_frame, text=_("Cancel"), command=self.destroy).pack(side="right")
 
         # Load existing or set defaults
         if target:
@@ -574,7 +575,7 @@ class PrintTargetDialog(tk.Toplevel):
     def _ok(self):
         name = self.name_var.get().strip()
         if not name:
-            messagebox.showerror("Error", "Target name is required")
+            messagebox.showerror(_("Error"), _("Target name is required"))
             return
         args = shlex.split(self.args_var.get())
         self.result_name = name

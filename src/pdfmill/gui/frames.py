@@ -15,13 +15,14 @@ from pdfmill.config import (
 )
 from pdfmill.gui.constants import ON_ERROR_OPTIONS, SORT_OPTIONS
 from pdfmill.gui.dialogs import PrintTargetDialog, TransformDialog
+from pdfmill.gui.i18n import _
 
 
 class SettingsFrame(ttk.LabelFrame):
     """Frame for editing global settings."""
 
     def __init__(self, parent):
-        super().__init__(parent, text="Global Settings", padding=10)
+        super().__init__(parent, text=_("Global Settings"), padding=10)
 
         self.on_error_var = tk.StringVar(value="continue")
         self.cleanup_source_var = tk.BooleanVar(value=False)
@@ -30,16 +31,16 @@ class SettingsFrame(ttk.LabelFrame):
         # On error
         row = ttk.Frame(self)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="On Error:").pack(side="left")
+        ttk.Label(row, text=_("On Error:")).pack(side="left")
         ttk.Combobox(row, textvariable=self.on_error_var, values=ON_ERROR_OPTIONS, state="readonly", width=15).pack(
             side="left", padx=5
         )
 
         # Cleanup checkboxes
-        ttk.Checkbutton(self, text="Cleanup source files after processing", variable=self.cleanup_source_var).pack(
+        ttk.Checkbutton(self, text=_("Cleanup source files after processing"), variable=self.cleanup_source_var).pack(
             anchor="w", pady=2
         )
-        ttk.Checkbutton(self, text="Cleanup output files after printing", variable=self.cleanup_output_var).pack(
+        ttk.Checkbutton(self, text=_("Cleanup output files after printing"), variable=self.cleanup_output_var).pack(
             anchor="w", pady=2
         )
 
@@ -60,7 +61,7 @@ class InputFrame(ttk.LabelFrame):
     """Frame for editing input configuration."""
 
     def __init__(self, parent):
-        super().__init__(parent, text="Input Configuration", padding=10)
+        super().__init__(parent, text=_("Input Configuration"), padding=10)
 
         self.path_var = tk.StringVar(value="./input")
         self.pattern_var = tk.StringVar(value="*.pdf")
@@ -71,39 +72,39 @@ class InputFrame(ttk.LabelFrame):
         # Input path
         row = ttk.Frame(self)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Input Path:").pack(side="left")
+        ttk.Label(row, text=_("Input Path:")).pack(side="left")
         ttk.Entry(row, textvariable=self.path_var, width=40).pack(side="left", padx=5)
-        ttk.Button(row, text="Browse...", command=self._browse_path).pack(side="left")
+        ttk.Button(row, text=_("Browse..."), command=self._browse_path).pack(side="left")
 
         # Pattern
         row = ttk.Frame(self)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="File Pattern:").pack(side="left")
+        ttk.Label(row, text=_("File Pattern:")).pack(side="left")
         ttk.Entry(row, textvariable=self.pattern_var, width=20).pack(side="left", padx=5)
 
         # Sort
         row = ttk.Frame(self)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Sort Order:").pack(side="left")
+        ttk.Label(row, text=_("Sort Order:")).pack(side="left")
         ttk.Combobox(row, textvariable=self.sort_var, values=SORT_OPTIONS, width=15).pack(side="left", padx=5)
 
         # Filter section
-        filter_frame = ttk.LabelFrame(self, text="Keyword Filter (optional)", padding=5)
+        filter_frame = ttk.LabelFrame(self, text=_("Keyword Filter (optional)"), padding=5)
         filter_frame.pack(fill="x", pady=5)
 
         row = ttk.Frame(filter_frame)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Keywords (comma-separated):").pack(side="left")
+        ttk.Label(row, text=_("Keywords (comma-separated):")).pack(side="left")
         ttk.Entry(row, textvariable=self.keywords_var, width=30).pack(side="left", padx=5)
 
         row = ttk.Frame(filter_frame)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Match:").pack(side="left")
-        ttk.Radiobutton(row, text="Any (OR)", variable=self.match_var, value="any").pack(side="left", padx=5)
-        ttk.Radiobutton(row, text="All (AND)", variable=self.match_var, value="all").pack(side="left", padx=5)
+        ttk.Label(row, text=_("Match:")).pack(side="left")
+        ttk.Radiobutton(row, text=_("Any (OR)"), variable=self.match_var, value="any").pack(side="left", padx=5)
+        ttk.Radiobutton(row, text=_("All (AND)"), variable=self.match_var, value="all").pack(side="left", padx=5)
 
     def _browse_path(self):
-        path = filedialog.askdirectory(title="Select Input Directory")
+        path = filedialog.askdirectory(title=_("Select Input Directory"))
         if path:
             self.path_var.set(path)
 
@@ -158,45 +159,45 @@ class OutputProfileEditor(ttk.Frame):
         # Profile name and enabled
         row = ttk.Frame(self)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Profile Name:").pack(side="left")
+        ttk.Label(row, text=_("Profile Name:")).pack(side="left")
         ttk.Entry(row, textvariable=self.name_var, width=20).pack(side="left", padx=5)
-        ttk.Checkbutton(row, text="Enabled", variable=self.enabled_var).pack(side="left", padx=10)
+        ttk.Checkbutton(row, text=_("Enabled"), variable=self.enabled_var).pack(side="left", padx=10)
 
         # Pages
         row = ttk.Frame(self)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Pages:").pack(side="left")
+        ttk.Label(row, text=_("Pages:")).pack(side="left")
         ttk.Entry(row, textvariable=self.pages_var, width=15).pack(side="left", padx=5)
-        ttk.Label(row, text="(e.g., all, last, 1-3, first)").pack(side="left")
+        ttk.Label(row, text=_("(e.g., all, last, 1-3, first)")).pack(side="left")
 
         # Output dir
         row = ttk.Frame(self)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Output Dir:").pack(side="left")
+        ttk.Label(row, text=_("Output Dir:")).pack(side="left")
         ttk.Entry(row, textvariable=self.output_dir_var, width=30).pack(side="left", padx=5)
-        ttk.Button(row, text="Browse...", command=self._browse_output).pack(side="left")
+        ttk.Button(row, text=_("Browse..."), command=self._browse_output).pack(side="left")
 
         # Prefix/Suffix
         row = ttk.Frame(self)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Prefix:").pack(side="left")
+        ttk.Label(row, text=_("Prefix:")).pack(side="left")
         ttk.Entry(row, textvariable=self.prefix_var, width=10).pack(side="left", padx=5)
-        ttk.Label(row, text="Suffix:").pack(side="left")
+        ttk.Label(row, text=_("Suffix:")).pack(side="left")
         ttk.Entry(row, textvariable=self.suffix_var, width=10).pack(side="left", padx=5)
 
         # Sort
         row = ttk.Frame(self)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Sort Override:").pack(side="left")
+        ttk.Label(row, text=_("Sort Override:")).pack(side="left")
         ttk.Combobox(row, textvariable=self.sort_var, values=SORT_OPTIONS, width=15).pack(side="left", padx=5)
 
         # Debug
-        ttk.Checkbutton(self, text="Debug mode (save intermediate files)", variable=self.debug_var).pack(
+        ttk.Checkbutton(self, text=_("Debug mode (save intermediate files)"), variable=self.debug_var).pack(
             anchor="w", pady=2
         )
 
         # Transforms section
-        tf = ttk.LabelFrame(self, text="Transforms", padding=5)
+        tf = ttk.LabelFrame(self, text=_("Transforms"), padding=5)
         tf.pack(fill="both", expand=True, pady=5)
 
         self.transform_list = tk.Listbox(tf, height=4)
@@ -204,38 +205,38 @@ class OutputProfileEditor(ttk.Frame):
 
         btn_col = ttk.Frame(tf)
         btn_col.pack(side="left", padx=5)
-        ttk.Button(btn_col, text="Add", command=self._add_transform).pack(fill="x", pady=1)
-        ttk.Button(btn_col, text="Edit", command=self._edit_transform).pack(fill="x", pady=1)
-        ttk.Button(btn_col, text="Remove", command=self._remove_transform).pack(fill="x", pady=1)
-        ttk.Button(btn_col, text="Up", command=self._move_up).pack(fill="x", pady=1)
-        ttk.Button(btn_col, text="Down", command=self._move_down).pack(fill="x", pady=1)
+        ttk.Button(btn_col, text=_("Add"), command=self._add_transform).pack(fill="x", pady=1)
+        ttk.Button(btn_col, text=_("Edit"), command=self._edit_transform).pack(fill="x", pady=1)
+        ttk.Button(btn_col, text=_("Remove"), command=self._remove_transform).pack(fill="x", pady=1)
+        ttk.Button(btn_col, text=_("Up"), command=self._move_up).pack(fill="x", pady=1)
+        ttk.Button(btn_col, text=_("Down"), command=self._move_down).pack(fill="x", pady=1)
 
         # Print config section
-        pf = ttk.LabelFrame(self, text="Print Configuration", padding=5)
+        pf = ttk.LabelFrame(self, text=_("Print Configuration"), padding=5)
         pf.pack(fill="x", pady=5)
 
         row = ttk.Frame(pf)
         row.pack(fill="x")
-        ttk.Checkbutton(row, text="Enabled", variable=self.print_enabled_var).pack(side="left")
-        ttk.Checkbutton(row, text="Merge PDFs before printing", variable=self.print_merge_var).pack(
+        ttk.Checkbutton(row, text=_("Enabled"), variable=self.print_enabled_var).pack(side="left")
+        ttk.Checkbutton(row, text=_("Merge PDFs before printing"), variable=self.print_merge_var).pack(
             side="left", padx=10
         )
 
         row = ttk.Frame(pf)
         row.pack(fill="x", pady=2)
-        ttk.Label(row, text="Print Targets:").pack(side="left")
+        ttk.Label(row, text=_("Print Targets:")).pack(side="left")
 
         self.target_list = tk.Listbox(pf, height=3)
         self.target_list.pack(fill="x", pady=2)
 
         btn_row = ttk.Frame(pf)
         btn_row.pack(fill="x")
-        ttk.Button(btn_row, text="Add Target", command=self._add_target).pack(side="left", padx=2)
-        ttk.Button(btn_row, text="Edit Target", command=self._edit_target).pack(side="left", padx=2)
-        ttk.Button(btn_row, text="Remove Target", command=self._remove_target).pack(side="left", padx=2)
+        ttk.Button(btn_row, text=_("Add Target"), command=self._add_target).pack(side="left", padx=2)
+        ttk.Button(btn_row, text=_("Edit Target"), command=self._edit_target).pack(side="left", padx=2)
+        ttk.Button(btn_row, text=_("Remove Target"), command=self._remove_target).pack(side="left", padx=2)
 
     def _browse_output(self):
-        path = filedialog.askdirectory(title="Select Output Directory")
+        path = filedialog.askdirectory(title=_("Select Output Directory"))
         if path:
             self.output_dir_var.set(path)
 
@@ -412,15 +413,15 @@ class OutputsFrame(ttk.Frame):
         left = ttk.Frame(self)
         left.pack(side="left", fill="y", padx=(0, 10))
 
-        ttk.Label(left, text="Profiles:").pack(anchor="w")
+        ttk.Label(left, text=_("Profiles:")).pack(anchor="w")
         self.profile_list = tk.Listbox(left, width=20, height=15)
         self.profile_list.pack(fill="y", expand=True)
         self.profile_list.bind("<<ListboxSelect>>", self._on_select)
 
         btn_frame = ttk.Frame(left)
         btn_frame.pack(fill="x", pady=5)
-        ttk.Button(btn_frame, text="Add", command=self._add_profile).pack(side="left", padx=2)
-        ttk.Button(btn_frame, text="Remove", command=self._remove_profile).pack(side="left", padx=2)
+        ttk.Button(btn_frame, text=_("Add"), command=self._add_profile).pack(side="left", padx=2)
+        ttk.Button(btn_frame, text=_("Remove"), command=self._remove_profile).pack(side="left", padx=2)
 
         # Right panel - profile editor
         self.editor = OutputProfileEditor(self, printers, on_refresh_printers)

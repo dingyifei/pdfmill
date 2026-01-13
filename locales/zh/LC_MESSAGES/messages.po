@@ -1,0 +1,559 @@
+# Chinese translations for pdfmill.
+# Copyright (C) 2026 pdfmill
+# This file is distributed under the same license as the pdfmill project.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: pdfmill 0.1.3\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-12 18:46-0800\n"
+"PO-Revision-Date: 2026-01-12 18:54-0800\n"
+"Last-Translator: \n"
+"Language: zh\n"
+"Language-Team: zh <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: src/pdfmill/gui/app.py:33 src/pdfmill/gui/app.py:229
+#: src/pdfmill/gui/app.py:252 src/pdfmill/gui/app.py:405
+#: src/pdfmill/gui/app.py:507
+msgid "pdfmill Config Editor"
+msgstr "pdfmill 配置编辑器"
+
+#: src/pdfmill/gui/app.py:126
+msgid "Settings"
+msgstr "设置"
+
+#: src/pdfmill/gui/app.py:126
+msgid "Input"
+msgstr "输入"
+
+#: src/pdfmill/gui/app.py:126
+msgid "Outputs"
+msgstr "输出"
+
+#: src/pdfmill/gui/app.py:133
+msgid "Run"
+msgstr "运行"
+
+#: src/pdfmill/gui/app.py:134
+msgid "Dry Run"
+msgstr "试运行"
+
+#: src/pdfmill/gui/app.py:135
+msgid "Validate"
+msgstr "验证"
+
+#: src/pdfmill/gui/app.py:137
+msgid "Ready"
+msgstr "就绪"
+
+#: src/pdfmill/gui/app.py:160
+msgid "Output Log"
+msgstr "输出日志"
+
+#: src/pdfmill/gui/app.py:189
+#, python-brace-format
+msgid "Warning: Could not enumerate printers: {}"
+msgstr "警告：无法枚举打印机：{}"
+
+#: src/pdfmill/gui/app.py:196
+#, python-brace-format
+msgid "Found {} printers"
+msgstr "找到 {} 台打印机"
+
+#: src/pdfmill/gui/app.py:203
+msgid "File"
+msgstr "文件"
+
+#: src/pdfmill/gui/app.py:204
+msgid "New"
+msgstr "新建"
+
+#: src/pdfmill/gui/app.py:205
+msgid "Open..."
+msgstr "打开..."
+
+#: src/pdfmill/gui/app.py:207
+msgid "Save"
+msgstr "保存"
+
+#: src/pdfmill/gui/app.py:208
+msgid "Save As..."
+msgstr "另存为..."
+
+#: src/pdfmill/gui/app.py:210
+msgid "Exit"
+msgstr "退出"
+
+#: src/pdfmill/gui/app.py:213
+msgid "Help"
+msgstr "帮助"
+
+#: src/pdfmill/gui/app.py:214 src/pdfmill/gui/app.py:507
+msgid "About"
+msgstr "关于"
+
+#: src/pdfmill/gui/app.py:229
+msgid "New Config"
+msgstr "新配置"
+
+#: src/pdfmill/gui/app.py:242
+msgid "Open Config"
+msgstr "打开配置"
+
+#: src/pdfmill/gui/app.py:243 src/pdfmill/gui/app.py:400
+msgid "YAML files"
+msgstr "YAML 文件"
+
+#: src/pdfmill/gui/app.py:243 src/pdfmill/gui/app.py:400
+msgid "All files"
+msgstr "所有文件"
+
+#: src/pdfmill/gui/app.py:253
+#, python-brace-format
+msgid "Loaded: {}"
+msgstr "已加载：{}"
+
+#: src/pdfmill/gui/app.py:255 src/pdfmill/gui/app.py:415
+#: src/pdfmill/gui/app.py:498 src/pdfmill/gui/dialogs.py:578
+msgid "Error"
+msgstr "错误"
+
+#: src/pdfmill/gui/app.py:255
+msgid "Failed to load config:"
+msgstr "加载配置失败："
+
+#: src/pdfmill/gui/app.py:398
+msgid "Save Config As"
+msgstr "配置另存为"
+
+#: src/pdfmill/gui/app.py:413
+#, python-brace-format
+msgid "Saved: {}"
+msgstr "已保存：{}"
+
+#: src/pdfmill/gui/app.py:415
+msgid "Failed to save config:"
+msgstr "保存配置失败："
+
+#: src/pdfmill/gui/app.py:421 src/pdfmill/gui/app.py:443
+msgid "At least one output profile is required"
+msgstr "至少需要一个输出配置文件"
+
+#: src/pdfmill/gui/app.py:422
+msgid "Configuration is valid!"
+msgstr "配置有效！"
+
+#: src/pdfmill/gui/app.py:423
+msgid "Valid"
+msgstr "有效"
+
+#: src/pdfmill/gui/app.py:425
+#, python-brace-format
+msgid "Validation error: {}"
+msgstr "验证错误：{}"
+
+#: src/pdfmill/gui/app.py:426
+msgid "Invalid"
+msgstr "无效"
+
+#: src/pdfmill/gui/app.py:427
+msgid "Validation Error"
+msgstr "验证错误"
+
+#: src/pdfmill/gui/app.py:437
+msgid "Pipeline already running!"
+msgstr "管道已在运行！"
+
+#: src/pdfmill/gui/app.py:445
+#, python-brace-format
+msgid "Configuration error: {}"
+msgstr "配置错误：{}"
+
+#: src/pdfmill/gui/app.py:451
+msgid "Running..."
+msgstr "运行中..."
+
+#: src/pdfmill/gui/app.py:451
+msgid "Dry Run..."
+msgstr "试运行中..."
+
+#: src/pdfmill/gui/app.py:452
+msgid "DRY RUN"
+msgstr "试运行"
+
+#: src/pdfmill/gui/app.py:452
+msgid "RUNNING"
+msgstr "运行中"
+
+#: src/pdfmill/gui/app.py:479
+msgid "Pipeline completed successfully"
+msgstr "管道运行成功"
+
+#: src/pdfmill/gui/app.py:495
+msgid "Complete"
+msgstr "完成"
+
+#: src/pdfmill/gui/app.py:499
+msgid "ERROR"
+msgstr "错误"
+
+#: src/pdfmill/gui/app.py:507
+#, python-brace-format
+msgid "Version {}"
+msgstr "版本 {}"
+
+#: src/pdfmill/gui/dialogs.py:34
+msgid "Edit Transform"
+msgstr "编辑变换"
+
+#: src/pdfmill/gui/dialogs.py:72 src/pdfmill/gui/frames.py:164
+#: src/pdfmill/gui/frames.py:220
+msgid "Enabled"
+msgstr "启用"
+
+#: src/pdfmill/gui/dialogs.py:77
+msgid "Type:"
+msgstr "类型："
+
+#: src/pdfmill/gui/dialogs.py:83
+msgid "Rotate Options"
+msgstr "旋转选项"
+
+#: src/pdfmill/gui/dialogs.py:86
+msgid "Angle:"
+msgstr "角度："
+
+#: src/pdfmill/gui/dialogs.py:90
+msgid "Crop Options"
+msgstr "裁剪选项"
+
+#: src/pdfmill/gui/dialogs.py:93 src/pdfmill/gui/dialogs.py:423
+msgid "Lower Left X:"
+msgstr "左下角 X："
+
+#: src/pdfmill/gui/dialogs.py:95 src/pdfmill/gui/dialogs.py:101
+#: src/pdfmill/gui/dialogs.py:136 src/pdfmill/gui/dialogs.py:425
+#: src/pdfmill/gui/dialogs.py:432 src/pdfmill/gui/dialogs.py:483
+msgid "Y:"
+msgstr "Y："
+
+#: src/pdfmill/gui/dialogs.py:99 src/pdfmill/gui/dialogs.py:430
+msgid "Upper Right X:"
+msgstr "右上角 X："
+
+#: src/pdfmill/gui/dialogs.py:105
+msgid "Size Options"
+msgstr "尺寸选项"
+
+#: src/pdfmill/gui/dialogs.py:108
+msgid "Width:"
+msgstr "宽度："
+
+#: src/pdfmill/gui/dialogs.py:110 src/pdfmill/gui/dialogs.py:171
+msgid "Height:"
+msgstr "高度："
+
+#: src/pdfmill/gui/dialogs.py:114
+msgid "Fit:"
+msgstr "适应："
+
+#: src/pdfmill/gui/dialogs.py:120
+msgid "Stamp Options"
+msgstr "印章选项"
+
+#: src/pdfmill/gui/dialogs.py:123
+msgid "Text:"
+msgstr "文本："
+
+#: src/pdfmill/gui/dialogs.py:127
+msgid "Position:"
+msgstr "位置："
+
+#: src/pdfmill/gui/dialogs.py:133
+msgid "X:"
+msgstr "X："
+
+#: src/pdfmill/gui/dialogs.py:139
+msgid "(for custom position)"
+msgstr "（用于自定义位置）"
+
+#: src/pdfmill/gui/dialogs.py:142
+msgid "Font Size:"
+msgstr "字体大小："
+
+#: src/pdfmill/gui/dialogs.py:144
+msgid "Margin:"
+msgstr "边距："
+
+#: src/pdfmill/gui/dialogs.py:149
+#, python-brace-format
+msgid "Placeholders: {page}, {total}, {datetime}, {date}, {time}"
+msgstr "占位符：{page}、{total}、{datetime}、{date}、{time}"
+
+#: src/pdfmill/gui/dialogs.py:155
+msgid "Split Options"
+msgstr "分割选项"
+
+#: src/pdfmill/gui/dialogs.py:156
+msgid "Regions (each becomes a separate page):"
+msgstr "区域（每个区域将成为单独的页面）："
+
+#: src/pdfmill/gui/dialogs.py:161
+msgid "Add Region"
+msgstr "添加区域"
+
+#: src/pdfmill/gui/dialogs.py:162 src/pdfmill/gui/dialogs.py:400
+msgid "Edit Region"
+msgstr "编辑区域"
+
+#: src/pdfmill/gui/dialogs.py:163 src/pdfmill/gui/dialogs.py:184
+#: src/pdfmill/gui/frames.py:210 src/pdfmill/gui/frames.py:424
+msgid "Remove"
+msgstr "删除"
+
+#: src/pdfmill/gui/dialogs.py:166
+msgid "Combine Options"
+msgstr "合并选项"
+
+#: src/pdfmill/gui/dialogs.py:169
+msgid "Output Page Size - Width:"
+msgstr "输出页面尺寸 - 宽度："
+
+#: src/pdfmill/gui/dialogs.py:175
+msgid "Pages per output:"
+msgstr "每个输出的页数："
+
+#: src/pdfmill/gui/dialogs.py:177
+msgid "Layout (where to place each input page):"
+msgstr "布局（每个输入页面的放置位置）："
+
+#: src/pdfmill/gui/dialogs.py:182
+msgid "Add Placement"
+msgstr "添加放置"
+
+#: src/pdfmill/gui/dialogs.py:183 src/pdfmill/gui/dialogs.py:453
+msgid "Edit Placement"
+msgstr "编辑放置"
+
+#: src/pdfmill/gui/dialogs.py:187
+msgid "Render Options"
+msgstr "渲染选项"
+
+#: src/pdfmill/gui/dialogs.py:190
+msgid "DPI:"
+msgstr "DPI："
+
+#: src/pdfmill/gui/dialogs.py:192
+msgid "(72-600, default 150)"
+msgstr "（72-600，默认 150）"
+
+#: src/pdfmill/gui/dialogs.py:197 src/pdfmill/gui/dialogs.py:437
+#: src/pdfmill/gui/dialogs.py:494 src/pdfmill/gui/dialogs.py:562
+msgid "OK"
+msgstr "确定"
+
+#: src/pdfmill/gui/dialogs.py:198 src/pdfmill/gui/dialogs.py:438
+#: src/pdfmill/gui/dialogs.py:495 src/pdfmill/gui/dialogs.py:563
+msgid "Cancel"
+msgstr "取消"
+
+#: src/pdfmill/gui/dialogs.py:419
+msgid "Define the crop region (supports units: mm, in, pt, cm)"
+msgstr "定义裁剪区域（支持单位：mm、in、pt、cm）"
+
+#: src/pdfmill/gui/dialogs.py:472
+msgid "Define where to place an input page on the output"
+msgstr "定义输入页面在输出上的放置位置"
+
+#: src/pdfmill/gui/dialogs.py:476
+msgid "Input Page (0-indexed):"
+msgstr "输入页面（从 0 开始）："
+
+#: src/pdfmill/gui/dialogs.py:481
+msgid "Position X:"
+msgstr "位置 X："
+
+#: src/pdfmill/gui/dialogs.py:488
+msgid "Scale:"
+msgstr "缩放："
+
+#: src/pdfmill/gui/dialogs.py:490
+msgid "(1.0 = 100%)"
+msgstr "（1.0 = 100%）"
+
+#: src/pdfmill/gui/dialogs.py:511
+msgid "Edit Print Target"
+msgstr "编辑打印目标"
+
+#: src/pdfmill/gui/dialogs.py:529
+msgid "Target Name:"
+msgstr "目标名称："
+
+#: src/pdfmill/gui/dialogs.py:535
+msgid "Printer:"
+msgstr "打印机："
+
+#: src/pdfmill/gui/dialogs.py:544
+msgid "Weight:"
+msgstr "权重："
+
+#: src/pdfmill/gui/dialogs.py:550
+msgid "Copies:"
+msgstr "份数："
+
+#: src/pdfmill/gui/dialogs.py:556
+msgid "Extra Args:"
+msgstr "额外参数："
+
+#: src/pdfmill/gui/dialogs.py:578
+msgid "Target name is required"
+msgstr "目标名称为必填项"
+
+#: src/pdfmill/gui/frames.py:25
+msgid "Global Settings"
+msgstr "全局设置"
+
+#: src/pdfmill/gui/frames.py:34
+msgid "On Error:"
+msgstr "出错时："
+
+#: src/pdfmill/gui/frames.py:40
+msgid "Cleanup source files after processing"
+msgstr "处理后清理源文件"
+
+#: src/pdfmill/gui/frames.py:43
+msgid "Cleanup output files after printing"
+msgstr "打印后清理输出文件"
+
+#: src/pdfmill/gui/frames.py:64
+msgid "Input Configuration"
+msgstr "输入配置"
+
+#: src/pdfmill/gui/frames.py:75
+msgid "Input Path:"
+msgstr "输入路径："
+
+#: src/pdfmill/gui/frames.py:77 src/pdfmill/gui/frames.py:178
+msgid "Browse..."
+msgstr "浏览..."
+
+#: src/pdfmill/gui/frames.py:82
+msgid "File Pattern:"
+msgstr "文件模式："
+
+#: src/pdfmill/gui/frames.py:88
+msgid "Sort Order:"
+msgstr "排序顺序："
+
+#: src/pdfmill/gui/frames.py:92
+msgid "Keyword Filter (optional)"
+msgstr "关键词过滤（可选）"
+
+#: src/pdfmill/gui/frames.py:97
+msgid "Keywords (comma-separated):"
+msgstr "关键词（逗号分隔）："
+
+#: src/pdfmill/gui/frames.py:102
+msgid "Match:"
+msgstr "匹配："
+
+#: src/pdfmill/gui/frames.py:103
+msgid "Any (OR)"
+msgstr "任意（或）"
+
+#: src/pdfmill/gui/frames.py:104
+msgid "All (AND)"
+msgstr "全部（与）"
+
+#: src/pdfmill/gui/frames.py:107
+msgid "Select Input Directory"
+msgstr "选择输入目录"
+
+#: src/pdfmill/gui/frames.py:162
+msgid "Profile Name:"
+msgstr "配置文件名："
+
+#: src/pdfmill/gui/frames.py:169
+msgid "Pages:"
+msgstr "页面："
+
+#: src/pdfmill/gui/frames.py:171
+msgid "(e.g., all, last, 1-3, first)"
+msgstr "（例如：all、last、1-3、first）"
+
+#: src/pdfmill/gui/frames.py:176
+msgid "Output Dir:"
+msgstr "输出目录："
+
+#: src/pdfmill/gui/frames.py:183
+msgid "Prefix:"
+msgstr "前缀："
+
+#: src/pdfmill/gui/frames.py:185
+msgid "Suffix:"
+msgstr "后缀："
+
+#: src/pdfmill/gui/frames.py:191
+msgid "Sort Override:"
+msgstr "排序覆盖："
+
+#: src/pdfmill/gui/frames.py:195
+msgid "Debug mode (save intermediate files)"
+msgstr "调试模式（保存中间文件）"
+
+#: src/pdfmill/gui/frames.py:200
+msgid "Transforms"
+msgstr "变换"
+
+#: src/pdfmill/gui/frames.py:208 src/pdfmill/gui/frames.py:423
+msgid "Add"
+msgstr "添加"
+
+#: src/pdfmill/gui/frames.py:209
+msgid "Edit"
+msgstr "编辑"
+
+#: src/pdfmill/gui/frames.py:211
+msgid "Up"
+msgstr "上移"
+
+#: src/pdfmill/gui/frames.py:212
+msgid "Down"
+msgstr "下移"
+
+#: src/pdfmill/gui/frames.py:215
+msgid "Print Configuration"
+msgstr "打印配置"
+
+#: src/pdfmill/gui/frames.py:221
+msgid "Merge PDFs before printing"
+msgstr "打印前合并 PDF"
+
+#: src/pdfmill/gui/frames.py:227
+msgid "Print Targets:"
+msgstr "打印目标："
+
+#: src/pdfmill/gui/frames.py:234
+msgid "Add Target"
+msgstr "添加目标"
+
+#: src/pdfmill/gui/frames.py:235
+msgid "Edit Target"
+msgstr "编辑目标"
+
+#: src/pdfmill/gui/frames.py:236
+msgid "Remove Target"
+msgstr "删除目标"
+
+#: src/pdfmill/gui/frames.py:239
+msgid "Select Output Directory"
+msgstr "选择输出目录"
+
+#: src/pdfmill/gui/frames.py:416
+msgid "Profiles:"
+msgstr "配置文件："

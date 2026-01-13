@@ -19,6 +19,7 @@ from pdfmill.config import (
 )
 from pdfmill.gui.dpi import enable_high_dpi
 from pdfmill.gui.frames import InputFrame, OutputsFrame, SettingsFrame
+from pdfmill.gui.i18n import _
 
 # Enable high DPI before creating any Tk windows
 enable_high_dpi()
@@ -29,7 +30,7 @@ class PdfMillApp(tk.Tk):
 
     def __init__(self):
         super().__init__()
-        self.title("pdfmill Config Editor")
+        self.title(_("pdfmill Config Editor"))
 
         # Configure high DPI scaling
         self._configure_dpi_scaling()
@@ -122,17 +123,18 @@ class PdfMillApp(tk.Tk):
         self._tab_frames = {}
         self._current_tab = tk.StringVar(value="Settings")
 
+        tab_labels = {"Settings": _("Settings"), "Input": _("Input"), "Outputs": _("Outputs")}
         for tab_name in ["Settings", "Input", "Outputs"]:
-            btn = ttk.Button(tab_frame, text=tab_name, command=lambda t=tab_name: self._switch_tab(t))
+            btn = ttk.Button(tab_frame, text=tab_labels[tab_name], command=lambda t=tab_name: self._switch_tab(t))
             btn.pack(side="left", padx=(0, 2))
             self._tab_buttons[tab_name] = btn
 
         # Action buttons on the right
-        ttk.Button(header, text="Run", command=self._run).pack(side="right", padx=2)
-        ttk.Button(header, text="Dry Run", command=self._dry_run).pack(side="right", padx=2)
-        ttk.Button(header, text="Validate", command=self._validate).pack(side="right", padx=2)
+        ttk.Button(header, text=_("Run"), command=self._run).pack(side="right", padx=2)
+        ttk.Button(header, text=_("Dry Run"), command=self._dry_run).pack(side="right", padx=2)
+        ttk.Button(header, text=_("Validate"), command=self._validate).pack(side="right", padx=2)
 
-        self.status_var = tk.StringVar(value="Ready")
+        self.status_var = tk.StringVar(value=_("Ready"))
         ttk.Label(header, textvariable=self.status_var).pack(side="right", padx=(0, 10))
 
         # Content area for tab panels
@@ -155,7 +157,7 @@ class PdfMillApp(tk.Tk):
         self._switch_tab("Settings")
 
         # Log output at bottom
-        log_frame = ttk.LabelFrame(self, text="Output Log", padding=5)
+        log_frame = ttk.LabelFrame(self, text=_("Output Log"), padding=5)
         log_frame.pack(fill="x", padx=10, pady=(0, 5))
 
         self.log_text = scrolledtext.ScrolledText(log_frame, height=8, state="disabled")
@@ -184,32 +186,32 @@ class PdfMillApp(tk.Tk):
 
             return list_printers()
         except Exception as e:
-            self._log(f"Warning: Could not enumerate printers: {e}")
+            self._log(_("Warning: Could not enumerate printers: {}").format(e))
             return []
 
     def _refresh_printers(self):
         self.printers = self._get_printers()
         self.outputs_frame.printers = self.printers
         self.outputs_frame.editor.printers = self.printers
-        self._log(f"Found {len(self.printers)} printers")
+        self._log(_("Found {} printers").format(len(self.printers)))
 
     def _create_menu(self):
         menubar = tk.Menu(self)
         self.config(menu=menubar)
 
         file_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="New", command=self._new_config, accelerator="Ctrl+N")
-        file_menu.add_command(label="Open...", command=self._open_config, accelerator="Ctrl+O")
+        menubar.add_cascade(label=_("File"), menu=file_menu)
+        file_menu.add_command(label=_("New"), command=self._new_config, accelerator="Ctrl+N")
+        file_menu.add_command(label=_("Open..."), command=self._open_config, accelerator="Ctrl+O")
         file_menu.add_separator()
-        file_menu.add_command(label="Save", command=self._save_config, accelerator="Ctrl+S")
-        file_menu.add_command(label="Save As...", command=self._save_config_as)
+        file_menu.add_command(label=_("Save"), command=self._save_config, accelerator="Ctrl+S")
+        file_menu.add_command(label=_("Save As..."), command=self._save_config_as)
         file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.quit)
+        file_menu.add_command(label=_("Exit"), command=self.quit)
 
         help_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="About", command=self._show_about)
+        menubar.add_cascade(label=_("Help"), menu=help_menu)
+        help_menu.add_command(label=_("About"), command=self._show_about)
 
         # Keyboard shortcuts
         self.bind("<Control-n>", lambda e: self._new_config())
@@ -224,7 +226,7 @@ class PdfMillApp(tk.Tk):
 
     def _new_config(self):
         self.current_file = None
-        self.title("pdfmill Config Editor - New Config")
+        self.title(_("pdfmill Config Editor") + " - " + _("New Config"))
 
         # Default config
         config = Config(
@@ -237,8 +239,8 @@ class PdfMillApp(tk.Tk):
 
     def _open_config(self):
         path = filedialog.askopenfilename(
-            title="Open Config",
-            filetypes=[("YAML files", "*.yaml *.yml"), ("All files", "*.*")],
+            title=_("Open Config"),
+            filetypes=[(_("YAML files"), "*.yaml *.yml"), (_("All files"), "*.*")],
         )
         if not path:
             return
@@ -247,10 +249,10 @@ class PdfMillApp(tk.Tk):
             config = load_config(Path(path))
             self._load_to_ui(config)
             self.current_file = Path(path)
-            self.title(f"pdfmill Config Editor - {path}")
-            self._log(f"Loaded: {path}")
+            self.title(_("pdfmill Config Editor") + f" - {path}")
+            self._log(_("Loaded: {}").format(path))
         except (ConfigError, FileNotFoundError) as e:
-            messagebox.showerror("Error", f"Failed to load config:\n{e}")
+            messagebox.showerror(_("Error"), _("Failed to load config:") + f"\n{e}")
 
     def _load_to_ui(self, config: Config):
         self.settings_frame.load(config.settings)
@@ -393,14 +395,14 @@ class PdfMillApp(tk.Tk):
 
     def _save_config_as(self):
         path = filedialog.asksaveasfilename(
-            title="Save Config As",
+            title=_("Save Config As"),
             defaultextension=".yaml",
-            filetypes=[("YAML files", "*.yaml *.yml"), ("All files", "*.*")],
+            filetypes=[(_("YAML files"), "*.yaml *.yml"), (_("All files"), "*.*")],
         )
         if path:
             self._save_to_file(Path(path))
             self.current_file = Path(path)
-            self.title(f"pdfmill Config Editor - {path}")
+            self.title(_("pdfmill Config Editor") + f" - {path}")
 
     def _save_to_file(self, path: Path):
         try:
@@ -408,21 +410,21 @@ class PdfMillApp(tk.Tk):
             data = self._config_to_dict(config)
             with open(path, "w", encoding="utf-8") as f:
                 yaml.dump(data, f, default_flow_style=False, sort_keys=False)
-            self._log(f"Saved: {path}")
+            self._log(_("Saved: {}").format(path))
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save config:\n{e}")
+            messagebox.showerror(_("Error"), _("Failed to save config:") + f"\n{e}")
 
     def _validate(self):
         try:
             config = self._ui_to_config()
             if not config.outputs:
-                raise ConfigError("At least one output profile is required")
-            self._log("Configuration is valid!")
-            self.status_var.set("Valid")
+                raise ConfigError(_("At least one output profile is required"))
+            self._log(_("Configuration is valid!"))
+            self.status_var.set(_("Valid"))
         except Exception as e:
-            self._log(f"Validation error: {e}")
-            self.status_var.set("Invalid")
-            messagebox.showerror("Validation Error", str(e))
+            self._log(_("Validation error: {}").format(e))
+            self.status_var.set(_("Invalid"))
+            messagebox.showerror(_("Validation Error"), str(e))
 
     def _run(self):
         self._execute_pipeline(dry_run=False)
@@ -432,22 +434,23 @@ class PdfMillApp(tk.Tk):
 
     def _execute_pipeline(self, dry_run: bool):
         if self.running:
-            self._log("Pipeline already running!")
+            self._log(_("Pipeline already running!"))
             return
 
         try:
             config = self._ui_to_config()
             if not config.outputs:
-                raise ConfigError("At least one output profile is required")
+                raise ConfigError(_("At least one output profile is required"))
         except Exception as e:
-            self._log(f"Configuration error: {e}")
+            self._log(_("Configuration error: {}").format(e))
             return
 
         input_path = Path(self.input_frame.path_var.get())
 
         self.running = True
-        self.status_var.set("Running..." if not dry_run else "Dry Run...")
-        self._log(f"\n{'=' * 40}\n{'DRY RUN' if dry_run else 'RUNNING'} pipeline...\n{'=' * 40}")
+        self.status_var.set(_("Running...") if not dry_run else _("Dry Run..."))
+        mode_str = _("DRY RUN") if dry_run else _("RUNNING")
+        self._log(f"\n{'=' * 40}\n{mode_str} pipeline...\n{'=' * 40}")
 
         thread = threading.Thread(
             target=self._pipeline_thread,
@@ -473,7 +476,7 @@ class PdfMillApp(tk.Tk):
 
             output = sys.stdout.getvalue() + sys.stderr.getvalue()
             self.output_queue.put(("output", output))
-            self.output_queue.put(("complete", "Pipeline completed successfully"))
+            self.output_queue.put(("complete", _("Pipeline completed successfully")))
         except Exception as e:
             output = sys.stdout.getvalue() + sys.stderr.getvalue()
             self.output_queue.put(("output", output))
@@ -489,11 +492,11 @@ class PdfMillApp(tk.Tk):
             if msg_type == "output" and msg:
                 self._log(msg)
             elif msg_type == "complete":
-                self.status_var.set("Complete")
+                self.status_var.set(_("Complete"))
                 self._log(f"\n=== {msg} ===\n")
             elif msg_type == "error":
-                self.status_var.set("Error")
-                self._log(f"\n=== ERROR: {msg} ===\n")
+                self.status_var.set(_("Error"))
+                self._log("\n=== " + _("ERROR") + f": {msg} ===\n")
 
         if self.running:
             self.after(100, self._poll_output)
@@ -501,7 +504,7 @@ class PdfMillApp(tk.Tk):
     def _show_about(self):
         from pdfmill import __version__
 
-        messagebox.showinfo("About", f"pdfmill Config Editor\nVersion {__version__}")
+        messagebox.showinfo(_("About"), _("pdfmill Config Editor") + f"\n" + _("Version {}").format(__version__))
 
 
 def launch_gui() -> int:
