@@ -1,0 +1,29 @@
+version: 1
+settings:
+  on_error: continue
+  cleanup_source: false
+  cleanup_output_after_print: false
+input:
+  path: input
+  pattern: Lecture*.pdf
+  sort: name_asc
+outputs:
+  default:
+    pages: '1'
+    output_dir: output
+    debug: true
+    transforms:
+    - split:
+        regions:
+        - lower_left:
+          - 45mm
+          - 150mm
+          upper_right:
+          - 170mm
+          - 240mm
+        - lower_left:
+          - 45mm
+          - 34mm
+          upper_right:
+          - 170mm
+          - 124mm

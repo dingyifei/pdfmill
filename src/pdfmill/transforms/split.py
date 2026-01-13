@@ -1,8 +1,9 @@
 """Split transform for pdfmill."""
 
-from copy import deepcopy
+import io
+import logging
 
-from pypdf import PageObject
+from pypdf import PageObject, PdfReader, PdfWriter
 
 from pdfmill.config import SplitTransform as SplitConfig
 from pdfmill.config import Transform
@@ -37,14 +38,37 @@ def split_page(
         ]
         pages = split_page(source_page, regions)
     """
+    if not regions:
+        return []
+
+    # Serialize the source page to bytes once.
+    # This is necessary because pypdf's deepcopy doesn't properly isolate
+    # the content stream - multiple copies share the same /Contents object,
+    # causing add_transformation() to affect all copies.
+    temp_writer = PdfWriter()
+    temp_writer.add_page(page)
+    buffer = io.BytesIO()
+    temp_writer.write(buffer)
+    source_bytes = buffer.getvalue()
+
     result_pages = []
 
-    for lower_left, upper_right in regions:
-        # Create a deep copy of the page for each region
-        page_copy = deepcopy(page)
-        # Apply crop to extract the region
-        crop_page(page_copy, lower_left, upper_right)
-        result_pages.append(page_copy)
+    # Temporarily suppress pypdf warnings about xref entries
+    # These occur when re-reading serialized single-page PDFs but are harmless
+    pypdf_logger = logging.getLogger("pypdf")
+    original_level = pypdf_logger.level
+    pypdf_logger.setLevel(logging.ERROR)
+
+    try:
+        for lower_left, upper_right in regions:
+            # Create a fresh reader for each region to get independent page objects
+            reader = PdfReader(io.BytesIO(source_bytes))
+            page_copy = reader.pages[0]
+            # Apply crop to extract the region
+            crop_page(page_copy, lower_left, upper_right)
+            result_pages.append(page_copy)
+    finally:
+        pypdf_logger.setLevel(original_level)
 
     return result_pages
 
