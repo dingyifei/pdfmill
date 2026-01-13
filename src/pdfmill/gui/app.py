@@ -272,7 +272,7 @@ class PdfMillApp(tk.Tk):
         data: dict[str, Any] = {
             "version": config.version,
             "settings": {
-                "on_error": config.settings.on_error,
+                "on_error": config.settings.on_error.value,
                 "cleanup_source": config.settings.cleanup_source,
                 "cleanup_output_after_print": config.settings.cleanup_output_after_print,
             },
@@ -284,11 +284,11 @@ class PdfMillApp(tk.Tk):
         }
 
         if config.input.sort:
-            data["input"]["sort"] = config.input.sort
+            data["input"]["sort"] = config.input.sort.value
         if config.input.filter:
             data["input"]["filter"] = {
                 "keywords": config.input.filter.keywords,
-                "match": config.input.filter.match,
+                "match": config.input.filter.match.value,
             }
 
         for name, profile in config.outputs.items():
@@ -304,7 +304,7 @@ class PdfMillApp(tk.Tk):
             if profile.filename_suffix:
                 p["filename_suffix"] = profile.filename_suffix
             if profile.sort:
-                p["sort"] = profile.sort
+                p["sort"] = profile.sort.value
             if profile.debug:
                 p["debug"] = profile.debug
 
@@ -323,16 +323,16 @@ class PdfMillApp(tk.Tk):
                         transform_dict["size"] = {
                             "width": t.size.width,
                             "height": t.size.height,
-                            "fit": t.size.fit,
+                            "fit": t.size.fit.value,
                         }
                     elif t.type == "stamp" and t.stamp:
                         stamp_dict: dict[str, Any] = {
                             "text": t.stamp.text,
-                            "position": t.stamp.position,
+                            "position": t.stamp.position.value,
                             "font_size": t.stamp.font_size,
                             "margin": t.stamp.margin,
                         }
-                        if t.stamp.position == "custom":
+                        if t.stamp.position.value == "custom":
                             stamp_dict["x"] = t.stamp.x
                             stamp_dict["y"] = t.stamp.y
                         transform_dict["stamp"] = stamp_dict

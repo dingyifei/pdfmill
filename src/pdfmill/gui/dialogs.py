@@ -2,6 +2,7 @@
 
 import shlex
 import tkinter as tk
+from copy import deepcopy
 from tkinter import messagebox, ttk
 
 from pdfmill.config import (
@@ -162,6 +163,7 @@ class TransformDialog(tk.Toplevel):
         btn_row.pack(fill="x")
         ttk.Button(btn_row, text=_("Add Region"), command=self._add_split_region).pack(side="left", padx=2)
         ttk.Button(btn_row, text=_("Edit Region"), command=self._edit_split_region).pack(side="left", padx=2)
+        ttk.Button(btn_row, text=_("Copy"), command=self._copy_split_region).pack(side="left", padx=2)
         ttk.Button(btn_row, text=_("Remove"), command=self._remove_split_region).pack(side="left", padx=2)
 
         # Combine frame
@@ -183,6 +185,7 @@ class TransformDialog(tk.Toplevel):
         btn_row.pack(fill="x")
         ttk.Button(btn_row, text=_("Add Placement"), command=self._add_combine_item).pack(side="left", padx=2)
         ttk.Button(btn_row, text=_("Edit Placement"), command=self._edit_combine_item).pack(side="left", padx=2)
+        ttk.Button(btn_row, text=_("Copy"), command=self._copy_combine_item).pack(side="left", padx=2)
         ttk.Button(btn_row, text=_("Remove"), command=self._remove_combine_item).pack(side="left", padx=2)
 
         # Render frame
@@ -269,6 +272,15 @@ class TransformDialog(tk.Toplevel):
             del self.split_regions[sel[0]]
             self._refresh_split_list()
 
+    def _copy_split_region(self):
+        sel = self.split_list.curselection()
+        if sel:
+            idx = sel[0]
+            copy = deepcopy(self.split_regions[idx])
+            self.split_regions.insert(idx + 1, copy)
+            self._refresh_split_list()
+            self.split_list.selection_set(idx + 1)
+
     def _refresh_combine_list(self):
         self.combine_list.delete(0, tk.END)
         for item in self.combine_layout:
@@ -297,6 +309,15 @@ class TransformDialog(tk.Toplevel):
         if sel:
             del self.combine_layout[sel[0]]
             self._refresh_combine_list()
+
+    def _copy_combine_item(self):
+        sel = self.combine_list.curselection()
+        if sel:
+            idx = sel[0]
+            copy = deepcopy(self.combine_layout[idx])
+            self.combine_layout.insert(idx + 1, copy)
+            self._refresh_combine_list()
+            self.combine_list.selection_set(idx + 1)
 
     def _load_transform(self, t: Transform):
         self.enabled_var.set(t.enabled)

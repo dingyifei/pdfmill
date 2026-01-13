@@ -1,6 +1,7 @@
 """Frame components for the GUI."""
 
 import tkinter as tk
+from copy import deepcopy
 from pathlib import Path
 from tkinter import filedialog, ttk
 
@@ -211,6 +212,7 @@ class OutputProfileEditor(ttk.Frame):
         btn_col.pack(side="left", padx=5)
         ttk.Button(btn_col, text=_("Add"), command=self._add_transform).pack(fill="x", pady=1)
         ttk.Button(btn_col, text=_("Edit"), command=self._edit_transform).pack(fill="x", pady=1)
+        ttk.Button(btn_col, text=_("Copy"), command=self._copy_transform).pack(fill="x", pady=1)
         ttk.Button(btn_col, text=_("Remove"), command=self._remove_transform).pack(fill="x", pady=1)
         ttk.Button(btn_col, text=_("Up"), command=self._move_up).pack(fill="x", pady=1)
         ttk.Button(btn_col, text=_("Down"), command=self._move_down).pack(fill="x", pady=1)
@@ -237,6 +239,7 @@ class OutputProfileEditor(ttk.Frame):
         btn_row.pack(fill="x")
         ttk.Button(btn_row, text=_("Add Target"), command=self._add_target).pack(side="left", padx=2)
         ttk.Button(btn_row, text=_("Edit Target"), command=self._edit_target).pack(side="left", padx=2)
+        ttk.Button(btn_row, text=_("Copy Target"), command=self._copy_target).pack(side="left", padx=2)
         ttk.Button(btn_row, text=_("Remove Target"), command=self._remove_target).pack(side="left", padx=2)
 
     def _browse_output(self):
@@ -295,6 +298,15 @@ class OutputProfileEditor(ttk.Frame):
         if sel:
             del self.transforms[sel[0]]
             self._refresh_transforms()
+
+    def _copy_transform(self):
+        sel = self.transform_list.curselection()
+        if sel:
+            idx = sel[0]
+            copy = deepcopy(self.transforms[idx])
+            self.transforms.insert(idx + 1, copy)
+            self._refresh_transforms()
+            self.transform_list.selection_set(idx + 1)
 
     def _move_up(self):
         sel = self.transform_list.curselection()
@@ -361,6 +373,20 @@ class OutputProfileEditor(ttk.Frame):
                     self.print_targets["default"] = target
             self._refresh_targets()
 
+    def _copy_target(self):
+        sel = self.target_list.curselection()
+        if sel:
+            name = list(self.print_targets.keys())[sel[0]]
+            target = self.print_targets[name]
+            # Generate new name
+            i = 2
+            new_name = f"{name}_copy"
+            while new_name in self.print_targets:
+                new_name = f"{name}_copy{i}"
+                i += 1
+            self.print_targets[new_name] = deepcopy(target)
+            self._refresh_targets()
+
     def load(self, name: str, profile: OutputProfile):
         self.name_var.set(name)
         self.enabled_var.set(profile.enabled)
@@ -425,6 +451,7 @@ class OutputsFrame(ttk.Frame):
         btn_frame = ttk.Frame(left)
         btn_frame.pack(fill="x", pady=5)
         ttk.Button(btn_frame, text=_("Add"), command=self._add_profile).pack(side="left", padx=2)
+        ttk.Button(btn_frame, text=_("Copy"), command=self._copy_profile).pack(side="left", padx=2)
         ttk.Button(btn_frame, text=_("Remove"), command=self._remove_profile).pack(side="left", padx=2)
 
         # Right panel - profile editor
@@ -482,6 +509,28 @@ class OutputsFrame(ttk.Frame):
             del self.profiles[name]
             self.current_profile = None
             self._refresh_list()
+
+    def _copy_profile(self):
+        sel = self.profile_list.curselection()
+        if sel:
+            self._save_current()
+            display_name = self.profile_list.get(sel[0])
+            name = display_name.replace("[DISABLED] ", "")
+            profile = self.profiles[name]
+            # Generate new name
+            i = 2
+            new_name = f"{name}_copy"
+            while new_name in self.profiles:
+                new_name = f"{name}_copy{i}"
+                i += 1
+            self.profiles[new_name] = deepcopy(profile)
+            self._refresh_list()
+            # Select the new profile
+            idx = list(self.profiles.keys()).index(new_name)
+            self.profile_list.selection_clear(0, tk.END)
+            self.profile_list.selection_set(idx)
+            self.current_profile = new_name
+            self.editor.load(new_name, self.profiles[new_name])
 
     def load(self, outputs: dict[str, OutputProfile]):
         self.profiles = dict(outputs)
