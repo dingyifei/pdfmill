@@ -5,7 +5,10 @@ from pathlib import Path
 from pypdf import PageObject, PdfWriter
 
 from pdfmill.config import Transform
+from pdfmill.logging_config import get_logger
 from pdfmill.transforms import TransformContext, get_transform
+
+logger = get_logger(__name__)
 
 
 class TransformExecutor:
@@ -62,7 +65,7 @@ class TransformExecutor:
             )
 
             if dry_run:
-                print(f"    [dry-run] {step_desc}")
+                logger.info("    [dry-run] %s", step_desc)
             else:
                 # Apply transform
                 result = handler.apply(pages, context)
@@ -97,4 +100,4 @@ class TransformExecutor:
         with open(debug_path, "wb") as f:
             writer.write(f)
 
-        print(f"    [debug] Saved: {debug_path}")
+        logger.debug("Saved: %s", debug_path)

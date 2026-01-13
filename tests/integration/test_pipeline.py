@@ -1,10 +1,12 @@
 """Integration tests for pdfmill pipeline processing."""
 
+import logging
 import pytest
 from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
+from pdfmill.logging_config import setup_logging
 from pdfmill.config import (
     load_config,
     Config,
@@ -255,7 +257,7 @@ class TestConfigFileIntegration:
 class TestErrorHandling:
     """Test error handling in the pipeline."""
 
-    def test_invalid_page_spec_continues(self, temp_pdf, temp_dir, capsys):
+    def test_invalid_page_spec_continues(self, temp_pdf, temp_dir, caplog):
         """Test that invalid page spec doesn't crash with on_error=continue."""
         config = Config(
             settings=Settings(on_error="continue"),
@@ -266,23 +268,25 @@ class TestErrorHandling:
         )
         output_dir = temp_dir / "output"
 
-        process(config, temp_pdf, output_dir)
+        with caplog.at_level(logging.ERROR, logger="pdfmill"):
+            setup_logging()
+            process(config, temp_pdf, output_dir)
 
         # Valid profile should still produce output
         outputs = list(output_dir.glob("*.pdf"))
         assert len(outputs) == 1
 
-        captured = capsys.readouterr()
-        assert "Error" in captured.out
+        assert "Error" in caplog.text
 
-    def test_empty_directory_handled(self, temp_dir, capsys):
+    def test_empty_directory_handled(self, temp_dir, caplog):
         """Test handling of empty input directory."""
         config = Config(outputs={"default": OutputProfile(pages="all")})
         input_dir = temp_dir / "input"
         input_dir.mkdir()
         output_dir = temp_dir / "output"
 
-        process(config, input_dir, output_dir)
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            setup_logging()
+            process(config, input_dir, output_dir)
 
-        captured = capsys.readouterr()
-        assert "No PDF files found" in captured.out
+        assert "No PDF files found" in caplog.text

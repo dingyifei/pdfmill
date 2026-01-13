@@ -11,7 +11,10 @@ from pdfmill.config import (
     PrintTarget,
     SortOrder,
 )
+from pdfmill.logging_config import get_logger
 from pdfmill.printer import PrinterError, print_pdf
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -151,7 +154,7 @@ class PrintPipeline:
             # Apply per-profile sorting if configured
             if profile.sort:
                 profile_files = self._sort_profile_files(profile_files, profile.sort)
-                print(f"Sorted profile '{profile_name}' files by: {profile.sort.value}")
+                logger.info("Sorted profile '%s' files by: %s", profile_name, profile.sort.value)
 
             targets = profile.print.targets
             merge_output_dir = output_dir if output_dir else profile.output_dir
@@ -167,7 +170,7 @@ class PrintPipeline:
                 )
                 result.success_count += 1
             except PrinterError as e:
-                print(f"  Print error: {e}")
+                logger.error("Print error: %s", e)
                 result.fail_count += 1
                 if on_error == ErrorHandling.STOP:
                     raise
@@ -205,7 +208,7 @@ class PrintPipeline:
             pdf_paths = [pf[0] for pf in profile_files]
             merged_path = merge_output_dir / f"merged_{profile_name}.pdf"
 
-            print(f"Merging {len(pdf_paths)} files for profile '{profile_name}'...")
+            logger.info("Merging %d files for profile '%s'...", len(pdf_paths), profile_name)
             self.merge_pdfs(pdf_paths, merged_path)
             result.temporary_files.append(merged_path)
             files_to_print = [merged_path]
@@ -215,11 +218,11 @@ class PrintPipeline:
         if len(targets) > 1 and profile.print.merge:
             # Multi-printer page distribution
             for file_path in files_to_print:
-                print(f"Splitting {file_path.name} across {len(targets)} printers...")
+                logger.info("Splitting %s across %d printers...", file_path.name, len(targets))
                 split_pdfs = self.split_pages_by_weight(file_path, targets, merge_output_dir, profile_name)
                 for target_name, split_path in split_pdfs.items():
                     target = targets[target_name]
-                    print(f"  Printing {split_path.name} to {target.printer}...")
+                    logger.info("  Printing %s to %s...", split_path.name, target.printer)
                     print_pdf(
                         split_path,
                         target.printer,
@@ -232,7 +235,7 @@ class PrintPipeline:
             # Single target or copy distribution (each file to all targets)
             for file_path in files_to_print:
                 for _target_name, target in targets.items():
-                    print(f"Printing {file_path.name} to {target.printer}...")
+                    logger.info("Printing %s to %s...", file_path.name, target.printer)
                     print_pdf(
                         file_path,
                         target.printer,

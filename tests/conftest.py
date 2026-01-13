@@ -1,5 +1,6 @@
 """Shared fixtures for pdfmill tests."""
 
+import logging
 import tempfile
 import shutil
 from pathlib import Path
@@ -7,6 +8,34 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
+
+
+# === Logging Fixture ===
+
+@pytest.fixture(autouse=True)
+def reset_logging():
+    """Reset pdfmill logging configuration before each test.
+
+    This prevents logging handlers from persisting across tests,
+    which can cause 'I/O operation on closed file' errors when
+    pytest's capsys closes stdout/stderr.
+    """
+    logger = logging.getLogger("pdfmill")
+    # Remove all handlers
+    logger.handlers.clear()
+    # Add NullHandler to prevent 'No handler found' warnings
+    logger.addHandler(logging.NullHandler())
+    yield
+    # Cleanup after test
+    logger.handlers.clear()
+    logger.addHandler(logging.NullHandler())
+
+
+@pytest.fixture
+def caplog_pdfmill(caplog):
+    """Capture pdfmill logs at DEBUG level for testing."""
+    with caplog.at_level(logging.DEBUG, logger="pdfmill"):
+        yield caplog
 
 
 # === Path/Directory Fixtures ===

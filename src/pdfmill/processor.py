@@ -14,10 +14,13 @@ from pdfmill.config import (
     OutputProfile,
     SortOrder,
 )
+from pdfmill.logging_config import get_logger
 from pdfmill.pipeline import PrintPipeline, TransformExecutor
 from pdfmill.printer import PrinterError
 from pdfmill.selector import PageSelectionError, select_pages
 from pdfmill.transforms import TransformError
+
+logger = get_logger(__name__)
 
 
 class ProcessingError(Exception):
@@ -133,7 +136,7 @@ def process_single_pdf(
         Path to output file, or None if dry run
     """
     if dry_run:
-        print(f"  Processing profile '{profile_name}' for {pdf_path.name}")
+        logger.info("  Processing profile '%s' for %s", profile_name, pdf_path.name)
 
     # Read source PDF
     reader = PdfReader(str(pdf_path))
@@ -146,7 +149,7 @@ def process_single_pdf(
         raise ProcessingError(f"Page selection failed: {e}")
 
     if dry_run:
-        print(f"    [dry-run] Select pages: {[i + 1 for i in page_indices]} from {total_pages} pages")
+        logger.info("    [dry-run] Select pages: %s from %d pages", [i + 1 for i in page_indices], total_pages)
 
     # Extract pages
     pages = [reader.pages[i] for i in page_indices]
@@ -175,7 +178,7 @@ def process_single_pdf(
     output_path = output_dir / output_filename
 
     if dry_run:
-        print(f"    [dry-run] Write to: {output_path}")
+        logger.info("    [dry-run] Write to: %s", output_path)
         return None
 
     # Write output
@@ -187,7 +190,7 @@ def process_single_pdf(
     with open(output_path, "wb") as f:
         writer.write(f)
 
-    print(f"  Created: {output_path}")
+    logger.info("  Created: %s", output_path)
     return output_path
 
 
@@ -209,7 +212,7 @@ def process(
     # Get input files
     input_files = get_input_files(input_path, config.input.pattern)
     if not input_files:
-        print(f"No PDF files found in: {input_path}")
+        logger.info("No PDF files found in: %s", input_path)
         return
 
     # Apply keyword filter if configured
@@ -218,12 +221,12 @@ def process(
         input_files = [f for f in input_files if matches_filter(f, config.input.filter)]
         filtered_count = total_before - len(input_files)
         if filtered_count > 0:
-            print(f"Filtered out {filtered_count} file(s) by keyword filter")
+            logger.info("Filtered out %d file(s) by keyword filter", filtered_count)
         if not input_files:
-            print("No PDF files matched the keyword filter")
+            logger.info("No PDF files matched the keyword filter")
             return
 
-    print(f"Found {len(input_files)} PDF file(s) to process")
+    logger.info("Found %d PDF file(s) to process", len(input_files))
 
     # Validate sort settings - error if both input.sort and any profile.sort are set
     for profile_name, profile in config.outputs.items():
@@ -236,7 +239,7 @@ def process(
     # Apply global input sorting if configured
     if config.input.sort:
         input_files = sort_files(input_files, config.input.sort)
-        print(f"Sorted files by: {config.input.sort.value}")
+        logger.info("Sorted files by: %s", config.input.sort.value)
 
     success_count = 0
     fail_count = 0
@@ -245,12 +248,12 @@ def process(
     output_files: list[tuple[Path, str, OutputProfile, Path]] = []
 
     for pdf_path in input_files:
-        print(f"\nProcessing: {pdf_path.name}")
+        logger.info("\nProcessing: %s", pdf_path.name)
 
         for profile_name, profile in config.outputs.items():
             # Skip disabled profiles
             if not profile.enabled:
-                print(f"  Skipping disabled profile: {profile_name}")
+                logger.debug("Skipping disabled profile: %s", profile_name)
                 continue
 
             try:
@@ -270,7 +273,7 @@ def process(
                 success_count += 1
 
             except (ProcessingError, TransformError) as e:
-                print(f"  Error in profile '{profile_name}': {e}")
+                logger.error("Error in profile '%s': %s", profile_name, e)
                 fail_count += 1
                 if config.settings.on_error == ErrorHandling.STOP:
                     raise
@@ -309,26 +312,26 @@ def process(
             for pdf_path in input_files:
                 try:
                     os.remove(pdf_path)
-                    print(f"Cleaned up source: {pdf_path}")
+                    logger.debug("Cleaned up source: %s", pdf_path)
                 except OSError as e:
-                    print(f"Failed to cleanup {pdf_path}: {e}")
+                    logger.warning("Failed to cleanup %s: %s", pdf_path, e)
 
         if config.settings.cleanup_output_after_print:
             for output_path, _, profile, _ in output_files:
                 if profile.print.enabled:
                     try:
                         os.remove(output_path)
-                        print(f"Cleaned up output: {output_path}")
+                        logger.debug("Cleaned up output: %s", output_path)
                     except OSError as e:
-                        print(f"Failed to cleanup {output_path}: {e}")
+                        logger.warning("Failed to cleanup %s: %s", output_path, e)
 
             # Also cleanup temporary files (merged/split)
             for temp_path in temporary_files:
                 try:
                     os.remove(temp_path)
-                    print(f"Cleaned up temporary: {temp_path}")
+                    logger.debug("Cleaned up temporary: %s", temp_path)
                 except OSError as e:
-                    print(f"Failed to cleanup {temp_path}: {e}")
+                    logger.warning("Failed to cleanup %s: %s", temp_path, e)
 
     # Summary
-    print(f"\nProcessing complete: {success_count} succeeded, {fail_count} failed")
+    logger.info("\nProcessing complete: %d succeeded, %d failed", success_count, fail_count)

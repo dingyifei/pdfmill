@@ -504,7 +504,7 @@ class PdfMillApp(tk.Tk):
     def _show_about(self):
         from pdfmill import __version__
 
-        messagebox.showinfo(_("About"), _("pdfmill Config Editor") + f"\n" + _("Version {}").format(__version__))
+        messagebox.showinfo(_("About"), _("pdfmill Config Editor") + "\n" + _("Version {}").format(__version__))
 
 
 def launch_gui() -> int:

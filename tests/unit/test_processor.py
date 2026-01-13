@@ -1,9 +1,11 @@
 """Tests for pdfmill.processor module."""
 
+import logging
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
+from pdfmill.logging_config import setup_logging
 from pdfmill.processor import (
     get_input_files,
     generate_output_filename,
@@ -183,7 +185,7 @@ class TestApplyTransforms:
             assert result[0] is new_page_1
             assert result[1] is new_page_2
 
-    def test_render_dry_run(self, capsys):
+    def test_render_dry_run(self, caplog):
         pages = [MagicMock()]
         transforms = [Transform(type="render", render=RenderTransform(dpi=300))]
 
@@ -191,15 +193,16 @@ class TestApplyTransforms:
         mock_handler.describe.return_value = "render_300dpi"
 
         executor = TransformExecutor()
-        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
-            executor.apply(pages, transforms, dry_run=True)
-            mock_handler.apply.assert_not_called()
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            setup_logging()
+            with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+                executor.apply(pages, transforms, dry_run=True)
+                mock_handler.apply.assert_not_called()
 
-        captured = capsys.readouterr()
-        assert "[dry-run]" in captured.out
-        assert "render_300dpi" in captured.out
+        assert "[dry-run]" in caplog.text
+        assert "render_300dpi" in caplog.text
 
-    def test_dry_run_no_transform(self, capsys):
+    def test_dry_run_no_transform(self, caplog):
         pages = [MagicMock()]
         transforms = [Transform(type="rotate", rotate=RotateTransform(angle=90))]
 
@@ -207,12 +210,13 @@ class TestApplyTransforms:
         mock_handler.describe.return_value = "rotate90"
 
         executor = TransformExecutor()
-        with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
-            executor.apply(pages, transforms, dry_run=True)
-            mock_handler.apply.assert_not_called()
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            setup_logging()
+            with patch("pdfmill.pipeline.transforms.get_transform", return_value=mock_handler):
+                executor.apply(pages, transforms, dry_run=True)
+                mock_handler.apply.assert_not_called()
 
-        captured = capsys.readouterr()
-        assert "[dry-run]" in captured.out
+        assert "[dry-run]" in caplog.text
 
     def test_multiple_transforms(self):
         pages = [MagicMock()]
@@ -255,20 +259,21 @@ class TestProcessSinglePdf:
         assert output.exists()
         assert "test_profile" in output.name
 
-    def test_dry_run_returns_none(self, temp_multi_page_pdf, temp_dir, capsys):
+    def test_dry_run_returns_none(self, temp_multi_page_pdf, temp_dir, caplog):
         profile = OutputProfile(pages="last")
 
-        output = process_single_pdf(
-            temp_multi_page_pdf,
-            "test_profile",
-            profile,
-            temp_dir,
-            dry_run=True,
-        )
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            setup_logging()
+            output = process_single_pdf(
+                temp_multi_page_pdf,
+                "test_profile",
+                profile,
+                temp_dir,
+                dry_run=True,
+            )
 
         assert output is None
-        captured = capsys.readouterr()
-        assert "[dry-run]" in captured.out
+        assert "[dry-run]" in caplog.text
 
     def test_output_dir_created(self, temp_multi_page_pdf, temp_dir):
         output_subdir = temp_dir / "subdir" / "nested"
@@ -356,13 +361,14 @@ class TestProcess:
         outputs = list(output_dir.glob("*.pdf"))
         assert len(outputs) == 2
 
-    def test_no_files_found(self, temp_dir, capsys):
+    def test_no_files_found(self, temp_dir, caplog):
         config = Config(outputs={"default": OutputProfile(pages="all")})
 
-        process(config, temp_dir, temp_dir)
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            setup_logging()
+            process(config, temp_dir, temp_dir)
 
-        captured = capsys.readouterr()
-        assert "No PDF files found" in captured.out
+        assert "No PDF files found" in caplog.text
 
     def test_multiple_profiles(self, temp_multi_page_pdf, temp_dir):
         config = Config(outputs={
@@ -376,7 +382,7 @@ class TestProcess:
         outputs = list(output_dir.glob("*.pdf"))
         assert len(outputs) == 2
 
-    def test_on_error_continue(self, temp_pdf, temp_dir, capsys):
+    def test_on_error_continue(self, temp_pdf, temp_dir, caplog):
         config = Config(
             settings=Settings(on_error="continue"),
             outputs={
@@ -387,10 +393,11 @@ class TestProcess:
         output_dir = temp_dir / "output"
 
         # Should not raise, should continue to good profile
-        process(config, temp_pdf, output_dir)
+        with caplog.at_level(logging.ERROR, logger="pdfmill"):
+            setup_logging()
+            process(config, temp_pdf, output_dir)
 
-        captured = capsys.readouterr()
-        assert "Error" in captured.out
+        assert "Error" in caplog.text
 
         # Good profile should still produce output
         outputs = list(output_dir.glob("*.pdf"))
@@ -405,14 +412,15 @@ class TestProcess:
         with pytest.raises(ProcessingError):
             process(config, temp_pdf, temp_dir)
 
-    def test_dry_run(self, temp_multi_page_pdf, temp_dir, capsys):
+    def test_dry_run(self, temp_multi_page_pdf, temp_dir, caplog):
         config = Config(outputs={"default": OutputProfile(pages="all")})
         output_dir = temp_dir / "output"
 
-        process(config, temp_multi_page_pdf, output_dir, dry_run=True)
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            setup_logging()
+            process(config, temp_multi_page_pdf, output_dir, dry_run=True)
 
-        captured = capsys.readouterr()
-        assert "[dry-run]" in captured.out
+        assert "[dry-run]" in caplog.text
 
         # No actual output should be created (output_dir may not even exist)
         if output_dir.exists():
@@ -436,7 +444,7 @@ class TestProcess:
             process(config, temp_multi_page_pdf, output_dir)
             mock_print.assert_called_once()
 
-    def test_print_error_continues(self, temp_multi_page_pdf, temp_dir, capsys):
+    def test_print_error_continues(self, temp_multi_page_pdf, temp_dir, caplog):
         from pdfmill.printer import PrinterError
 
         config = Config(
@@ -453,12 +461,13 @@ class TestProcess:
         )
         output_dir = temp_dir / "output"
 
-        with patch("pdfmill.pipeline.printing.print_pdf") as mock_print:
-            mock_print.side_effect = PrinterError("Print failed")
-            process(config, temp_multi_page_pdf, output_dir)
+        with caplog.at_level(logging.ERROR, logger="pdfmill"):
+            setup_logging()
+            with patch("pdfmill.pipeline.printing.print_pdf") as mock_print:
+                mock_print.side_effect = PrinterError("Print failed")
+                process(config, temp_multi_page_pdf, output_dir)
 
-        captured = capsys.readouterr()
-        assert "Print error" in captured.out
+        assert "Print error" in caplog.text
 
 
 class TestCleanup:
@@ -795,7 +804,7 @@ class TestEnabledField:
             # 2 enabled transforms
             assert mock_handler.apply.call_count == 2
 
-    def test_disabled_profile_skipped(self, temp_multi_page_pdf, temp_dir, capsys):
+    def test_disabled_profile_skipped(self, temp_multi_page_pdf, temp_dir, caplog):
         """Test that disabled profiles are skipped."""
         config = Config(outputs={
             "enabled": OutputProfile(pages="all", enabled=True),
@@ -803,7 +812,9 @@ class TestEnabledField:
         })
         output_dir = temp_dir / "output"
 
-        process(config, temp_multi_page_pdf, output_dir)
+        with caplog.at_level(logging.DEBUG, logger="pdfmill"):
+            setup_logging(verbosity=2)
+            process(config, temp_multi_page_pdf, output_dir)
 
         # Only one output should be created (from enabled profile)
         outputs = list(output_dir.glob("*.pdf"))
@@ -811,10 +822,9 @@ class TestEnabledField:
         assert "enabled" in outputs[0].name
 
         # Check log message
-        captured = capsys.readouterr()
-        assert "Skipping disabled profile: disabled" in captured.out
+        assert "Skipping disabled profile: disabled" in caplog.text
 
-    def test_all_disabled_profiles_skipped(self, temp_multi_page_pdf, temp_dir, capsys):
+    def test_all_disabled_profiles_skipped(self, temp_multi_page_pdf, temp_dir, caplog):
         """Test that all disabled profiles are skipped."""
         config = Config(outputs={
             "disabled1": OutputProfile(pages="all", enabled=False),
@@ -822,16 +832,17 @@ class TestEnabledField:
         })
         output_dir = temp_dir / "output"
 
-        process(config, temp_multi_page_pdf, output_dir)
+        with caplog.at_level(logging.DEBUG, logger="pdfmill"):
+            setup_logging(verbosity=2)
+            process(config, temp_multi_page_pdf, output_dir)
 
         # No outputs should be created
         if output_dir.exists():
             outputs = list(output_dir.glob("*.pdf"))
             assert len(outputs) == 0
 
-        captured = capsys.readouterr()
-        assert "Skipping disabled profile: disabled1" in captured.out
-        assert "Skipping disabled profile: disabled2" in captured.out
+        assert "Skipping disabled profile: disabled1" in caplog.text
+        assert "Skipping disabled profile: disabled2" in caplog.text
 
     def test_disabled_profile_with_print_enabled_no_print(self, temp_multi_page_pdf, temp_dir):
         """Test that disabled profile doesn't print even if print.enabled is True."""

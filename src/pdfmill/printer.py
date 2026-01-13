@@ -7,6 +7,10 @@ import sys
 import urllib.request
 from pathlib import Path
 
+from pdfmill.logging_config import get_logger, is_quiet_mode
+
+logger = get_logger(__name__)
+
 # SumatraPDF version to download
 SUMATRA_VERSION = "3.5.2"
 
@@ -87,26 +91,27 @@ def download_sumatra(force: bool = False) -> Path:
     cache_path = get_sumatra_cache_path()
 
     if cache_path.exists() and not force:
-        print(f"SumatraPDF already installed at: {cache_path}")
+        logger.info("SumatraPDF already installed at: %s", cache_path)
         return cache_path
 
     url = get_sumatra_download_url()
     arch = get_architecture()
 
-    print(f"Downloading SumatraPDF {SUMATRA_VERSION} ({arch})...")
-    print(f"  From: {url}")
-    print(f"  To: {cache_path}")
+    logger.info("Downloading SumatraPDF %s (%s)...", SUMATRA_VERSION, arch)
+    logger.info("  From: %s", url)
+    logger.info("  To: %s", cache_path)
 
     try:
-        # Download with progress indication
+        # Download with progress indication (only if not in quiet mode)
         def report_progress(block_num, block_size, total_size):
-            if total_size > 0:
+            if total_size > 0 and not is_quiet_mode():
                 percent = min(100, block_num * block_size * 100 // total_size)
                 print(f"\r  Progress: {percent}%", end="", flush=True)
 
         urllib.request.urlretrieve(url, cache_path, reporthook=report_progress)
-        print()  # New line after progress
-        print(f"Successfully installed SumatraPDF to: {cache_path}")
+        if not is_quiet_mode():
+            print()  # New line after progress
+        logger.info("Successfully installed SumatraPDF to: %s", cache_path)
         return cache_path
 
     except Exception as e:
@@ -127,19 +132,19 @@ def remove_sumatra() -> bool:
 
     if cache_path.exists():
         cache_path.unlink()
-        print(f"Removed SumatraPDF from: {cache_path}")
+        logger.info("Removed SumatraPDF from: %s", cache_path)
 
         # Also try to remove cache dir if empty
         cache_dir = get_cache_dir()
         try:
             cache_dir.rmdir()
-            print(f"Removed empty cache directory: {cache_dir}")
+            logger.debug("Removed empty cache directory: %s", cache_dir)
         except OSError:
             pass  # Directory not empty, that's fine
 
         return True
     else:
-        print("SumatraPDF is not installed in cache.")
+        logger.info("SumatraPDF is not installed in cache.")
         return False
 
 
@@ -223,7 +228,7 @@ def find_sumatra_pdf(auto_download: bool = True) -> Path | None:
         try:
             return download_sumatra()
         except PrinterError as e:
-            print(f"Warning: {e}", file=sys.stderr)
+            logger.warning("%s", e)
             return None
 
     return None
@@ -281,7 +286,7 @@ def print_pdf(
     cmd.extend(["-print-to", printer, str(pdf_path)])
 
     if dry_run:
-        print(f"[dry-run] Would execute: {' '.join(cmd)}")
+        logger.info("[dry-run] Would execute: %s", " ".join(cmd))
         return True
 
     try:
@@ -293,7 +298,7 @@ def print_pdf(
         )
         return True
     except subprocess.CalledProcessError as e:
-        print(f"Print failed: {e.stderr}", file=sys.stderr)
+        logger.error("Print failed: %s", e.stderr)
         return False
     except FileNotFoundError:
         raise PrinterError(f"SumatraPDF not found at: {sumatra_path}")

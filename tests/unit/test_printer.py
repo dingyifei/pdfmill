@@ -1,10 +1,12 @@
 """Tests for pdfmill.printer module."""
 
+import logging
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import sys
 
+from pdfmill.logging_config import setup_logging
 from pdfmill.printer import (
     get_architecture,
     get_cache_dir,
@@ -247,15 +249,16 @@ class TestFindSumatraPdf:
 class TestPrintPdf:
     """Test PDF printing."""
 
-    def test_dry_run_no_subprocess(self, temp_pdf, mock_subprocess_run, capsys):
-        with patch("pdfmill.printer.find_sumatra_pdf") as mock_find:
-            mock_find.return_value = Path("SumatraPDF.exe")
-            result = print_pdf(temp_pdf, "Test Printer", dry_run=True)
+    def test_dry_run_no_subprocess(self, temp_pdf, mock_subprocess_run, caplog):
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            setup_logging()
+            with patch("pdfmill.printer.find_sumatra_pdf") as mock_find:
+                mock_find.return_value = Path("SumatraPDF.exe")
+                result = print_pdf(temp_pdf, "Test Printer", dry_run=True)
 
         assert result is True
         mock_subprocess_run.assert_not_called()
-        captured = capsys.readouterr()
-        assert "[dry-run]" in captured.out
+        assert "[dry-run]" in caplog.text
 
     def test_pdf_not_found_raises(self, temp_dir):
         nonexistent = temp_dir / "nonexistent.pdf"

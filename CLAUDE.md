@@ -35,24 +35,35 @@ pdfm -c config.yaml --validate
 
 # Dry run (preview without processing)
 pdfm -c config.yaml -i ./input --dry-run
+
+# Verbose output (-v for verbose, -vv for debug)
+pdfm -c config.yaml -i ./input -vv
+
+# Quiet mode (errors only)
+pdfm -c config.yaml -i ./input -q
+
+# Log to file
+pdfm -c config.yaml -i ./input --log-file output.log
 ```
 
 ## Architecture
 
 ```
 src/pdfmill/
-├── cli.py          # Entry point, argparse CLI
-├── config.py       # YAML config loading, dataclass models
-├── selector.py     # Page selection (patterns, ranges, indices)
-├── transforms.py   # Rotate, crop, resize operations
-├── printer.py      # SumatraPDF wrapper, printer enumeration
-└── processor.py    # Main pipeline orchestration
+├── cli.py              # Entry point, argparse CLI
+├── config.py           # YAML config loading, dataclass models
+├── logging_config.py   # Logging setup, formatters, verbosity control
+├── selector.py         # Page selection (patterns, ranges, indices)
+├── transforms.py       # Rotate, crop, resize operations
+├── printer.py          # SumatraPDF wrapper, printer enumeration
+└── processor.py        # Main pipeline orchestration
 ```
 
 ### Module Responsibilities
 
 - **cli.py** - Parses args, dispatches to processor or utility commands
 - **config.py** - Loads YAML, validates structure, returns typed `Config` dataclass
+- **logging_config.py** - Configures Python logging with verbosity levels, console/file handlers
 - **selector.py** - Converts page specs (`"last"`, `"1-3"`, `[-1]`) to 0-indexed page list
 - **transforms.py** - Applies rotate/crop/resize/stamp/render/split/combine to pypdf page objects
 - **printer.py** - Finds SumatraPDF, sends print jobs with pass-through args

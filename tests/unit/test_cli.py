@@ -1,10 +1,12 @@
 """Tests for pdfmill.cli module."""
 
+import logging
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from pdfmill.cli import main, create_parser, show_version, cmd_install, cmd_uninstall, cmd_list_printers
+from pdfmill.logging_config import setup_logging
 
 
 class TestCreateParser:
@@ -80,34 +82,37 @@ class TestCreateParser:
 class TestShowVersion:
     """Test version display."""
 
-    def test_shows_version(self, capsys):
-        with patch("pdfmill.printer.get_sumatra_status") as mock_status:
-            mock_status.return_value = {"installed": False, "path": None, "version": None}
-            show_version()
+    def test_shows_version(self, caplog):
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            setup_logging()
+            with patch("pdfmill.printer.get_sumatra_status") as mock_status:
+                mock_status.return_value = {"installed": False, "path": None, "version": None}
+                show_version()
 
-        captured = capsys.readouterr()
-        assert "pdfmill" in captured.out
+        assert "pdfmill" in caplog.text
 
-    def test_shows_sumatra_installed(self, capsys):
-        with patch("pdfmill.printer.get_sumatra_status") as mock_status:
-            mock_status.return_value = {
-                "installed": True,
-                "path": "/path/to/SumatraPDF.exe",
-                "version": "3.5.2"
-            }
-            show_version()
+    def test_shows_sumatra_installed(self, caplog):
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            setup_logging()
+            with patch("pdfmill.printer.get_sumatra_status") as mock_status:
+                mock_status.return_value = {
+                    "installed": True,
+                    "path": "/path/to/SumatraPDF.exe",
+                    "version": "3.5.2"
+                }
+                show_version()
 
-        captured = capsys.readouterr()
-        assert "SumatraPDF" in captured.out
-        assert "3.5.2" in captured.out
+        assert "SumatraPDF" in caplog.text
+        assert "3.5.2" in caplog.text
 
-    def test_shows_sumatra_not_installed(self, capsys):
-        with patch("pdfmill.printer.get_sumatra_status") as mock_status:
-            mock_status.return_value = {"installed": False, "path": None, "version": None}
-            show_version()
+    def test_shows_sumatra_not_installed(self, caplog):
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            setup_logging()
+            with patch("pdfmill.printer.get_sumatra_status") as mock_status:
+                mock_status.return_value = {"installed": False, "path": None, "version": None}
+                show_version()
 
-        captured = capsys.readouterr()
-        assert "not installed" in captured.out
+        assert "not installed" in caplog.text
 
 
 class TestCmdInstall:
@@ -159,31 +164,35 @@ class TestCmdUninstall:
 class TestCmdListPrinters:
     """Test list printers command."""
 
-    def test_list_printers_success(self, capsys):
-        with patch("pdfmill.printer.list_printers") as mock_list:
-            mock_list.return_value = ["Printer 1", "Printer 2"]
-            result = cmd_list_printers()
+    def test_list_printers_success(self, caplog):
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            setup_logging()
+            with patch("pdfmill.printer.list_printers") as mock_list:
+                mock_list.return_value = ["Printer 1", "Printer 2"]
+                result = cmd_list_printers()
 
         assert result == 0
-        captured = capsys.readouterr()
-        assert "Printer 1" in captured.out
-        assert "Printer 2" in captured.out
+        assert "Printer 1" in caplog.text
+        assert "Printer 2" in caplog.text
 
-    def test_list_printers_empty(self, capsys):
-        with patch("pdfmill.printer.list_printers") as mock_list:
-            mock_list.return_value = []
-            result = cmd_list_printers()
+    def test_list_printers_empty(self, caplog):
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            setup_logging()
+            with patch("pdfmill.printer.list_printers") as mock_list:
+                mock_list.return_value = []
+                result = cmd_list_printers()
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "No printers found" in captured.out
+        assert "No printers found" in caplog.text
 
-    def test_list_printers_error(self, capsys):
+    def test_list_printers_error(self, caplog):
         from pdfmill.printer import PrinterError
 
-        with patch("pdfmill.printer.list_printers") as mock_list:
-            mock_list.side_effect = PrinterError("win32print not available")
-            result = cmd_list_printers()
+        with caplog.at_level(logging.ERROR, logger="pdfmill"):
+            setup_logging()
+            with patch("pdfmill.printer.list_printers") as mock_list:
+                mock_list.side_effect = PrinterError("win32print not available")
+                result = cmd_list_printers()
 
         assert result == 1
 
@@ -232,12 +241,12 @@ class TestMain:
         # Should print help
         assert "pdfm" in captured.out or "usage" in captured.out.lower()
 
-    def test_validate_valid_config(self, temp_config_file, capsys):
-        result = main(["--config", str(temp_config_file), "--validate"])
+    def test_validate_valid_config(self, temp_config_file, caplog):
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            result = main(["--config", str(temp_config_file), "--validate"])
 
         assert result == 0
-        captured = capsys.readouterr()
-        assert "valid" in captured.out.lower()
+        assert "valid" in caplog.text.lower()
 
     def test_validate_missing_config(self, temp_dir, capsys):
         result = main(["--config", str(temp_dir / "missing.yaml"), "--validate"])
@@ -328,7 +337,7 @@ class TestStrictValidation:
         assert args.validate is True
         assert args.strict is True
 
-    def test_strict_validation_success(self, tmp_path, capsys):
+    def test_strict_validation_success(self, tmp_path, caplog):
         """Test --strict passes when all resources exist."""
         # Create input directory
         input_dir = tmp_path / "input"
@@ -347,17 +356,17 @@ outputs:
         config_file = tmp_path / "config.yaml"
         config_file.write_text(config_content)
 
-        result = main([
-            "--config", str(config_file),
-            "--validate",
-            "--strict",
-        ])
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            result = main([
+                "--config", str(config_file),
+                "--validate",
+                "--strict",
+            ])
 
         assert result == 0
-        captured = capsys.readouterr()
-        assert "Strict validation" in captured.out
+        assert "Strict validation" in caplog.text
 
-    def test_strict_validation_missing_input_path(self, tmp_path, capsys):
+    def test_strict_validation_missing_input_path(self, tmp_path, caplog):
         """Test --strict fails when input path doesn't exist."""
         config_content = f"""
 version: 1
@@ -370,18 +379,18 @@ outputs:
         config_file = tmp_path / "config.yaml"
         config_file.write_text(config_content)
 
-        result = main([
-            "--config", str(config_file),
-            "--validate",
-            "--strict",
-        ])
+        with caplog.at_level(logging.DEBUG, logger="pdfmill"):
+            result = main([
+                "--config", str(config_file),
+                "--validate",
+                "--strict",
+            ])
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "input.path" in captured.out
-        assert "does not exist" in captured.out
+        assert "input.path" in caplog.text
+        assert "does not exist" in caplog.text
 
-    def test_strict_validation_printer_not_found(self, tmp_path, capsys):
+    def test_strict_validation_printer_not_found(self, tmp_path, caplog):
         """Test --strict fails when printer doesn't exist."""
         input_dir = tmp_path / "input"
         input_dir.mkdir()
@@ -401,17 +410,17 @@ outputs:
         config_file = tmp_path / "config.yaml"
         config_file.write_text(config_content)
 
-        result = main([
-            "--config", str(config_file),
-            "--validate",
-            "--strict",
-        ])
+        with caplog.at_level(logging.DEBUG, logger="pdfmill"):
+            result = main([
+                "--config", str(config_file),
+                "--validate",
+                "--strict",
+            ])
 
         assert result == 1
-        captured = capsys.readouterr()
-        assert "NonExistentPrinter12345" in captured.out
+        assert "NonExistentPrinter12345" in caplog.text
 
-    def test_validate_without_strict(self, tmp_path, capsys):
+    def test_validate_without_strict(self, tmp_path, caplog):
         """Test --validate without --strict doesn't check external resources."""
         config_content = f"""
 version: 1
@@ -424,15 +433,15 @@ outputs:
         config_file = tmp_path / "config.yaml"
         config_file.write_text(config_content)
 
-        result = main([
-            "--config", str(config_file),
-            "--validate",
-        ])
+        with caplog.at_level(logging.INFO, logger="pdfmill"):
+            result = main([
+                "--config", str(config_file),
+                "--validate",
+            ])
 
         # Should pass - we're only validating syntax, not strict checking
         assert result == 0
-        captured = capsys.readouterr()
-        assert "Strict validation" not in captured.out
+        assert "Strict validation" not in caplog.text
 
     def test_invalid_page_spec_fails_validate(self, tmp_path, capsys):
         """Test that invalid page spec syntax fails --validate."""

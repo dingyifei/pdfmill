@@ -5,19 +5,22 @@ import sys
 from pathlib import Path
 
 from pdfmill import __version__
+from pdfmill.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def show_version() -> None:
     """Show version information including SumatraPDF status."""
     from pdfmill.printer import SUMATRA_VERSION, get_sumatra_status
 
-    print(f"pdfmill {__version__}")
+    logger.info("pdfmill %s", __version__)
 
     status = get_sumatra_status()
     if status["installed"]:
-        print(f"SumatraPDF {SUMATRA_VERSION} installed at: {status['path']}")
+        logger.info("SumatraPDF %s installed at: %s", SUMATRA_VERSION, status["path"])
     else:
-        print("SumatraPDF: not installed (run 'pdfm install' to download)")
+        logger.info("SumatraPDF: not installed (run 'pdfm install' to download)")
 
 
 def cmd_install(force: bool = False) -> int:
@@ -28,7 +31,7 @@ def cmd_install(force: bool = False) -> int:
         download_sumatra(force=force)
         return 0
     except PrinterError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error("%s", e)
         return 1
 
 
@@ -49,14 +52,14 @@ def cmd_list_printers() -> int:
     try:
         printers = list_printers()
         if not printers:
-            print("No printers found.")
+            logger.info("No printers found.")
             return 1
-        print("Available printers:")
+        logger.info("Available printers:")
         for i, printer in enumerate(printers, 1):
-            print(f"  {i}. {printer}")
+            logger.info("  %d. %s", i, printer)
         return 0
     except PrinterError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error("%s", e)
         return 1
 
 
@@ -144,6 +147,28 @@ Examples:
         help="Force re-download even if already installed (used with 'install')",
     )
 
+    # Logging options
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase verbosity (-v for verbose, -vv for debug)",
+    )
+
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Suppress all output except errors",
+    )
+
+    parser.add_argument(
+        "--log-file",
+        type=Path,
+        help="Write logs to file (includes all levels)",
+    )
+
     return parser
 
 
@@ -151,6 +176,15 @@ def main(args: list[str] | None = None) -> int:
     """Main entry point for the CLI."""
     parser = create_parser()
     parsed = parser.parse_args(args)
+
+    # Setup logging based on CLI flags
+    from pdfmill.logging_config import setup_logging
+
+    setup_logging(
+        verbosity=parsed.verbose,
+        quiet=parsed.quiet,
+        log_file=parsed.log_file,
+    )
 
     # Handle --version
     if parsed.version:
@@ -182,40 +216,43 @@ def main(args: list[str] | None = None) -> int:
 
         try:
             config = load_config(parsed.config)
-            print(f"Configuration syntax is valid: {parsed.config}")
-            print(f"  Outputs defined: {', '.join(config.outputs.keys())}")
+            logger.info("Configuration syntax is valid: %s", parsed.config)
+            logger.info("  Outputs defined: %s", ", ".join(config.outputs.keys()))
 
             # If --strict, perform additional validation
             if parsed.strict:
                 from pdfmill.validation import validate_strict
 
-                print("\nStrict validation:")
+                logger.info("\nStrict validation:")
                 result = validate_strict(config)
 
                 if result.issues:
                     for issue in result.issues:
-                        print(f"  {issue}")
+                        if issue.level == "error":
+                            logger.error("  %s", issue)
+                        else:
+                            logger.warning("  %s", issue)
                     error_count = sum(1 for i in result.issues if i.level == "error")
                     warning_count = sum(1 for i in result.issues if i.level == "warning")
                     if result.has_errors:
-                        print(f"\nValidation failed with {error_count} error(s)")
+                        logger.error("\nValidation failed with %d error(s)", error_count)
                         return 1
                     else:
-                        print(f"\nValidation passed with {warning_count} warning(s)")
+                        logger.info("\nValidation passed with %d warning(s)", warning_count)
                 else:
-                    print("  All external resources validated successfully")
+                    logger.info("  All external resources validated successfully")
 
             return 0
         except ConfigError as e:
-            print(f"Configuration error: {e}", file=sys.stderr)
+            logger.error("Configuration error: %s", e)
             return 1
         except FileNotFoundError:
-            print(f"Configuration file not found: {parsed.config}", file=sys.stderr)
+            logger.error("Configuration file not found: %s", parsed.config)
             return 1
 
     # Handle processing
     if not parsed.input:
-        print("Error: --input is required for processing", file=sys.stderr)
+        logger.error("--input is required for processing")
         return 1
 
     from pdfmill.config import ConfigError, load_config
@@ -235,13 +272,13 @@ def main(args: list[str] | None = None) -> int:
         )
         return 0
     except ConfigError as e:
-        print(f"Configuration error: {e}", file=sys.stderr)
+        logger.error("Configuration error: %s", e)
         return 1
     except FileNotFoundError as e:
-        print(f"File not found: {e}", file=sys.stderr)
+        logger.error("File not found: %s", e)
         return 1
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error("%s", e)
         return 1
 
 
