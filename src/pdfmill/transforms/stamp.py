@@ -16,6 +16,34 @@ from pdfmill.transforms.base import BaseTransform, TransformContext, TransformRe
 from pdfmill.transforms.registry import register_transform
 
 
+def _parse_color(color_str: str):
+    """Parse a color string into a reportlab color object.
+
+    Supports color names (e.g., "black", "red") and hex codes (e.g., "#FF0000").
+    """
+    try:
+        from reportlab.lib import colors
+    except ImportError:
+        raise TransformError("reportlab is required for stamp transform. Install with: pip install reportlab")
+
+    # Try hex color
+    if color_str.startswith("#"):
+        hex_str = color_str[1:]
+        if len(hex_str) == 6:
+            r = int(hex_str[0:2], 16) / 255
+            g = int(hex_str[2:4], 16) / 255
+            b = int(hex_str[4:6], 16) / 255
+            return colors.Color(r, g, b)
+        raise TransformError(f"Invalid hex color: {color_str}")
+
+    # Try named color
+    color = getattr(colors, color_str, None)
+    if color is not None:
+        return color
+
+    raise TransformError(f"Unknown color: {color_str}. Use a color name (e.g., 'black', 'red') or hex code (e.g., '#FF0000')")
+
+
 def _create_text_overlay(
     text: str,
     width: float,
@@ -24,6 +52,8 @@ def _create_text_overlay(
     y: float,
     font_name: str,
     font_size: int,
+    font_color: str = "black",
+    opacity: float = 1.0,
 ) -> bytes:
     """
     Create a PDF page with text overlay using reportlab.
@@ -36,6 +66,8 @@ def _create_text_overlay(
         y: Y position in points
         font_name: Font name (PDF standard fonts)
         font_size: Font size in points
+        font_color: Font color (name or hex code)
+        opacity: Opacity 0.0-1.0
 
     Returns:
         PDF bytes containing the text overlay
@@ -48,6 +80,15 @@ def _create_text_overlay(
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=(width, height))
     c.setFont(font_name, font_size)
+
+    # Set color
+    color = _parse_color(font_color)
+    c.setFillColor(color)
+
+    # Set opacity
+    if opacity < 1.0:
+        c.setFillAlpha(opacity)
+
     c.drawString(x, y, text)
     c.save()
     buffer.seek(0)
@@ -140,6 +181,8 @@ def stamp_page(
     y: float | str = 0,
     font_size: int = 10,
     font_name: str = "Helvetica",
+    font_color: str = "black",
+    opacity: float = 1.0,
     margin: float | str = 10,
     page_num: int = 1,
     total_pages: int = 1,
@@ -163,6 +206,8 @@ def stamp_page(
         y: Y coordinate (used when position=CUSTOM)
         font_size: Font size in points
         font_name: Font name (PDF standard font)
+        font_color: Font color (name or hex code)
+        opacity: Opacity 0.0-1.0 (1.0 = fully opaque)
         margin: Margin from edge for preset positions
         page_num: Current page number (1-indexed)
         total_pages: Total number of pages
@@ -196,7 +241,8 @@ def stamp_page(
 
     # Create overlay PDF
     overlay_bytes = _create_text_overlay(
-        formatted_text, page_width, page_height, stamp_x, stamp_y, font_name, font_size
+        formatted_text, page_width, page_height, stamp_x, stamp_y, font_name, font_size,
+        font_color, opacity
     )
 
     # Merge overlay onto page
@@ -235,6 +281,8 @@ class StampTransformHandler(BaseTransform):
                 y=self.config.y,
                 font_size=self.config.font_size,
                 font_name=self.config.font_name,
+                font_color=self.config.font_color,
+                opacity=self.config.opacity,
                 margin=self.config.margin,
                 page_num=i + 1,  # 1-indexed
                 total_pages=total_pages,

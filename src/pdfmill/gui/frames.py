@@ -156,10 +156,10 @@ class OutputProfileEditor(ttk.Frame):
         self.output_dir_var = tk.StringVar(value="./output")
         self.prefix_var = tk.StringVar()
         self.suffix_var = tk.StringVar()
-        self.sort_var = tk.StringVar()
+        self.sort_var = tk.StringVar(value="name_asc")
         self.debug_var = tk.BooleanVar(value=False)
         self.print_enabled_var = tk.BooleanVar(value=False)
-        self.print_merge_var = tk.BooleanVar(value=False)
+        self.print_merge_var = tk.BooleanVar(value=True)
 
         # Profile name and enabled
         row = ttk.Frame(self)

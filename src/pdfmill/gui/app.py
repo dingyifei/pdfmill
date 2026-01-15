@@ -331,6 +331,8 @@ class PdfMillApp(tk.Tk):
                             "position": t.stamp.position.value,
                             "font_size": t.stamp.font_size,
                             "margin": t.stamp.margin,
+                            "font_color": t.stamp.font_color,
+                            "opacity": t.stamp.opacity,
                         }
                         if t.stamp.position.value == "custom":
                             stamp_dict["x"] = t.stamp.x

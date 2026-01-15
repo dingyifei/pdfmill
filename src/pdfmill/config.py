@@ -223,6 +223,8 @@ class StampTransform:
     y: str | float = "10mm"  # Y coordinate (used when position=CUSTOM)
     font_size: int = 10
     font_name: str = "Helvetica"  # PDF standard font
+    font_color: str = "black"  # Font color (name or hex, e.g., "red", "#FF0000")
+    opacity: float = 1.0  # Opacity 0.0-1.0 (1.0 = fully opaque)
     margin: str | float = "10mm"  # Margin from edge for preset positions
     datetime_format: str = "%Y-%m-%d %H:%M:%S"  # strftime format
 

@@ -59,6 +59,8 @@ class TransformDialog(tk.Toplevel):
         self.stamp_y_var = tk.StringVar(value="10mm")
         self.stamp_fontsize_var = tk.IntVar(value=10)
         self.stamp_margin_var = tk.StringVar(value="10mm")
+        self.stamp_color_var = tk.StringVar(value="black")
+        self.stamp_opacity_var = tk.IntVar(value=100)  # 0-100%
         self.render_dpi_var = tk.IntVar(value=150)
 
         # Split regions list
@@ -146,6 +148,12 @@ class TransformDialog(tk.Toplevel):
         ttk.Spinbox(row, textvariable=self.stamp_fontsize_var, from_=6, to=72, width=5).pack(side="left", padx=5)
         ttk.Label(row, text=_("Margin:")).pack(side="left")
         ttk.Entry(row, textvariable=self.stamp_margin_var, width=8).pack(side="left", padx=5)
+        row = ttk.Frame(self.stamp_frame)
+        row.pack(fill="x", pady=2)
+        ttk.Label(row, text=_("Color:")).pack(side="left")
+        ttk.Entry(row, textvariable=self.stamp_color_var, width=10).pack(side="left", padx=5)
+        ttk.Label(row, text=_("Opacity (%):")).pack(side="left")
+        ttk.Spinbox(row, textvariable=self.stamp_opacity_var, from_=0, to=100, width=5).pack(side="left", padx=5)
         # Help text
         help_text = ttk.Label(
             self.stamp_frame,
@@ -340,6 +348,8 @@ class TransformDialog(tk.Toplevel):
             self.stamp_y_var.set(str(t.stamp.y))
             self.stamp_fontsize_var.set(t.stamp.font_size)
             self.stamp_margin_var.set(str(t.stamp.margin))
+            self.stamp_color_var.set(t.stamp.font_color)
+            self.stamp_opacity_var.set(int(t.stamp.opacity * 100))
         elif t.type == "split" and t.split:
             self.split_regions = list(t.split.regions)
             self._refresh_split_list()
@@ -391,6 +401,8 @@ class TransformDialog(tk.Toplevel):
                     y=self.stamp_y_var.get(),
                     font_size=self.stamp_fontsize_var.get(),
                     margin=self.stamp_margin_var.get(),
+                    font_color=self.stamp_color_var.get(),
+                    opacity=self.stamp_opacity_var.get() / 100.0,
                 ),
             )
         elif t == "split":
