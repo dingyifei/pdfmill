@@ -1,20 +1,18 @@
 """Tests for pdfmill.validation module."""
 
-import pytest
-from pathlib import Path
 from unittest.mock import patch
 
-from pdfmill.validation import (
-    validate_strict,
-    ValidationResult,
-    ValidationIssue,
-)
 from pdfmill.config import (
     Config,
     InputConfig,
     OutputProfile,
     PrintConfig,
     PrintTarget,
+)
+from pdfmill.validation import (
+    ValidationIssue,
+    ValidationResult,
+    validate_strict,
 )
 
 

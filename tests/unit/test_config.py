@@ -1,29 +1,30 @@
 """Tests for pdfmill.config module."""
 
-import pytest
-import yaml
 from pathlib import Path
 
+import pytest
+import yaml
+
 from pdfmill.config import (
-    load_config,
-    parse_transform,
-    parse_output_profile,
-    ConfigError,
-    Config,
-    Transform,
-    RotateTransform,
-    CropTransform,
-    SizeTransform,
-    StampTransform,
-    SplitTransform,
-    SplitRegion,
-    CombineTransform,
     CombineLayoutItem,
-    RenderTransform,
+    CombineTransform,
+    Config,
+    ConfigError,
+    CropTransform,
     OutputProfile,
     PrintConfig,
     PrintTarget,
+    RenderTransform,
+    RotateTransform,
     Settings,
+    SizeTransform,
+    SplitRegion,
+    SplitTransform,
+    StampTransform,
+    Transform,
+    load_config,
+    parse_output_profile,
+    parse_transform,
 )
 
 
@@ -53,7 +54,7 @@ class TestLoadConfig:
     def test_invalid_yaml(self, temp_dir):
         bad_yaml = temp_dir / "bad.yaml"
         bad_yaml.write_text("{{invalid yaml: [")
-        with pytest.raises(Exception):  # yaml.YAMLError
+        with pytest.raises(yaml.YAMLError):
             load_config(bad_yaml)
 
     def test_missing_outputs_section(self, temp_dir):

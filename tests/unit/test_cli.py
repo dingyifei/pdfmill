@@ -1,11 +1,10 @@
 """Tests for pdfmill.cli module."""
 
 import logging
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from pdfmill.cli import main, create_parser, show_version, cmd_install, cmd_uninstall, cmd_list_printers
+from pdfmill.cli import cmd_install, cmd_list_printers, cmd_uninstall, create_parser, main, show_version
 from pdfmill.logging_config import setup_logging
 
 
@@ -223,13 +222,13 @@ class TestMain:
 
     def test_install_force(self):
         with patch("pdfmill.cli.cmd_install", return_value=0) as mock_cmd:
-            result = main(["install", "--force"])
+            main(["install", "--force"])
 
         mock_cmd.assert_called_once_with(force=True)
 
     def test_uninstall_command(self):
         with patch("pdfmill.cli.cmd_uninstall", return_value=0) as mock_cmd:
-            result = main(["uninstall"])
+            main(["uninstall"])
 
         mock_cmd.assert_called_once()
 

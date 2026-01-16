@@ -1,26 +1,26 @@
 """Tests for pdfmill.printer module."""
 
 import logging
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-import sys
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from pdfmill.logging_config import setup_logging
 from pdfmill.printer import (
+    SUMATRA_URLS,
+    SUMATRA_VERSION,
+    PrinterError,
+    download_sumatra,
+    find_sumatra_pdf,
     get_architecture,
     get_cache_dir,
     get_sumatra_cache_path,
     get_sumatra_download_url,
-    download_sumatra,
-    remove_sumatra,
     get_sumatra_status,
     list_printers,
-    find_sumatra_pdf,
     print_pdf,
-    PrinterError,
-    SUMATRA_VERSION,
-    SUMATRA_URLS,
+    remove_sumatra,
 )
 
 
@@ -60,16 +60,14 @@ class TestGetCacheDir:
     """Test cache directory resolution."""
 
     def test_windows_localappdata(self, temp_dir):
-        with patch("sys.platform", "win32"):
-            with patch.dict("os.environ", {"LOCALAPPDATA": str(temp_dir)}):
-                cache_dir = get_cache_dir()
-                assert "pdfmill" in str(cache_dir)
+        with patch("sys.platform", "win32"), patch.dict("os.environ", {"LOCALAPPDATA": str(temp_dir)}):
+            cache_dir = get_cache_dir()
+            assert "pdfmill" in str(cache_dir)
 
     def test_linux_xdg_cache(self, temp_dir):
-        with patch("sys.platform", "linux"):
-            with patch.dict("os.environ", {"XDG_CACHE_HOME": str(temp_dir)}):
-                cache_dir = get_cache_dir()
-                assert "pdfmill" in str(cache_dir)
+        with patch("sys.platform", "linux"), patch.dict("os.environ", {"XDG_CACHE_HOME": str(temp_dir)}):
+            cache_dir = get_cache_dir()
+            assert "pdfmill" in str(cache_dir)
 
 
 class TestGetSumatraCachePath:
@@ -106,28 +104,31 @@ class TestDownloadSumatra:
     """Test SumatraPDF download."""
 
     def test_not_windows_raises(self):
-        with patch("sys.platform", "linux"):
-            with pytest.raises(PrinterError, match="Windows"):
-                download_sumatra()
+        with patch("sys.platform", "linux"), pytest.raises(PrinterError, match="Windows"):
+            download_sumatra()
 
     def test_already_exists_no_force(self, temp_dir):
         existing = temp_dir / "SumatraPDF.exe"
         existing.touch()
 
-        with patch("sys.platform", "win32"):
-            with patch("pdfmill.printer.get_sumatra_cache_path", return_value=existing):
-                result = download_sumatra(force=False)
-                assert result == existing
+        with (
+            patch("sys.platform", "win32"),
+            patch("pdfmill.printer.get_sumatra_cache_path", return_value=existing),
+        ):
+            result = download_sumatra(force=False)
+            assert result == existing
 
     def test_force_redownloads(self, temp_dir):
         existing = temp_dir / "SumatraPDF.exe"
         existing.touch()
 
-        with patch("sys.platform", "win32"):
-            with patch("pdfmill.printer.get_sumatra_cache_path", return_value=existing):
-                with patch("urllib.request.urlretrieve") as mock_download:
-                    result = download_sumatra(force=True)
-                    mock_download.assert_called_once()
+        with (
+            patch("sys.platform", "win32"),
+            patch("pdfmill.printer.get_sumatra_cache_path", return_value=existing),
+            patch("urllib.request.urlretrieve") as mock_download,
+        ):
+            download_sumatra(force=True)
+            mock_download.assert_called_once()
 
 
 class TestRemoveSumatra:
@@ -137,11 +138,13 @@ class TestRemoveSumatra:
         existing = temp_dir / "SumatraPDF.exe"
         existing.touch()
 
-        with patch("pdfmill.printer.get_sumatra_cache_path", return_value=existing):
-            with patch("pdfmill.printer.get_cache_dir", return_value=temp_dir):
-                result = remove_sumatra()
-                assert result is True
-                assert not existing.exists()
+        with (
+            patch("pdfmill.printer.get_sumatra_cache_path", return_value=existing),
+            patch("pdfmill.printer.get_cache_dir", return_value=temp_dir),
+        ):
+            result = remove_sumatra()
+            assert result is True
+            assert not existing.exists()
 
     def test_not_found_returns_false(self, temp_dir):
         nonexistent = temp_dir / "SumatraPDF.exe"
@@ -212,11 +215,13 @@ class TestFindSumatraPdf:
     def test_env_var_path_not_exists(self, temp_dir):
         nonexistent = temp_dir / "nonexistent.exe"
 
-        with patch.dict("os.environ", {"PDFPIPE_SUMATRA_PATH": str(nonexistent)}):
-            with patch("pdfmill.printer.get_sumatra_cache_path") as mock_cache:
-                mock_cache.return_value = temp_dir / "cached.exe"
-                result = find_sumatra_pdf(auto_download=False)
-                assert result is None
+        with (
+            patch.dict("os.environ", {"PDFPIPE_SUMATRA_PATH": str(nonexistent)}),
+            patch("pdfmill.printer.get_sumatra_cache_path") as mock_cache,
+        ):
+            mock_cache.return_value = temp_dir / "cached.exe"
+            result = find_sumatra_pdf(auto_download=False)
+            assert result is None
 
     def test_cwd_path(self, temp_dir, monkeypatch):
         sumatra_path = temp_dir / "SumatraPDF.exe"
@@ -231,19 +236,23 @@ class TestFindSumatraPdf:
         cache_path = temp_dir / "SumatraPDF.exe"
         cache_path.touch()
 
-        with patch.dict("os.environ", {"PDFPIPE_SUMATRA_PATH": ""}):
-            with patch("pdfmill.printer.get_sumatra_cache_path", return_value=cache_path):
-                with patch("pathlib.Path.cwd", return_value=Path("/nonexistent")):
-                    result = find_sumatra_pdf(auto_download=False)
-                    assert result == cache_path
+        with (
+            patch.dict("os.environ", {"PDFPIPE_SUMATRA_PATH": ""}),
+            patch("pdfmill.printer.get_sumatra_cache_path", return_value=cache_path),
+            patch("pathlib.Path.cwd", return_value=Path("/nonexistent")),
+        ):
+            result = find_sumatra_pdf(auto_download=False)
+            assert result == cache_path
 
     def test_not_found_no_auto_download(self, temp_dir):
-        with patch.dict("os.environ", {"PDFPIPE_SUMATRA_PATH": "", "PATH": ""}):
-            with patch("pdfmill.printer.get_sumatra_cache_path") as mock_cache:
-                mock_cache.return_value = temp_dir / "nonexistent.exe"
-                with patch("pathlib.Path.cwd", return_value=temp_dir / "other"):
-                    result = find_sumatra_pdf(auto_download=False)
-                    assert result is None
+        with (
+            patch.dict("os.environ", {"PDFPIPE_SUMATRA_PATH": "", "PATH": ""}),
+            patch("pdfmill.printer.get_sumatra_cache_path") as mock_cache,
+            patch("pathlib.Path.cwd", return_value=temp_dir / "other"),
+        ):
+            mock_cache.return_value = temp_dir / "nonexistent.exe"
+            result = find_sumatra_pdf(auto_download=False)
+            assert result is None
 
 
 class TestPrintPdf:
@@ -267,9 +276,11 @@ class TestPrintPdf:
             print_pdf(nonexistent, "Printer")
 
     def test_sumatra_not_found_raises(self, temp_pdf):
-        with patch("pdfmill.printer.find_sumatra_pdf", return_value=None):
-            with pytest.raises(PrinterError, match="SumatraPDF.exe not found"):
-                print_pdf(temp_pdf, "Printer")
+        with (
+            patch("pdfmill.printer.find_sumatra_pdf", return_value=None),
+            pytest.raises(PrinterError, match="SumatraPDF.exe not found"),
+        ):
+            print_pdf(temp_pdf, "Printer")
 
     def test_success(self, temp_pdf, mock_subprocess_run):
         with patch("pdfmill.printer.find_sumatra_pdf") as mock_find:

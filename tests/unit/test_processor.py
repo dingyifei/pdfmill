@@ -1,31 +1,31 @@
 """Tests for pdfmill.processor module."""
 
 import logging
-import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from pdfmill.logging_config import setup_logging
-from pdfmill.processor import (
-    get_input_files,
-    generate_output_filename,
-    process_single_pdf,
-    process,
-    ProcessingError,
-)
-from pdfmill.pipeline import TransformExecutor
+import pytest
+
 from pdfmill.config import (
     Config,
-    OutputProfile,
-    Transform,
-    RotateTransform,
     CropTransform,
-    SizeTransform,
-    RenderTransform,
-    Settings,
+    OutputProfile,
     PrintConfig,
     PrintTarget,
+    RenderTransform,
+    RotateTransform,
+    Settings,
+    SizeTransform,
     SortOrder,
+    Transform,
+)
+from pdfmill.logging_config import setup_logging
+from pdfmill.pipeline import TransformExecutor
+from pdfmill.processor import (
+    ProcessingError,
+    generate_output_filename,
+    get_input_files,
+    process,
+    process_single_pdf,
 )
 
 
@@ -531,8 +531,9 @@ class TestSortFiles:
     """Test file sorting functionality."""
 
     def test_sort_name_asc(self, temp_dir):
-        from pdfmill.processor import sort_files
         from pypdf import PdfWriter
+
+        from pdfmill.processor import sort_files
 
         # Create files with specific names
         for name in ["charlie.pdf", "alpha.pdf", "bravo.pdf"]:
@@ -548,8 +549,9 @@ class TestSortFiles:
         assert [f.name for f in sorted_files] == ["alpha.pdf", "bravo.pdf", "charlie.pdf"]
 
     def test_sort_name_desc(self, temp_dir):
-        from pdfmill.processor import sort_files
         from pypdf import PdfWriter
+
+        from pdfmill.processor import sort_files
 
         for name in ["alpha.pdf", "charlie.pdf", "bravo.pdf"]:
             pdf = temp_dir / name
@@ -564,10 +566,11 @@ class TestSortFiles:
         assert [f.name for f in sorted_files] == ["charlie.pdf", "bravo.pdf", "alpha.pdf"]
 
     def test_sort_time_asc(self, temp_dir):
-        from pdfmill.processor import sort_files
-        from pypdf import PdfWriter
-        import time
         import os
+
+        from pypdf import PdfWriter
+
+        from pdfmill.processor import sort_files
 
         # Create files with different mtimes
         for i, name in enumerate(["first.pdf", "second.pdf", "third.pdf"]):
@@ -604,8 +607,9 @@ class TestSplitPagesByWeight:
     """Test page splitting across printer targets."""
 
     def test_split_two_printers_equal_weight(self, temp_dir):
+        from pypdf import PdfReader, PdfWriter
+
         from pdfmill.pipeline import PrintPipeline
-        from pypdf import PdfWriter, PdfReader
 
         # Create 10-page PDF
         pdf_path = temp_dir / "source.pdf"
@@ -631,8 +635,9 @@ class TestSplitPagesByWeight:
         assert len(reader_b.pages) == 5
 
     def test_split_unequal_weight(self, temp_dir):
+        from pypdf import PdfReader, PdfWriter
+
         from pdfmill.pipeline import PrintPipeline
-        from pypdf import PdfWriter, PdfReader
 
         # Create 10-page PDF
         pdf_path = temp_dir / "source.pdf"
@@ -657,8 +662,9 @@ class TestSplitPagesByWeight:
         assert len(reader_slow.pages) == 3
 
     def test_split_zero_weight_skipped(self, temp_dir):
-        from pdfmill.pipeline import PrintPipeline
         from pypdf import PdfWriter
+
+        from pdfmill.pipeline import PrintPipeline
 
         pdf_path = temp_dir / "source.pdf"
         writer = PdfWriter()
@@ -679,8 +685,9 @@ class TestSplitPagesByWeight:
         assert "inactive" not in result
 
     def test_split_single_page(self, temp_dir):
+        from pypdf import PdfReader, PdfWriter
+
         from pdfmill.pipeline import PrintPipeline
-        from pypdf import PdfWriter, PdfReader
 
         pdf_path = temp_dir / "source.pdf"
         writer = PdfWriter()
@@ -730,7 +737,7 @@ class TestMultiPrinterIntegration:
 
     def test_sort_conflict_raises_error(self, temp_multi_page_pdf, temp_dir):
         """Test that having both input.sort and profile.sort raises error."""
-        from pdfmill.config import InputConfig, ConfigError
+        from pdfmill.config import ConfigError, InputConfig
 
         config = Config(
             input=InputConfig(sort=SortOrder.NAME_ASC),

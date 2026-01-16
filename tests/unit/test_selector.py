@@ -3,10 +3,10 @@
 import pytest
 
 from pdfmill.selector import (
-    select_pages,
-    _select_from_list,
-    validate_page_spec_syntax,
     PageSelectionError,
+    _select_from_list,
+    select_pages,
+    validate_page_spec_syntax,
 )
 
 

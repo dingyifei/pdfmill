@@ -1,26 +1,25 @@
 """Tests for pdfmill.transforms module."""
 
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from pdfmill.config import StampPosition
 from pdfmill.transforms import (
-    parse_dimension,
+    UNIT_TO_POINTS,
+    TransformError,
+    _calculate_stamp_position,
+    _format_stamp_text,
+    combine_pages,
+    crop_page,
     get_page_dimensions,
     is_landscape,
-    rotate_page,
-    crop_page,
+    parse_dimension,
     resize_page,
-    stamp_page,
+    rotate_page,
     split_page,
-    combine_pages,
-    render_page,
-    detect_page_orientation,
-    TransformError,
-    UNIT_TO_POINTS,
-    _format_stamp_text,
-    _calculate_stamp_position,
+    stamp_page,
 )
-from pdfmill.config import StampPosition
 
 
 class TestParseDimension:
@@ -450,18 +449,17 @@ class TestCalculateStampPosition:
 
 def _has_reportlab():
     """Check if reportlab is installed."""
-    try:
-        from reportlab.pdfgen import canvas
-        return True
-    except ImportError:
-        return False
+    import importlib.util
+
+    return importlib.util.find_spec("reportlab") is not None
 
 
 def _create_minimal_pdf_bytes():
     """Create minimal PDF bytes for testing."""
     try:
-        from reportlab.pdfgen import canvas
         import io
+
+        from reportlab.pdfgen import canvas
         buffer = io.BytesIO()
         c = canvas.Canvas(buffer, pagesize=(612, 792))
         c.drawString(100, 100, "test")
@@ -704,7 +702,7 @@ class TestCombinePages:
 
     def test_combine_creates_page(self, temp_pdf):
         """Combine should create a new page."""
-        from pypdf import PdfReader, PageObject
+        from pypdf import PageObject, PdfReader
         reader = PdfReader(str(temp_pdf))
         pages = list(reader.pages)
 
@@ -809,13 +807,15 @@ class TestRenderPage:
     def test_missing_pdf2image_raises(self):
         """Test that missing pdf2image raises TransformError."""
         mock_page = MagicMock()
-        with patch.dict("sys.modules", {"pdf2image": None}):
-            with patch("pdfmill.transforms.render_page") as mock_render:
-                mock_render.side_effect = TransformError(
-                    "pdf2image is required for render transform"
-                )
-                with pytest.raises(TransformError, match="pdf2image is required"):
-                    mock_render(mock_page, 150)
+        with (
+            patch.dict("sys.modules", {"pdf2image": None}),
+            patch("pdfmill.transforms.render_page") as mock_render,
+            pytest.raises(TransformError, match="pdf2image is required"),
+        ):
+            mock_render.side_effect = TransformError(
+                "pdf2image is required for render transform"
+            )
+            mock_render(mock_page, 150)
 
     def test_missing_pillow_raises(self):
         """Test that missing Pillow raises TransformError."""
@@ -844,7 +844,7 @@ class TestRenderPage:
 
         with patch("pdfmill.transforms.render_page") as mock_render:
             mock_render.return_value = mock_result_page
-            result = mock_render(mock_page)
+            mock_render(mock_page)
             mock_render.assert_called_once_with(mock_page)
 
     def test_render_custom_dpi(self):
@@ -854,7 +854,7 @@ class TestRenderPage:
 
         with patch("pdfmill.transforms.render_page") as mock_render:
             mock_render.return_value = mock_result_page
-            result = mock_render(mock_page, dpi=600)
+            mock_render(mock_page, dpi=600)
             mock_render.assert_called_once_with(mock_page, dpi=600)
 
     def test_render_failed_raises(self):

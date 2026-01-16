@@ -1,14 +1,13 @@
 """Shared fixtures for pdfmill tests."""
 
 import logging
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
-
 
 # === Logging Fixture ===
 

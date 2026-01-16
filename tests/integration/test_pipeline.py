@@ -1,23 +1,21 @@
 """Integration tests for pdfmill pipeline processing."""
 
 import logging
-import pytest
-from pathlib import Path
 
+import pytest
 from pypdf import PdfReader, PdfWriter
 
-from pdfmill.logging_config import setup_logging
 from pdfmill.config import (
-    load_config,
     Config,
-    OutputProfile,
-    Transform,
-    RotateTransform,
     CropTransform,
-    SizeTransform,
+    OutputProfile,
+    RotateTransform,
     Settings,
+    Transform,
+    load_config,
 )
-from pdfmill.processor import process, process_single_pdf
+from pdfmill.logging_config import setup_logging
+from pdfmill.processor import process
 
 
 @pytest.mark.integration
