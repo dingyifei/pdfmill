@@ -403,46 +403,40 @@ class TestCalculateStampPosition:
 
     def test_bottom_left(self):
         x, y = _calculate_stamp_position(
-            StampPosition.BOTTOM_LEFT, 612, 792, "test", 12, 28.35  # 10mm margin
+            StampPosition.BOTTOM_LEFT,
+            612,
+            792,
+            "test",
+            12,
+            28.35,  # 10mm margin
         )
         assert x == 28.35  # margin
         assert y == 28.35  # margin
 
     def test_bottom_right(self):
-        x, y = _calculate_stamp_position(
-            StampPosition.BOTTOM_RIGHT, 612, 792, "test", 12, 28.35
-        )
+        x, y = _calculate_stamp_position(StampPosition.BOTTOM_RIGHT, 612, 792, "test", 12, 28.35)
         # text_width ≈ 4 * 12 * 0.5 = 24
         assert x < 612  # should be near right edge
         assert y == 28.35  # margin
 
     def test_top_left(self):
-        x, y = _calculate_stamp_position(
-            StampPosition.TOP_LEFT, 612, 792, "test", 12, 28.35
-        )
+        x, y = _calculate_stamp_position(StampPosition.TOP_LEFT, 612, 792, "test", 12, 28.35)
         assert x == 28.35  # margin
         assert y > 750  # near top
 
     def test_top_right(self):
-        x, y = _calculate_stamp_position(
-            StampPosition.TOP_RIGHT, 612, 792, "test", 12, 28.35
-        )
+        x, y = _calculate_stamp_position(StampPosition.TOP_RIGHT, 612, 792, "test", 12, 28.35)
         assert x < 612
         assert y > 750
 
     def test_center(self):
-        x, y = _calculate_stamp_position(
-            StampPosition.CENTER, 612, 792, "test", 12, 28.35
-        )
+        x, y = _calculate_stamp_position(StampPosition.CENTER, 612, 792, "test", 12, 28.35)
         # Should be roughly centered
         assert 250 < x < 350
         assert 350 < y < 450
 
     def test_custom_position(self):
-        x, y = _calculate_stamp_position(
-            StampPosition.CUSTOM, 612, 792, "test", 12, 28.35,
-            custom_x=100, custom_y=200
-        )
+        x, y = _calculate_stamp_position(StampPosition.CUSTOM, 612, 792, "test", 12, 28.35, custom_x=100, custom_y=200)
         assert x == 100
         assert y == 200
 
@@ -460,6 +454,7 @@ def _create_minimal_pdf_bytes():
         import io
 
         from reportlab.pdfgen import canvas
+
         buffer = io.BytesIO()
         c = canvas.Canvas(buffer, pagesize=(612, 792))
         c.drawString(100, 100, "test")
@@ -480,10 +475,7 @@ class TestStampPage:
         actual = {pos.value for pos in StampPosition}
         assert actual == expected
 
-    @pytest.mark.skipif(
-        not _has_reportlab(),
-        reason="reportlab not installed"
-    )
+    @pytest.mark.skipif(not _has_reportlab(), reason="reportlab not installed")
     def test_stamp_merges_overlay(self, mock_page):
         """Test that stamp_page calls merge_page."""
         with patch("pdfmill.transforms.stamp._create_text_overlay") as mock_create:
@@ -538,7 +530,8 @@ class TestStampIntegration:
         writer = PdfWriter()
         writer.add_page(page)
         import tempfile
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             writer.write(f)
             output_path = f.name
 
@@ -548,6 +541,7 @@ class TestStampIntegration:
 
         # Cleanup
         import os
+
         os.unlink(output_path)
 
     def test_stamp_multi_page_pdf(self, temp_multi_page_pdf):
@@ -570,7 +564,8 @@ class TestStampIntegration:
 
         # Write and verify
         import tempfile
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             writer.write(f)
             output_path = f.name
 
@@ -579,6 +574,7 @@ class TestStampIntegration:
 
         # Cleanup
         import os
+
         os.unlink(output_path)
 
     def test_stamp_all_positions(self, temp_pdf):
@@ -637,6 +633,7 @@ class TestSplitPage:
     def test_split_returns_list(self, temp_pdf):
         """Split should return a list of pages."""
         from pypdf import PdfReader
+
         reader = PdfReader(str(temp_pdf))
         page = reader.pages[0]
 
@@ -650,6 +647,7 @@ class TestSplitPage:
     def test_split_multiple_regions(self, temp_pdf):
         """Split with multiple regions should return multiple pages."""
         from pypdf import PdfReader
+
         reader = PdfReader(str(temp_pdf))
         page = reader.pages[0]
 
@@ -663,6 +661,7 @@ class TestSplitPage:
     def test_split_preserves_content(self, temp_pdf):
         """Split should create independent page copies."""
         from pypdf import PdfReader
+
         reader = PdfReader(str(temp_pdf))
         page = reader.pages[0]
 
@@ -678,6 +677,7 @@ class TestSplitPage:
     def test_split_with_string_units(self, temp_pdf):
         """Split should work with string unit coordinates."""
         from pypdf import PdfReader
+
         reader = PdfReader(str(temp_pdf))
         page = reader.pages[0]
 
@@ -690,6 +690,7 @@ class TestSplitPage:
     def test_split_empty_regions(self, temp_pdf):
         """Split with empty regions list should return empty list."""
         from pypdf import PdfReader
+
         reader = PdfReader(str(temp_pdf))
         page = reader.pages[0]
 
@@ -703,6 +704,7 @@ class TestCombinePages:
     def test_combine_creates_page(self, temp_pdf):
         """Combine should create a new page."""
         from pypdf import PageObject, PdfReader
+
         reader = PdfReader(str(temp_pdf))
         pages = list(reader.pages)
 
@@ -715,6 +717,7 @@ class TestCombinePages:
     def test_combine_with_scale(self, temp_pdf):
         """Combine should respect scale factor."""
         from pypdf import PdfReader
+
         reader = PdfReader(str(temp_pdf))
         pages = list(reader.pages)
 
@@ -729,6 +732,7 @@ class TestCombinePages:
     def test_combine_multiple_pages(self, temp_multi_page_pdf):
         """Combine should handle multiple pages in layout."""
         from pypdf import PdfReader
+
         reader = PdfReader(str(temp_multi_page_pdf))
         pages = list(reader.pages[:2])
 
@@ -743,6 +747,7 @@ class TestCombinePages:
     def test_combine_skips_missing_pages(self, temp_pdf):
         """Combine should skip layout items referencing non-existent pages."""
         from pypdf import PdfReader
+
         reader = PdfReader(str(temp_pdf))
         pages = list(reader.pages)  # Only 1 page
 
@@ -757,6 +762,7 @@ class TestCombinePages:
     def test_combine_with_string_positions(self, temp_pdf):
         """Combine should work with string unit positions."""
         from pypdf import PdfReader
+
         reader = PdfReader(str(temp_pdf))
         pages = list(reader.pages)
 
@@ -769,6 +775,7 @@ class TestCombinePages:
     def test_combine_empty_layout(self, temp_pdf):
         """Combine with empty layout should create blank page."""
         from pypdf import PdfReader
+
         reader = PdfReader(str(temp_pdf))
         pages = list(reader.pages)
 
@@ -780,6 +787,7 @@ class TestCombinePages:
     def test_combine_custom_page_size(self, temp_pdf):
         """Combine should use the specified page size."""
         from pypdf import PdfReader
+
         reader = PdfReader(str(temp_pdf))
         pages = list(reader.pages)
 
@@ -791,6 +799,7 @@ class TestCombinePages:
     def test_combine_default_scale(self, temp_pdf):
         """Combine should default to scale 1.0 if not specified."""
         from pypdf import PdfReader
+
         reader = PdfReader(str(temp_pdf))
         pages = list(reader.pages)
 
@@ -812,18 +821,14 @@ class TestRenderPage:
             patch("pdfmill.transforms.render_page") as mock_render,
             pytest.raises(TransformError, match="pdf2image is required"),
         ):
-            mock_render.side_effect = TransformError(
-                "pdf2image is required for render transform"
-            )
+            mock_render.side_effect = TransformError("pdf2image is required for render transform")
             mock_render(mock_page, 150)
 
     def test_missing_pillow_raises(self):
         """Test that missing Pillow raises TransformError."""
         mock_page = MagicMock()
         with patch("pdfmill.transforms.render_page") as mock_render:
-            mock_render.side_effect = TransformError(
-                "Pillow is required for render transform"
-            )
+            mock_render.side_effect = TransformError("Pillow is required for render transform")
             with pytest.raises(TransformError, match="Pillow is required"):
                 mock_render(mock_page, 150)
 

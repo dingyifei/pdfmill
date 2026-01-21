@@ -38,8 +38,7 @@ class TestCLIIntegration:
             yaml.dump(minimal_config_dict, f)
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfmill.cli",
-             "--config", str(config_path), "--validate"],
+            [sys.executable, "-m", "pdfmill.cli", "--config", str(config_path), "--validate"],
             capture_output=True,
             text=True,
         )
@@ -52,8 +51,7 @@ class TestCLIIntegration:
         config_path.write_text("version: 1\n# missing outputs")
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfmill.cli",
-             "--config", str(config_path), "--validate"],
+            [sys.executable, "-m", "pdfmill.cli", "--config", str(config_path), "--validate"],
             capture_output=True,
             text=True,
         )
@@ -62,8 +60,7 @@ class TestCLIIntegration:
     def test_validate_missing_config(self, temp_dir):
         """Test --validate with non-existent config."""
         result = subprocess.run(
-            [sys.executable, "-m", "pdfmill.cli",
-             "--config", str(temp_dir / "nonexistent.yaml"), "--validate"],
+            [sys.executable, "-m", "pdfmill.cli", "--config", str(temp_dir / "nonexistent.yaml"), "--validate"],
             capture_output=True,
             text=True,
         )
@@ -78,11 +75,18 @@ class TestCLIIntegration:
         output_dir = temp_dir / "output"
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfmill.cli",
-             "--config", str(config_path),
-             "--input", str(temp_pdf),
-             "--output", str(output_dir),
-             "--dry-run"],
+            [
+                sys.executable,
+                "-m",
+                "pdfmill.cli",
+                "--config",
+                str(config_path),
+                "--input",
+                str(temp_pdf),
+                "--output",
+                str(output_dir),
+                "--dry-run",
+            ],
             capture_output=True,
             text=True,
         )
@@ -102,10 +106,17 @@ class TestCLIIntegration:
         output_dir = temp_dir / "output"
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfmill.cli",
-             "--config", str(config_path),
-             "--input", str(temp_multi_page_pdf),
-             "--output", str(output_dir)],
+            [
+                sys.executable,
+                "-m",
+                "pdfmill.cli",
+                "--config",
+                str(config_path),
+                "--input",
+                str(temp_multi_page_pdf),
+                "--output",
+                str(output_dir),
+            ],
             capture_output=True,
             text=True,
         )
@@ -123,8 +134,7 @@ class TestCLIIntegration:
             yaml.dump(minimal_config_dict, f)
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfmill.cli",
-             "--config", str(config_path)],
+            [sys.executable, "-m", "pdfmill.cli", "--config", str(config_path)],
             capture_output=True,
             text=True,
         )
@@ -143,7 +153,7 @@ class TestCLIWithConfigProfiles:
             "outputs": {
                 "first": {"pages": "first"},
                 "last": {"pages": "last"},
-            }
+            },
         }
         config_path = temp_dir / "config.yaml"
         with open(config_path, "w") as f:
@@ -152,10 +162,17 @@ class TestCLIWithConfigProfiles:
         output_dir = temp_dir / "output"
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfmill.cli",
-             "--config", str(config_path),
-             "--input", str(temp_multi_page_pdf),
-             "--output", str(output_dir)],
+            [
+                sys.executable,
+                "-m",
+                "pdfmill.cli",
+                "--config",
+                str(config_path),
+                "--input",
+                str(temp_multi_page_pdf),
+                "--output",
+                str(output_dir),
+            ],
             capture_output=True,
             text=True,
         )
@@ -166,17 +183,7 @@ class TestCLIWithConfigProfiles:
 
     def test_profile_with_transforms(self, temp_dir, temp_pdf):
         """Test processing with transforms defined in config."""
-        config_dict = {
-            "version": 1,
-            "outputs": {
-                "rotated": {
-                    "pages": "all",
-                    "transforms": [
-                        {"rotate": 90}
-                    ]
-                }
-            }
-        }
+        config_dict = {"version": 1, "outputs": {"rotated": {"pages": "all", "transforms": [{"rotate": 90}]}}}
         config_path = temp_dir / "config.yaml"
         with open(config_path, "w") as f:
             yaml.dump(config_dict, f)
@@ -184,10 +191,17 @@ class TestCLIWithConfigProfiles:
         output_dir = temp_dir / "output"
 
         result = subprocess.run(
-            [sys.executable, "-m", "pdfmill.cli",
-             "--config", str(config_path),
-             "--input", str(temp_pdf),
-             "--output", str(output_dir)],
+            [
+                sys.executable,
+                "-m",
+                "pdfmill.cli",
+                "--config",
+                str(config_path),
+                "--input",
+                str(temp_pdf),
+                "--output",
+                str(output_dir),
+            ],
             capture_output=True,
             text=True,
         )

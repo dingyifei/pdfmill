@@ -11,6 +11,7 @@ import yaml
 
 # === Logging Fixture ===
 
+
 @pytest.fixture(autouse=True)
 def reset_logging():
     """Reset pdfmill logging configuration before each test.
@@ -39,6 +40,7 @@ def caplog_pdfmill(caplog):
 
 # === Path/Directory Fixtures ===
 
+
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for test outputs."""
@@ -48,6 +50,7 @@ def temp_dir():
 
 
 # === PDF Fixtures ===
+
 
 @pytest.fixture
 def temp_pdf(temp_dir):
@@ -91,6 +94,7 @@ def temp_landscape_pdf(temp_dir):
 
 # === Mock pypdf PageObject Fixtures ===
 
+
 @pytest.fixture
 def mock_page():
     """Create a mock pypdf PageObject (portrait letter size)."""
@@ -119,6 +123,7 @@ def mock_landscape_page():
 
 # === Config Fixtures ===
 
+
 @pytest.fixture
 def minimal_config_dict():
     """Minimal valid configuration dictionary."""
@@ -128,7 +133,7 @@ def minimal_config_dict():
             "default": {
                 "pages": "all",
             }
-        }
+        },
     }
 
 
@@ -163,7 +168,7 @@ def full_config_dict():
                     "args": ["-silent"],
                 },
             }
-        }
+        },
     }
 
 
@@ -187,6 +192,7 @@ def full_config_file(temp_dir, full_config_dict):
 
 # === Mock win32print ===
 
+
 @pytest.fixture
 def mock_win32print():
     """Mock win32print module for printer tests."""
@@ -204,6 +210,7 @@ def mock_win32print():
 
 # === Mock subprocess ===
 
+
 @pytest.fixture
 def mock_subprocess_run():
     """Mock subprocess.run for SumatraPDF calls."""
@@ -213,6 +220,7 @@ def mock_subprocess_run():
 
 
 # === Session-scoped PDF fixtures for integration tests ===
+
 
 @pytest.fixture(scope="session")
 def session_fixtures_dir(tmp_path_factory):

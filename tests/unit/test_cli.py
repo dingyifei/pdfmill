@@ -94,11 +94,7 @@ class TestShowVersion:
         with caplog.at_level(logging.INFO, logger="pdfmill"):
             setup_logging()
             with patch("pdfmill.printer.get_sumatra_status") as mock_status:
-                mock_status.return_value = {
-                    "installed": True,
-                    "path": "/path/to/SumatraPDF.exe",
-                    "version": "3.5.2"
-                }
+                mock_status.return_value = {"installed": True, "path": "/path/to/SumatraPDF.exe", "version": "3.5.2"}
                 show_version()
 
         assert "SumatraPDF" in caplog.text
@@ -270,23 +266,33 @@ class TestMain:
 
     def test_full_process(self, temp_config_file, temp_pdf, temp_dir):
         with patch("pdfmill.processor.process") as mock_process:
-            result = main([
-                "--config", str(temp_config_file),
-                "--input", str(temp_pdf),
-                "--output", str(temp_dir),
-            ])
+            result = main(
+                [
+                    "--config",
+                    str(temp_config_file),
+                    "--input",
+                    str(temp_pdf),
+                    "--output",
+                    str(temp_dir),
+                ]
+            )
 
         assert result == 0
         mock_process.assert_called_once()
 
     def test_dry_run_passed(self, temp_config_file, temp_pdf, temp_dir):
         with patch("pdfmill.processor.process") as mock_process:
-            main([
-                "--config", str(temp_config_file),
-                "--input", str(temp_pdf),
-                "--output", str(temp_dir),
-                "--dry-run",
-            ])
+            main(
+                [
+                    "--config",
+                    str(temp_config_file),
+                    "--input",
+                    str(temp_pdf),
+                    "--output",
+                    str(temp_dir),
+                    "--dry-run",
+                ]
+            )
 
         call_kwargs = mock_process.call_args.kwargs
         assert call_kwargs["dry_run"] is True
@@ -295,11 +301,16 @@ class TestMain:
         output_dir = temp_dir / "custom_output"
 
         with patch("pdfmill.processor.process") as mock_process:
-            main([
-                "--config", str(temp_config_file),
-                "--input", str(temp_pdf),
-                "--output", str(output_dir),
-            ])
+            main(
+                [
+                    "--config",
+                    str(temp_config_file),
+                    "--input",
+                    str(temp_pdf),
+                    "--output",
+                    str(output_dir),
+                ]
+            )
 
         call_kwargs = mock_process.call_args.kwargs
         assert call_kwargs["output_dir"] == output_dir
@@ -307,11 +318,16 @@ class TestMain:
     def test_process_error_returns_1(self, temp_config_file, temp_pdf, temp_dir):
         with patch("pdfmill.processor.process") as mock_process:
             mock_process.side_effect = Exception("Processing failed")
-            result = main([
-                "--config", str(temp_config_file),
-                "--input", str(temp_pdf),
-                "--output", str(temp_dir),
-            ])
+            result = main(
+                [
+                    "--config",
+                    str(temp_config_file),
+                    "--input",
+                    str(temp_pdf),
+                    "--output",
+                    str(temp_dir),
+                ]
+            )
 
         assert result == 1
 
@@ -319,10 +335,14 @@ class TestMain:
         bad_config = temp_dir / "bad.yaml"
         bad_config.write_text("{{invalid yaml")
 
-        result = main([
-            "--config", str(bad_config),
-            "--input", str(temp_dir),
-        ])
+        result = main(
+            [
+                "--config",
+                str(bad_config),
+                "--input",
+                str(temp_dir),
+            ]
+        )
 
         assert result == 1
 
@@ -356,11 +376,14 @@ outputs:
         config_file.write_text(config_content)
 
         with caplog.at_level(logging.INFO, logger="pdfmill"):
-            result = main([
-                "--config", str(config_file),
-                "--validate",
-                "--strict",
-            ])
+            result = main(
+                [
+                    "--config",
+                    str(config_file),
+                    "--validate",
+                    "--strict",
+                ]
+            )
 
         assert result == 0
         assert "Strict validation" in caplog.text
@@ -379,11 +402,14 @@ outputs:
         config_file.write_text(config_content)
 
         with caplog.at_level(logging.DEBUG, logger="pdfmill"):
-            result = main([
-                "--config", str(config_file),
-                "--validate",
-                "--strict",
-            ])
+            result = main(
+                [
+                    "--config",
+                    str(config_file),
+                    "--validate",
+                    "--strict",
+                ]
+            )
 
         assert result == 1
         assert "input.path" in caplog.text
@@ -410,11 +436,14 @@ outputs:
         config_file.write_text(config_content)
 
         with caplog.at_level(logging.DEBUG, logger="pdfmill"):
-            result = main([
-                "--config", str(config_file),
-                "--validate",
-                "--strict",
-            ])
+            result = main(
+                [
+                    "--config",
+                    str(config_file),
+                    "--validate",
+                    "--strict",
+                ]
+            )
 
         assert result == 1
         assert "NonExistentPrinter12345" in caplog.text
@@ -433,10 +462,13 @@ outputs:
         config_file.write_text(config_content)
 
         with caplog.at_level(logging.INFO, logger="pdfmill"):
-            result = main([
-                "--config", str(config_file),
-                "--validate",
-            ])
+            result = main(
+                [
+                    "--config",
+                    str(config_file),
+                    "--validate",
+                ]
+            )
 
         # Should pass - we're only validating syntax, not strict checking
         assert result == 0
@@ -453,10 +485,13 @@ outputs:
         config_file = tmp_path / "config.yaml"
         config_file.write_text(config_content)
 
-        result = main([
-            "--config", str(config_file),
-            "--validate",
-        ])
+        result = main(
+            [
+                "--config",
+                str(config_file),
+                "--validate",
+            ]
+        )
 
         assert result == 1
         captured = capsys.readouterr()

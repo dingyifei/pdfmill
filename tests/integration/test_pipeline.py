@@ -74,12 +74,13 @@ class TestPipelineIntegration:
 
     def test_process_with_rotation(self, temp_pdf, temp_dir):
         """Test processing with rotation transform."""
-        config = Config(outputs={
-            "rotated": OutputProfile(
-                pages="all",
-                transforms=[Transform(type="rotate", rotate=RotateTransform(angle=90))]
-            )
-        })
+        config = Config(
+            outputs={
+                "rotated": OutputProfile(
+                    pages="all", transforms=[Transform(type="rotate", rotate=RotateTransform(angle=90))]
+                )
+            }
+        )
         output_dir = temp_dir / "output"
 
         process(config, temp_pdf, output_dir)
@@ -92,15 +93,16 @@ class TestPipelineIntegration:
 
     def test_process_with_crop(self, temp_pdf, temp_dir):
         """Test processing with crop transform."""
-        config = Config(outputs={
-            "cropped": OutputProfile(
-                pages="all",
-                transforms=[Transform(
-                    type="crop",
-                    crop=CropTransform(lower_left=(50, 50), upper_right=(300, 400))
-                )]
-            )
-        })
+        config = Config(
+            outputs={
+                "cropped": OutputProfile(
+                    pages="all",
+                    transforms=[
+                        Transform(type="crop", crop=CropTransform(lower_left=(50, 50), upper_right=(300, 400)))
+                    ],
+                )
+            }
+        )
         output_dir = temp_dir / "output"
 
         process(config, temp_pdf, output_dir)
@@ -120,11 +122,13 @@ class TestPipelineIntegration:
 
     def test_process_multiple_profiles(self, temp_multi_page_pdf, temp_dir):
         """Test processing with multiple output profiles."""
-        config = Config(outputs={
-            "first": OutputProfile(pages="first"),
-            "last": OutputProfile(pages="last"),
-            "all": OutputProfile(pages="all"),
-        })
+        config = Config(
+            outputs={
+                "first": OutputProfile(pages="first"),
+                "last": OutputProfile(pages="last"),
+                "all": OutputProfile(pages="all"),
+            }
+        )
         output_dir = temp_dir / "output"
 
         process(config, temp_multi_page_pdf, output_dir)
@@ -171,13 +175,15 @@ class TestPipelineIntegration:
 
     def test_process_with_prefix_suffix(self, temp_pdf, temp_dir):
         """Test output filename with prefix and suffix."""
-        config = Config(outputs={
-            "label": OutputProfile(
-                pages="all",
-                filename_prefix="shipping_",
-                filename_suffix="_final",
-            )
-        })
+        config = Config(
+            outputs={
+                "label": OutputProfile(
+                    pages="all",
+                    filename_prefix="shipping_",
+                    filename_suffix="_final",
+                )
+            }
+        )
         output_dir = temp_dir / "output"
 
         process(config, temp_pdf, output_dir)
@@ -191,18 +197,17 @@ class TestPipelineIntegration:
 
     def test_chained_transforms(self, temp_pdf, temp_dir):
         """Test applying multiple transforms in sequence."""
-        config = Config(outputs={
-            "processed": OutputProfile(
-                pages="all",
-                transforms=[
-                    Transform(type="rotate", rotate=RotateTransform(angle=90)),
-                    Transform(type="crop", crop=CropTransform(
-                        lower_left=(10, 10),
-                        upper_right=(500, 700)
-                    )),
-                ]
-            )
-        })
+        config = Config(
+            outputs={
+                "processed": OutputProfile(
+                    pages="all",
+                    transforms=[
+                        Transform(type="rotate", rotate=RotateTransform(angle=90)),
+                        Transform(type="crop", crop=CropTransform(lower_left=(10, 10), upper_right=(500, 700))),
+                    ],
+                )
+            }
+        )
         output_dir = temp_dir / "output"
 
         process(config, temp_pdf, output_dir)
@@ -262,7 +267,7 @@ class TestErrorHandling:
             outputs={
                 "invalid": OutputProfile(pages="100"),  # Invalid for 1-page PDF
                 "valid": OutputProfile(pages="1"),
-            }
+            },
         )
         output_dir = temp_dir / "output"
 

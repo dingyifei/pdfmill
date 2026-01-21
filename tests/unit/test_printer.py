@@ -320,6 +320,7 @@ class TestPrintPdf:
 
     def test_subprocess_failure_returns_false(self, temp_pdf):
         import subprocess
+
         with patch("pdfmill.printer.find_sumatra_pdf") as mock_find:
             mock_find.return_value = Path("SumatraPDF.exe")
             with patch("subprocess.run") as mock_run:

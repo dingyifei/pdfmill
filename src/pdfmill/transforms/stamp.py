@@ -41,7 +41,9 @@ def _parse_color(color_str: str):
     if color is not None:
         return color
 
-    raise TransformError(f"Unknown color: {color_str}. Use a color name (e.g., 'black', 'red') or hex code (e.g., '#FF0000')")
+    raise TransformError(
+        f"Unknown color: {color_str}. Use a color name (e.g., 'black', 'red') or hex code (e.g., '#FF0000')"
+    )
 
 
 def _create_text_overlay(
@@ -241,8 +243,7 @@ def stamp_page(
 
     # Create overlay PDF
     overlay_bytes = _create_text_overlay(
-        formatted_text, page_width, page_height, stamp_x, stamp_y, font_name, font_size,
-        font_color, opacity
+        formatted_text, page_width, page_height, stamp_x, stamp_y, font_name, font_size, font_color, opacity
     )
 
     # Merge overlay onto page

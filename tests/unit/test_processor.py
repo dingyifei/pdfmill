@@ -371,10 +371,12 @@ class TestProcess:
         assert "No PDF files found" in caplog.text
 
     def test_multiple_profiles(self, temp_multi_page_pdf, temp_dir):
-        config = Config(outputs={
-            "first": OutputProfile(pages="first"),
-            "last": OutputProfile(pages="last"),
-        })
+        config = Config(
+            outputs={
+                "first": OutputProfile(pages="first"),
+                "last": OutputProfile(pages="last"),
+            }
+        )
         output_dir = temp_dir / "output"
 
         process(config, temp_multi_page_pdf, output_dir)
@@ -388,7 +390,7 @@ class TestProcess:
             outputs={
                 "bad": OutputProfile(pages="10"),  # Will fail
                 "good": OutputProfile(pages="1"),  # Will succeed
-            }
+            },
         )
         output_dir = temp_dir / "output"
 
@@ -406,7 +408,7 @@ class TestProcess:
     def test_on_error_stop(self, temp_pdf, temp_dir):
         config = Config(
             settings=Settings(on_error="stop"),
-            outputs={"bad": OutputProfile(pages="10")}  # Will fail
+            outputs={"bad": OutputProfile(pages="10")},  # Will fail
         )
 
         with pytest.raises(ProcessingError):
@@ -428,15 +430,14 @@ class TestProcess:
             assert len(outputs) == 0
 
     def test_print_enabled(self, temp_multi_page_pdf, temp_dir):
-        config = Config(outputs={
-            "label": OutputProfile(
-                pages="last",
-                print=PrintConfig(
-                    enabled=True,
-                    targets={"default": PrintTarget(printer="Test Printer")}
-                ),
-            )
-        })
+        config = Config(
+            outputs={
+                "label": OutputProfile(
+                    pages="last",
+                    print=PrintConfig(enabled=True, targets={"default": PrintTarget(printer="Test Printer")}),
+                )
+            }
+        )
         output_dir = temp_dir / "output"
 
         with patch("pdfmill.pipeline.printing.print_pdf") as mock_print:
@@ -452,12 +453,9 @@ class TestProcess:
             outputs={
                 "label": OutputProfile(
                     pages="last",
-                    print=PrintConfig(
-                        enabled=True,
-                        targets={"default": PrintTarget(printer="Fake Printer")}
-                    ),
+                    print=PrintConfig(enabled=True, targets={"default": PrintTarget(printer="Fake Printer")}),
                 )
-            }
+            },
         )
         output_dir = temp_dir / "output"
 
@@ -484,10 +482,7 @@ class TestCleanup:
             writer.write(f)
 
         output_dir = temp_dir / "output"
-        config = Config(
-            settings=Settings(cleanup_source=True),
-            outputs={"default": OutputProfile(pages="all")}
-        )
+        config = Config(settings=Settings(cleanup_source=True), outputs={"default": OutputProfile(pages="all")})
 
         process(config, source_pdf, output_dir)
 
@@ -510,12 +505,9 @@ class TestCleanup:
             outputs={
                 "label": OutputProfile(
                     pages="all",
-                    print=PrintConfig(
-                        enabled=True,
-                        targets={"default": PrintTarget(printer="Test")}
-                    ),
+                    print=PrintConfig(enabled=True, targets={"default": PrintTarget(printer="Test")}),
                 )
-            }
+            },
         )
 
         with patch("pdfmill.pipeline.printing.print_pdf") as mock_print:
@@ -714,18 +706,20 @@ class TestMultiPrinterIntegration:
 
     def test_multi_target_copy_distribution(self, temp_multi_page_pdf, temp_dir):
         """Test that each target receives copies."""
-        config = Config(outputs={
-            "label": OutputProfile(
-                pages="last",
-                print=PrintConfig(
-                    enabled=True,
-                    targets={
-                        "archive": PrintTarget(printer="Archive", copies=2),
-                        "customer": PrintTarget(printer="Customer", copies=1),
-                    }
-                ),
-            )
-        })
+        config = Config(
+            outputs={
+                "label": OutputProfile(
+                    pages="last",
+                    print=PrintConfig(
+                        enabled=True,
+                        targets={
+                            "archive": PrintTarget(printer="Archive", copies=2),
+                            "customer": PrintTarget(printer="Customer", copies=1),
+                        },
+                    ),
+                )
+            }
+        )
         output_dir = temp_dir / "output"
 
         with patch("pdfmill.pipeline.printing.print_pdf") as mock_print:
@@ -746,7 +740,7 @@ class TestMultiPrinterIntegration:
                     pages="all",
                     sort=SortOrder.TIME_DESC,  # Conflicts with input.sort
                 )
-            }
+            },
         )
         output_dir = temp_dir / "output"
 
@@ -813,10 +807,12 @@ class TestEnabledField:
 
     def test_disabled_profile_skipped(self, temp_multi_page_pdf, temp_dir, caplog):
         """Test that disabled profiles are skipped."""
-        config = Config(outputs={
-            "enabled": OutputProfile(pages="all", enabled=True),
-            "disabled": OutputProfile(pages="all", enabled=False),
-        })
+        config = Config(
+            outputs={
+                "enabled": OutputProfile(pages="all", enabled=True),
+                "disabled": OutputProfile(pages="all", enabled=False),
+            }
+        )
         output_dir = temp_dir / "output"
 
         with caplog.at_level(logging.DEBUG, logger="pdfmill"):
@@ -833,10 +829,12 @@ class TestEnabledField:
 
     def test_all_disabled_profiles_skipped(self, temp_multi_page_pdf, temp_dir, caplog):
         """Test that all disabled profiles are skipped."""
-        config = Config(outputs={
-            "disabled1": OutputProfile(pages="all", enabled=False),
-            "disabled2": OutputProfile(pages="last", enabled=False),
-        })
+        config = Config(
+            outputs={
+                "disabled1": OutputProfile(pages="all", enabled=False),
+                "disabled2": OutputProfile(pages="last", enabled=False),
+            }
+        )
         output_dir = temp_dir / "output"
 
         with caplog.at_level(logging.DEBUG, logger="pdfmill"):
@@ -853,16 +851,15 @@ class TestEnabledField:
 
     def test_disabled_profile_with_print_enabled_no_print(self, temp_multi_page_pdf, temp_dir):
         """Test that disabled profile doesn't print even if print.enabled is True."""
-        config = Config(outputs={
-            "disabled": OutputProfile(
-                pages="all",
-                enabled=False,
-                print=PrintConfig(
-                    enabled=True,
-                    targets={"default": PrintTarget(printer="Test")}
+        config = Config(
+            outputs={
+                "disabled": OutputProfile(
+                    pages="all",
+                    enabled=False,
+                    print=PrintConfig(enabled=True, targets={"default": PrintTarget(printer="Test")}),
                 ),
-            ),
-        })
+            }
+        )
         output_dir = temp_dir / "output"
 
         with patch("pdfmill.pipeline.printing.print_pdf") as mock_print:
@@ -871,9 +868,11 @@ class TestEnabledField:
 
     def test_enabled_profile_default_value(self, temp_multi_page_pdf, temp_dir):
         """Test that profile without explicit enabled defaults to True."""
-        config = Config(outputs={
-            "default_enabled": OutputProfile(pages="all"),  # No enabled field
-        })
+        config = Config(
+            outputs={
+                "default_enabled": OutputProfile(pages="all"),  # No enabled field
+            }
+        )
         output_dir = temp_dir / "output"
 
         process(config, temp_multi_page_pdf, output_dir)

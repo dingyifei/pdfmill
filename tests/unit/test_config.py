@@ -121,9 +121,7 @@ class TestParseTransform:
         assert t.rotate.angle == 0
 
     def test_crop_basic(self):
-        t = parse_transform({
-            "crop": {"lower_left": [10, 20], "upper_right": [100, 200]}
-        })
+        t = parse_transform({"crop": {"lower_left": [10, 20], "upper_right": [100, 200]}})
         assert t.type == "crop"
         assert t.crop is not None
         assert t.crop.lower_left == (10, 20)
@@ -135,9 +133,7 @@ class TestParseTransform:
         assert t.crop.upper_right == (612, 792)
 
     def test_size_basic(self):
-        t = parse_transform({
-            "size": {"width": "4in", "height": "6in", "fit": "contain"}
-        })
+        t = parse_transform({"size": {"width": "4in", "height": "6in", "fit": "contain"}})
         assert t.type == "size"
         assert t.size is not None
         assert t.size.width == "4in"
@@ -160,16 +156,18 @@ class TestParseTransform:
         assert t.stamp.font_size == 10
 
     def test_stamp_full_config(self):
-        t = parse_transform({
-            "stamp": {
-                "text": "{page}/{total}",
-                "position": "top-left",
-                "font_size": 14,
-                "font_name": "Times-Roman",
-                "margin": "15mm",
-                "datetime_format": "%Y/%m/%d",
+        t = parse_transform(
+            {
+                "stamp": {
+                    "text": "{page}/{total}",
+                    "position": "top-left",
+                    "font_size": 14,
+                    "font_name": "Times-Roman",
+                    "margin": "15mm",
+                    "datetime_format": "%Y/%m/%d",
+                }
             }
-        })
+        )
         assert t.type == "stamp"
         assert t.stamp.text == "{page}/{total}"
         assert t.stamp.position == "top-left"
@@ -179,14 +177,16 @@ class TestParseTransform:
         assert t.stamp.datetime_format == "%Y/%m/%d"
 
     def test_stamp_custom_position(self):
-        t = parse_transform({
-            "stamp": {
-                "text": "Test",
-                "position": "custom",
-                "x": "50mm",
-                "y": "100mm",
+        t = parse_transform(
+            {
+                "stamp": {
+                    "text": "Test",
+                    "position": "custom",
+                    "x": "50mm",
+                    "y": "100mm",
+                }
             }
-        })
+        )
         assert t.stamp.position == "custom"
         assert t.stamp.x == "50mm"
         assert t.stamp.y == "100mm"
@@ -237,14 +237,16 @@ class TestParseTransform:
             parse_transform({})
 
     def test_split_basic(self):
-        t = parse_transform({
-            "split": {
-                "regions": [
-                    {"lower_left": [0, 0], "upper_right": ["4in", "6in"]},
-                    {"lower_left": ["4in", 0], "upper_right": ["8in", "6in"]},
-                ]
+        t = parse_transform(
+            {
+                "split": {
+                    "regions": [
+                        {"lower_left": [0, 0], "upper_right": ["4in", "6in"]},
+                        {"lower_left": ["4in", 0], "upper_right": ["8in", "6in"]},
+                    ]
+                }
             }
-        })
+        )
         assert t.type == "split"
         assert t.split is not None
         assert len(t.split.regions) == 2
@@ -258,25 +260,29 @@ class TestParseTransform:
         assert t.split.regions == []
 
     def test_split_region_defaults(self):
-        t = parse_transform({
-            "split": {
-                "regions": [{}]  # Empty region dict
+        t = parse_transform(
+            {
+                "split": {
+                    "regions": [{}]  # Empty region dict
+                }
             }
-        })
+        )
         assert t.split.regions[0].lower_left == (0, 0)
         assert t.split.regions[0].upper_right == (612, 792)
 
     def test_combine_basic(self):
-        t = parse_transform({
-            "combine": {
-                "page_size": ["8.5in", "11in"],
-                "pages_per_output": 2,
-                "layout": [
-                    {"page": 0, "position": ["0in", "5.5in"], "scale": 0.5},
-                    {"page": 1, "position": ["0in", "0in"], "scale": 0.5},
-                ]
+        t = parse_transform(
+            {
+                "combine": {
+                    "page_size": ["8.5in", "11in"],
+                    "pages_per_output": 2,
+                    "layout": [
+                        {"page": 0, "position": ["0in", "5.5in"], "scale": 0.5},
+                        {"page": 1, "position": ["0in", "0in"], "scale": 0.5},
+                    ],
+                }
             }
-        })
+        )
         assert t.type == "combine"
         assert t.combine is not None
         assert t.combine.page_size == ("8.5in", "11in")
@@ -293,11 +299,13 @@ class TestParseTransform:
         assert t.combine.layout == []
 
     def test_combine_layout_item_defaults(self):
-        t = parse_transform({
-            "combine": {
-                "layout": [{}]  # Empty layout item
+        t = parse_transform(
+            {
+                "combine": {
+                    "layout": [{}]  # Empty layout item
+                }
             }
-        })
+        )
         assert t.combine.layout[0].page == 0
         assert t.combine.layout[0].position == (0, 0)
         assert t.combine.layout[0].scale == 1.0
@@ -548,19 +556,13 @@ class TestEnabledField:
 
     def test_crop_transform_enabled_false(self):
         """Crop transform with enabled=False."""
-        t = parse_transform({
-            "crop": {"lower_left": [0, 0], "upper_right": [100, 100]},
-            "enabled": False
-        })
+        t = parse_transform({"crop": {"lower_left": [0, 0], "upper_right": [100, 100]}, "enabled": False})
         assert t.type == "crop"
         assert t.enabled is False
 
     def test_size_transform_enabled_false(self):
         """Size transform with enabled=False."""
-        t = parse_transform({
-            "size": {"width": "4in", "height": "6in"},
-            "enabled": False
-        })
+        t = parse_transform({"size": {"width": "4in", "height": "6in"}, "enabled": False})
         assert t.type == "size"
         assert t.enabled is False
 
@@ -587,7 +589,7 @@ class TestEnabledField:
                 {"rotate": 90, "enabled": True},
                 {"rotate": 180, "enabled": False},
                 {"crop": {"lower_left": [0, 0], "upper_right": [100, 100]}},
-            ]
+            ],
         }
         profile = parse_output_profile("test", data)
         assert len(profile.transforms) == 3
