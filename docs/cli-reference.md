@@ -81,6 +81,29 @@ pdfm -c config.yaml --validate --strict
 pdfm -c config.yaml -i ./input --dry-run
 ```
 
+### Watch Mode Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--watch` | - | Enable watch mode |
+| `--watch-interval` | `2.0` | Polling interval in seconds (for network drives) |
+| `--watch-debounce` | `1.0` | Debounce delay for file stability check |
+| `--watch-state` | auto | Path to state file for tracking processed files |
+| `--no-process-existing` | - | Skip files that exist when watch mode starts |
+
+```sh
+# Watch directory for new files
+pdfm -c config.yaml -i ./input --watch
+
+# Watch with dry-run preview
+pdfm -c config.yaml -i ./input --watch --dry-run
+
+# Skip existing files on startup
+pdfm -c config.yaml -i ./input --watch --no-process-existing
+```
+
+See [Watch Mode](watch-mode.md) for detailed documentation.
+
 ### Information Options
 
 | Option | Description |
@@ -152,4 +175,5 @@ pdfm -c my_config.yaml -i ./input
 
 - [Getting Started](getting-started.md) - Installation guide
 - [Configuration Guide](configuration.md) - Config file structure
+- [Watch Mode](watch-mode.md) - Automatic file processing
 - [Printing](printing.md) - Print setup and troubleshooting

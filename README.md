@@ -22,6 +22,7 @@ Currently, supports only windows
 - **Input Sorting**: Sort files by name or timestamp before processing
 - **Printing**: Send outputs to different printers with custom settings
 - **Multi-Printer Distribution**: Split pages across multiple printers by speed/weight
+- **Watch Mode**: Monitor directories and automatically process new PDFs as they arrive
 - **Dry Run**: Preview what will happen before processing
 
 ## Installation
@@ -51,6 +52,9 @@ pdfm -c configs/label_packing.yaml -i document.pdf
 # Dry run (see what would happen)
 pdfm -c configs/label_packing.yaml -i ./input --dry-run
 
+# Watch mode (process new files automatically)
+pdfm -c configs/label_packing.yaml -i ./input --watch
+
 # Validate a config file
 pdfm -c configs/label_packing.yaml --validate
 ```
@@ -66,6 +70,7 @@ pdfm -c configs/label_packing.yaml --validate
 | [Transforms](docs/transforms.md) | All transform types (rotate, crop, resize, stamp, split, combine, render) |
 | [Output Profiles](docs/output-profiles.md) | Output profile options and debug mode |
 | [Printing](docs/printing.md) | Single and multi-printer setup |
+| [Watch Mode](docs/watch-mode.md) | Automatic file monitoring and processing |
 | [CLI Reference](docs/cli-reference.md) | Command-line options |
 
 ## Example Configs

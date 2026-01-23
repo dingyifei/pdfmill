@@ -33,6 +33,9 @@ pip install pdfmill[stamp]
 
 # For auto-rotation via OCR (adds pymupdf, pytesseract, Pillow)
 pip install pdfmill[ocr]
+
+# For watch mode (adds watchdog)
+pip install pdfmill[watch]
 ```
 
 ## SumatraPDF Setup
@@ -96,3 +99,4 @@ pdfm -c my_config.yaml --validate
 - [Page Selection](page-selection.md) - Select specific pages
 - [Transforms](transforms.md) - Rotate, crop, resize, and more
 - [Printing](printing.md) - Send output to printers
+- [Watch Mode](watch-mode.md) - Automatically process new files

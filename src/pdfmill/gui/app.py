@@ -18,7 +18,7 @@ from pdfmill.config import (
     load_config,
 )
 from pdfmill.gui.dpi import enable_high_dpi
-from pdfmill.gui.frames import InputFrame, OutputsFrame, SettingsFrame
+from pdfmill.gui.frames import InputFrame, OutputsFrame, SettingsFrame, WatchFrame
 from pdfmill.gui.i18n import _
 
 # Enable high DPI before creating any Tk windows
@@ -41,6 +41,13 @@ class PdfMillApp(tk.Tk):
         self.running = False
         self.output_queue: queue.Queue = queue.Queue()
 
+        # Watch mode state
+        self.watching = False
+        self.watcher_thread = None
+        self.watcher_instance = None
+        self.watch_output_queue: queue.Queue = queue.Queue()
+        self.watch_processed_count = 0
+
         # Get printers
         self.printers = self._get_printers()
 
@@ -49,6 +56,9 @@ class PdfMillApp(tk.Tk):
 
         # Create widgets
         self._create_widgets()
+
+        # Handle window close
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         # Load default config
         self._new_config()
@@ -123,8 +133,8 @@ class PdfMillApp(tk.Tk):
         self._tab_frames = {}
         self._current_tab = tk.StringVar(value="Settings")
 
-        tab_labels = {"Settings": _("Settings"), "Input": _("Input"), "Outputs": _("Outputs")}
-        for tab_name in ["Settings", "Input", "Outputs"]:
+        tab_labels = {"Settings": _("Settings"), "Input": _("Input"), "Outputs": _("Outputs"), "Watch": _("Watch")}
+        for tab_name in ["Settings", "Input", "Outputs", "Watch"]:
             btn = ttk.Button(tab_frame, text=tab_labels[tab_name], command=lambda t=tab_name: self._switch_tab(t))
             btn.pack(side="left", padx=(0, 2))
             self._tab_buttons[tab_name] = btn
@@ -152,6 +162,11 @@ class PdfMillApp(tk.Tk):
         # Outputs tab
         self.outputs_frame = OutputsFrame(content, self.printers, self._refresh_printers)
         self._tab_frames["Outputs"] = self.outputs_frame
+
+        # Watch tab
+        self.watch_frame = WatchFrame(content)
+        self._tab_frames["Watch"] = self.watch_frame
+        self.watch_frame.set_callbacks(self._start_watch, self._stop_watch)
 
         # Show initial tab
         self._switch_tab("Settings")
@@ -258,6 +273,7 @@ class PdfMillApp(tk.Tk):
         self.settings_frame.load(config.settings)
         self.input_frame.load(config.input)
         self.outputs_frame.load(config.outputs)
+        self.watch_frame.load(config.watch)
 
     def _ui_to_config(self) -> Config:
         return Config(
@@ -265,6 +281,7 @@ class PdfMillApp(tk.Tk):
             settings=self.settings_frame.to_settings(),
             input=self.input_frame.to_input_config(),
             outputs=self.outputs_frame.to_outputs(),
+            watch=self.watch_frame.to_watch_settings(),
         )
 
     def _config_to_dict(self, config: Config) -> dict[str, Any]:
@@ -387,6 +404,18 @@ class PdfMillApp(tk.Tk):
 
             data["outputs"][name] = p
 
+        # Add watch settings (only if non-default values)
+        if (
+            config.watch.poll_interval != 2.0
+            or config.watch.debounce_delay != 1.0
+            or not config.watch.process_existing
+        ):
+            data["watch"] = {
+                "poll_interval": config.watch.poll_interval,
+                "debounce_delay": config.watch.debounce_delay,
+                "process_existing": config.watch.process_existing,
+            }
+
         return data
 
     def _save_config(self):
@@ -437,6 +466,10 @@ class PdfMillApp(tk.Tk):
     def _execute_pipeline(self, dry_run: bool):
         if self.running:
             self._log(_("Pipeline already running!"))
+            return
+
+        if self.watching:
+            self._log(_("Cannot run pipeline while watch mode is active"))
             return
 
         try:
@@ -511,6 +544,168 @@ class PdfMillApp(tk.Tk):
 
         if self.running:
             self.after(100, self._poll_output)
+
+    def _start_watch(self):
+        """Start watch mode."""
+        if self.running:
+            self.watch_frame.log(_("Cannot start watch mode while pipeline is running"))
+            return
+
+        if self.watching:
+            self.watch_frame.log(_("Watch mode is already running"))
+            return
+
+        try:
+            config = self._ui_to_config()
+            if not config.outputs:
+                raise ConfigError(_("At least one output profile is required"))
+        except Exception as e:
+            self.watch_frame.log(_("Configuration error: {}").format(e))
+            return
+
+        input_path = Path(self.input_frame.path_var.get())
+        if not input_path.exists():
+            self.watch_frame.log(_("Input directory does not exist: {}").format(input_path))
+            return
+
+        # Convert WatchSettings to WatchConfig for the watcher
+        from pdfmill.watcher import WatchConfig
+
+        watch_settings = self.watch_frame.to_watch_settings()
+        watch_config = WatchConfig(
+            poll_interval=watch_settings.poll_interval,
+            debounce_delay=watch_settings.debounce_delay,
+            process_existing=watch_settings.process_existing,
+        )
+        dry_run = self.watch_frame.dry_run_var.get()
+
+        self.watching = True
+        self.watch_processed_count = 0
+        self.watch_frame.set_watching(True)
+        self.watch_frame.update_count(0)
+
+        mode_str = _("DRY RUN") if dry_run else _("WATCH MODE")
+        self.watch_frame.log(f"\n{'=' * 40}\n{mode_str} starting...\n{'=' * 40}")
+        self.watch_frame.log(_("Watching: {}").format(input_path))
+
+        self.watcher_thread = threading.Thread(
+            target=self._watch_thread,
+            args=(config, input_path, watch_config, dry_run),
+            daemon=True,
+        )
+        self.watcher_thread.start()
+        self.after(100, self._poll_watch_output)
+
+    def _stop_watch(self):
+        """Stop watch mode."""
+        if not self.watching:
+            return
+
+        self.watch_frame.log(_("Stopping watch mode..."))
+        if self.watcher_instance:
+            self.watcher_instance._shutdown = True
+
+    def _watch_thread(self, config, input_path, watch_config, dry_run):
+        """Run the watcher in a background thread."""
+        import io
+        import sys
+
+        from pdfmill.logging_config import setup_logging
+        from pdfmill.watcher import PdfWatcher
+
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        captured_stdout = io.StringIO()
+        captured_stderr = io.StringIO()
+        sys.stdout = captured_stdout
+        sys.stderr = captured_stderr
+
+        # Reconfigure logging to use captured streams
+        setup_logging(stdout_stream=captured_stdout, stderr_stream=captured_stderr)
+
+        try:
+            self.watcher_instance = PdfWatcher(
+                config=config,
+                input_path=input_path,
+                dry_run=dry_run,
+                watch_config=watch_config,
+            )
+
+            # Run the watcher (blocks until shutdown)
+            self.watcher_instance.run()
+
+            # Final output
+            output = captured_stdout.getvalue() + captured_stderr.getvalue()
+            if output:
+                self.watch_output_queue.put(("output", output))
+            self.watch_output_queue.put(("stopped", _("Watch mode stopped")))
+
+        except Exception as e:
+            output = captured_stdout.getvalue() + captured_stderr.getvalue()
+            if output:
+                self.watch_output_queue.put(("output", output))
+            self.watch_output_queue.put(("error", str(e)))
+
+        finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+            # Restore logging to use real stdout/stderr
+            setup_logging()
+            self.watching = False
+            self.watcher_instance = None
+
+    def _poll_watch_output(self):
+        """Poll for watch output and update UI."""
+        while not self.watch_output_queue.empty():
+            msg_type, msg = self.watch_output_queue.get_nowait()
+            if msg_type == "output" and msg:
+                # Split multi-line output and log each line
+                for line in msg.strip().split("\n"):
+                    if line:
+                        self.watch_frame.log(line)
+                        # Count processed files from log messages
+                        if "Processing" in line or "Detected new file" in line:
+                            self.watch_processed_count += 1
+                            self.watch_frame.update_count(self.watch_processed_count)
+            elif msg_type == "stopped":
+                self.watch_frame.log(f"\n=== {msg} ===\n")
+                self.watch_frame.set_watching(False)
+            elif msg_type == "error":
+                self.watch_frame.log("\n=== " + _("ERROR") + f": {msg} ===\n")
+                self.watch_frame.set_watching(False)
+
+        if self.watching:
+            # Also check for incremental output from the watcher
+            self._check_watcher_output()
+            self.after(100, self._poll_watch_output)
+
+    def _check_watcher_output(self):
+        """Check for incremental output from the watcher's captured streams."""
+        # The watcher thread captures output, but we need to periodically check
+        # This is handled by the queue in _watch_thread
+        pass
+
+    def _on_close(self):
+        """Handle window close event."""
+        if self.watching:
+            if messagebox.askyesno(
+                _("Confirm Exit"),
+                _("Watch mode is active. Stop watching and exit?"),
+            ):
+                self._stop_watch()
+                # Give the watcher thread a moment to stop
+                self.after(500, self.destroy)
+            return
+
+        if self.running:
+            if messagebox.askyesno(
+                _("Confirm Exit"),
+                _("Pipeline is running. Exit anyway?"),
+            ):
+                self.destroy()
+            return
+
+        self.destroy()
 
     def _show_about(self):
         from pdfmill import __version__

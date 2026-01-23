@@ -16,6 +16,7 @@ from pdfmill.config import (
     Settings,
     SortOrder,
     Transform,
+    WatchSettings,
 )
 from pdfmill.gui.constants import ON_ERROR_OPTIONS, SORT_OPTIONS
 from pdfmill.gui.dialogs import PrintTargetDialog, TransformDialog
@@ -545,3 +546,147 @@ class OutputsFrame(ttk.Frame):
     def to_outputs(self) -> dict[str, OutputProfile]:
         self._save_current()
         return dict(self.profiles)
+
+
+class WatchFrame(ttk.LabelFrame):
+    """Frame for watch mode controls and logging."""
+
+    def __init__(self, parent):
+        super().__init__(parent, text=_("Watch Mode"), padding=10)
+
+        self._on_start = None
+        self._on_stop = None
+
+        # Settings section
+        settings_frame = ttk.LabelFrame(self, text=_("Watch Settings"), padding=5)
+        settings_frame.pack(fill="x", pady=(0, 10))
+
+        # Poll interval
+        row = ttk.Frame(settings_frame)
+        row.pack(fill="x", pady=2)
+        ttk.Label(row, text=_("Poll Interval (seconds):")).pack(side="left")
+        self.poll_interval_var = tk.StringVar(value="2.0")
+        ttk.Spinbox(
+            row,
+            textvariable=self.poll_interval_var,
+            from_=0.5,
+            to=60.0,
+            increment=0.5,
+            width=8,
+        ).pack(side="left", padx=5)
+        ttk.Label(row, text=_("(for network drives)")).pack(side="left")
+
+        # Debounce delay
+        row = ttk.Frame(settings_frame)
+        row.pack(fill="x", pady=2)
+        ttk.Label(row, text=_("Debounce Delay (seconds):")).pack(side="left")
+        self.debounce_delay_var = tk.StringVar(value="1.0")
+        ttk.Spinbox(
+            row,
+            textvariable=self.debounce_delay_var,
+            from_=0.1,
+            to=10.0,
+            increment=0.1,
+            width=8,
+        ).pack(side="left", padx=5)
+        ttk.Label(row, text=_("(file write wait)")).pack(side="left")
+
+        # Checkboxes
+        self.process_existing_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            settings_frame,
+            text=_("Process existing files on startup"),
+            variable=self.process_existing_var,
+        ).pack(anchor="w", pady=2)
+
+        self.dry_run_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            settings_frame,
+            text=_("Dry run (preview only)"),
+            variable=self.dry_run_var,
+        ).pack(anchor="w", pady=2)
+
+        # Control buttons and status row
+        control_row = ttk.Frame(self)
+        control_row.pack(fill="x", pady=10)
+
+        self.start_btn = ttk.Button(control_row, text=_("Start Watching"), command=self._on_start_click)
+        self.start_btn.pack(side="left", padx=(0, 5))
+
+        self.stop_btn = ttk.Button(control_row, text=_("Stop Watching"), command=self._on_stop_click, state="disabled")
+        self.stop_btn.pack(side="left", padx=(0, 20))
+
+        ttk.Label(control_row, text=_("Status:")).pack(side="left")
+        self.status_var = tk.StringVar(value=_("Stopped"))
+        self.status_label = ttk.Label(control_row, textvariable=self.status_var)
+        self.status_label.pack(side="left", padx=5)
+
+        self.count_var = tk.StringVar(value="0 files")
+        ttk.Label(control_row, textvariable=self.count_var).pack(side="right")
+
+        # Log area
+        log_frame = ttk.LabelFrame(self, text=_("Watch Log"), padding=5)
+        log_frame.pack(fill="both", expand=True, pady=(0, 5))
+
+        from tkinter import scrolledtext
+
+        self.log_text = scrolledtext.ScrolledText(log_frame, height=20, state="disabled")
+        self.log_text.pack(fill="both", expand=True)
+
+        # Clear log button
+        ttk.Button(self, text=_("Clear Log"), command=self._clear_log).pack(anchor="w")
+
+    def set_callbacks(self, on_start, on_stop):
+        """Set callback functions for start/stop buttons."""
+        self._on_start = on_start
+        self._on_stop = on_stop
+
+    def _on_start_click(self):
+        if self._on_start:
+            self._on_start()
+
+    def _on_stop_click(self):
+        if self._on_stop:
+            self._on_stop()
+
+    def set_watching(self, watching: bool):
+        """Update UI state based on watching status."""
+        if watching:
+            self.start_btn.configure(state="disabled")
+            self.stop_btn.configure(state="normal")
+            self.status_var.set(_("Watching..."))
+        else:
+            self.start_btn.configure(state="normal")
+            self.stop_btn.configure(state="disabled")
+            self.status_var.set(_("Stopped"))
+
+    def update_count(self, count: int):
+        """Update the processed file count."""
+        self.count_var.set(_("{} files").format(count))
+
+    def log(self, msg: str):
+        """Append a message to the log area."""
+        self.log_text.configure(state="normal")
+        self.log_text.insert("end", msg + "\n")
+        self.log_text.see("end")
+        self.log_text.configure(state="disabled")
+
+    def _clear_log(self):
+        """Clear the log area."""
+        self.log_text.configure(state="normal")
+        self.log_text.delete("1.0", "end")
+        self.log_text.configure(state="disabled")
+
+    def load(self, watch_settings: WatchSettings):
+        """Load watch settings into UI."""
+        self.poll_interval_var.set(str(watch_settings.poll_interval))
+        self.debounce_delay_var.set(str(watch_settings.debounce_delay))
+        self.process_existing_var.set(watch_settings.process_existing)
+
+    def to_watch_settings(self) -> WatchSettings:
+        """Build WatchSettings from UI values."""
+        return WatchSettings(
+            poll_interval=float(self.poll_interval_var.get()),
+            debounce_delay=float(self.debounce_delay_var.get()),
+            process_existing=self.process_existing_var.get(),
+        )

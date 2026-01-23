@@ -20,6 +20,7 @@ pip install -e .
 **Optional dependencies**:
 - `pip install pdfmill[stamp]` - For stamp transform (adds reportlab)
 - `pip install pdfmill[ocr]` - For auto-rotation via OCR (adds pymupdf, pytesseract, Pillow)
+- `pip install pdfmill[watch]` - For watch mode (adds watchdog)
 
 ## Commands
 
@@ -44,6 +45,15 @@ pdfm -c config.yaml -i ./input -q
 
 # Log to file
 pdfm -c config.yaml -i ./input --log-file output.log
+
+# Watch mode - process new files as they appear
+pdfm -c config.yaml -i ./input --watch
+
+# Watch mode with dry-run preview
+pdfm -c config.yaml -i ./input --watch --dry-run
+
+# Watch mode - skip existing files on startup
+pdfm -c config.yaml -i ./input --watch --no-process-existing
 ```
 
 ## Architecture
@@ -56,7 +66,8 @@ src/pdfmill/
 ├── selector.py         # Page selection (patterns, ranges, indices)
 ├── transforms.py       # Rotate, crop, resize operations
 ├── printer.py          # SumatraPDF wrapper, printer enumeration
-└── processor.py        # Main pipeline orchestration
+├── processor.py        # Main pipeline orchestration
+└── watcher.py          # Watch mode for monitoring input directory
 ```
 
 ### Module Responsibilities
@@ -68,6 +79,7 @@ src/pdfmill/
 - **transforms.py** - Applies rotate/crop/resize/stamp/render/split/combine to pypdf page objects
 - **printer.py** - Finds SumatraPDF, sends print jobs with pass-through args
 - **processor.py** - Orchestrates: load config → get files → select pages → transform → write → print
+- **watcher.py** - Monitors input directory for new PDFs, tracks processed files via JSON state
 
 ## Config Structure
 
@@ -77,6 +89,11 @@ settings:
   on_error: continue|stop
   cleanup_source: false
   cleanup_output_after_print: false
+
+watch:
+  poll_interval: 2.0      # Polling interval in seconds (default: 2.0)
+  debounce_delay: 1.0     # File stability wait time in seconds (default: 1.0)
+  process_existing: true  # Process existing files on startup (default: true)
 
 input:
   path: ./input
@@ -240,6 +257,54 @@ The `render` transform rasterizes pages to images and re-embeds them. This perma
 ```
 
 Requires `poppler` installed on the system (used by pdf2image).
+
+## Watch Mode
+
+Monitor an input directory and automatically process new PDF files as they appear. Requires `pip install pdfmill[watch]`.
+
+```sh
+# Basic watch mode
+pdfm -c config.yaml -i ./input --watch
+
+# With dry-run to preview without processing
+pdfm -c config.yaml -i ./input --watch --dry-run
+
+# Skip existing files on startup
+pdfm -c config.yaml -i ./input --watch --no-process-existing
+
+# Custom polling interval and debounce
+pdfm -c config.yaml -i ./input --watch --watch-interval 5.0 --watch-debounce 2.0
+```
+
+**Options**:
+- `--watch` - Enable watch mode
+- `--watch-interval` - Polling interval in seconds (default: 2.0, used for network drives)
+- `--watch-debounce` - Wait time for file stability check (default: 1.0)
+- `--watch-state` - Custom path for state file (default: `.pdfmill_watch_state.json` in input dir)
+- `--no-process-existing` - Skip files that exist when watch mode starts
+
+**State Tracking**:
+- Processed files are tracked in `.pdfmill_watch_state.json` to avoid reprocessing after restarts
+- State resets automatically when config changes (detected via hash)
+- Files are only reprocessed if their size or modification time changes
+
+**File Monitoring**:
+- Uses native OS file events via `watchdog` library for immediate detection
+- Falls back to polling for network drives (UNC paths)
+- Debounces file events to wait for files being written to complete
+
+**Config File Settings**:
+
+Watch settings can also be configured in the YAML config file:
+
+```yaml
+watch:
+  poll_interval: 2.0      # Polling interval in seconds (default: 2.0)
+  debounce_delay: 1.0     # File stability wait time in seconds (default: 1.0)
+  process_existing: true  # Process existing files on startup (default: true)
+```
+
+These settings are saved/loaded with the config and used by the GUI's Watch tab.
 
 ## Key Constants
 

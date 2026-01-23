@@ -124,3 +124,4 @@ input:
 - [Configuration Guide](configuration.md) - Overall config structure
 - [Page Selection](page-selection.md) - Select pages within each PDF
 - [Output Profiles](output-profiles.md) - Per-profile sort override
+- [Watch Mode](watch-mode.md) - Automatically process new files in input directory

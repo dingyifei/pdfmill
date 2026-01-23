@@ -313,6 +313,20 @@ class Settings:
 
 
 @dataclass
+class WatchSettings:
+    """Watch mode settings."""
+
+    poll_interval: float = 2.0
+    """Polling interval in seconds (fallback for network drives)."""
+
+    debounce_delay: float = 1.0
+    """Wait time in seconds for file stability check."""
+
+    process_existing: bool = True
+    """Whether to process existing files on startup."""
+
+
+@dataclass
 class FilterConfig:
     """Keyword filter configuration for input files."""
 
@@ -338,6 +352,7 @@ class Config:
     settings: Settings = field(default_factory=Settings)
     input: InputConfig = field(default_factory=InputConfig)
     outputs: dict[str, OutputProfile] = field(default_factory=dict)
+    watch: WatchSettings = field(default_factory=WatchSettings)
 
 
 def parse_transform(transform_data: dict[str, Any]) -> Transform:
@@ -598,9 +613,20 @@ def load_config(config_path: Path) -> Config:
     for name, output_data in data["outputs"].items():
         outputs[name] = parse_output_profile(name, output_data)
 
+    # Parse watch settings
+    watch_settings = WatchSettings()
+    if "watch" in data:
+        w = data["watch"]
+        watch_settings = WatchSettings(
+            poll_interval=float(w.get("poll_interval", 2.0)),
+            debounce_delay=float(w.get("debounce_delay", 1.0)),
+            process_existing=w.get("process_existing", True),
+        )
+
     return Config(
         version=data.get("version", 1),
         settings=settings,
         input=input_config,
         outputs=outputs,
+        watch=watch_settings,
     )

@@ -78,6 +78,13 @@ Examples:
   pdfm -c config.yaml --validate                Validate config only
   pdfm -c config.yaml -i ./input --dry-run      Show what would happen
   pdfm --list-printers                          List available printers
+
+Watch mode:
+  pdfm -c config.yaml -i ./input --watch        Watch and process new files
+  pdfm -c config.yaml -i ./input --watch --dry-run
+                                                Watch with preview mode
+  pdfm -c config.yaml -i ./input --watch --no-process-existing
+                                                Skip existing files on startup
 """,
     )
 
@@ -125,6 +132,39 @@ Examples:
         "--dry-run",
         action="store_true",
         help="Show what would be done without actually doing it",
+    )
+
+    # Watch mode arguments
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="Watch input directory and process new files as they appear",
+    )
+
+    parser.add_argument(
+        "--watch-interval",
+        type=float,
+        default=2.0,
+        help="Polling interval in seconds for watch mode (default: 2.0)",
+    )
+
+    parser.add_argument(
+        "--watch-debounce",
+        type=float,
+        default=1.0,
+        help="Debounce delay in seconds for file stability check (default: 1.0)",
+    )
+
+    parser.add_argument(
+        "--watch-state",
+        type=Path,
+        help="Path to state file for tracking processed files in watch mode",
+    )
+
+    parser.add_argument(
+        "--no-process-existing",
+        action="store_true",
+        help="Skip processing existing files when starting watch mode",
     )
 
     parser.add_argument(
@@ -256,13 +296,41 @@ def main(args: list[str] | None = None) -> int:
         return 1
 
     from pdfmill.config import ConfigError, load_config
-    from pdfmill.processor import process
 
     try:
         config = load_config(parsed.config)
 
         # Override output directory if specified
         output_dir = parsed.output
+
+        # Handle watch mode
+        if parsed.watch:
+            # Watch mode requires a directory input
+            if not parsed.input.is_dir():
+                logger.error("--watch requires an input directory, not a file")
+                return 1
+
+            from pdfmill.watcher import PdfWatcher, WatchConfig
+
+            watch_config = WatchConfig(
+                poll_interval=parsed.watch_interval,
+                debounce_delay=parsed.watch_debounce,
+                state_file=parsed.watch_state,
+                process_existing=not parsed.no_process_existing,
+            )
+
+            watcher = PdfWatcher(
+                config=config,
+                input_path=parsed.input,
+                output_dir=output_dir,
+                dry_run=parsed.dry_run,
+                watch_config=watch_config,
+            )
+            watcher.run()
+            return 0
+
+        # Regular processing
+        from pdfmill.processor import process
 
         process(
             config=config,
