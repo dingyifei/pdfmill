@@ -405,11 +405,7 @@ class PdfMillApp(tk.Tk):
             data["outputs"][name] = p
 
         # Add watch settings (only if non-default values)
-        if (
-            config.watch.poll_interval != 2.0
-            or config.watch.debounce_delay != 1.0
-            or not config.watch.process_existing
-        ):
+        if config.watch.poll_interval != 2.0 or config.watch.debounce_delay != 1.0 or not config.watch.process_existing:
             data["watch"] = {
                 "poll_interval": config.watch.poll_interval,
                 "debounce_delay": config.watch.debounce_delay,

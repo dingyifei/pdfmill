@@ -482,14 +482,20 @@ class TestCliWatchMode:
             mock_watcher = MagicMock()
             mock_watcher_class.return_value = mock_watcher
 
-            main([
-                "-c", str(temp_config_file),
-                "-i", str(temp_dir),
-                "--watch",
-                "--watch-interval", "5.0",
-                "--watch-debounce", "2.0",
-                "--no-process-existing",
-            ])
+            main(
+                [
+                    "-c",
+                    str(temp_config_file),
+                    "-i",
+                    str(temp_dir),
+                    "--watch",
+                    "--watch-interval",
+                    "5.0",
+                    "--watch-debounce",
+                    "2.0",
+                    "--no-process-existing",
+                ]
+            )
 
             call_kwargs = mock_watcher_class.call_args.kwargs
             assert call_kwargs["watch_config"].poll_interval == 5.0
