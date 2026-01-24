@@ -57,6 +57,13 @@ class FitMode(str, Enum):
     STRETCH = "stretch"  # Stretch to exact dimensions
 
 
+class SafetyAction(str, Enum):
+    """Action to take when safety check fails."""
+
+    BLOCK = "block"  # Block the print job (raise error)
+    WARN = "warn"  # Log warning but continue printing
+
+
 # ============================================================================
 # Exceptions
 # ============================================================================
@@ -171,6 +178,10 @@ class PrintConfig:
     enabled: bool = False
     merge: bool = False  # Merge all PDFs before printing as single job
     targets: dict[str, PrintTarget] = field(default_factory=dict)
+    # Safety limits
+    max_pages: int | None = None  # Maximum total pages to print
+    max_page_size: tuple[str, str] | None = None  # Maximum page dimensions (width, height)
+    action: SafetyAction = SafetyAction.BLOCK  # Action on safety violation
 
 
 @dataclass
@@ -532,10 +543,26 @@ def parse_output_profile(name: str, data: dict[str, Any]) -> OutputProfile:
                 args=_parse_args(p.get("args", [])),
             )
 
+        # Parse safety action
+        action = SafetyAction.BLOCK
+        action_str = p.get("action")
+        if action_str:
+            action = _parse_enum(SafetyAction, action_str, profile=name, field="print.action")
+
+        # Parse max_page_size as tuple if provided
+        max_page_size = None
+        if "max_page_size" in p:
+            size_val = p["max_page_size"]
+            if isinstance(size_val, list) and len(size_val) == 2:
+                max_page_size = (str(size_val[0]), str(size_val[1]))
+
         print_config = PrintConfig(
             enabled=p.get("enabled", False),
             merge=p.get("merge", False),
             targets=targets,
+            max_pages=p.get("max_pages"),
+            max_page_size=max_page_size,
+            action=action,
         )
 
     # Parse sort if provided

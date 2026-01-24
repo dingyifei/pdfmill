@@ -15,7 +15,7 @@ from pdfmill.config import (
     SortOrder,
 )
 from pdfmill.logging_config import get_logger
-from pdfmill.pipeline import PrintPipeline, TransformExecutor
+from pdfmill.pipeline import PrintPipeline, PrintSafetyError, TransformExecutor
 from pdfmill.printer import PrinterError
 from pdfmill.selector import PageSelectionError, select_pages
 from pdfmill.transforms import TransformError
@@ -301,7 +301,7 @@ def process(
             )
             temporary_files = print_result.temporary_files
             fail_count += print_result.fail_count
-        except PrinterError:
+        except (PrinterError, PrintSafetyError):
             # Error already logged by pipeline, re-raise if on_error is STOP
             if config.settings.on_error == ErrorHandling.STOP:
                 raise

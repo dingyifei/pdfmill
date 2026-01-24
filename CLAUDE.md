@@ -160,6 +160,32 @@ outputs:
       enabled: true         # Would print if profile was enabled
 ```
 
+## Print Safety
+
+Prevent accidentally printing too many pages or sending oversized documents to incompatible printers.
+
+```yaml
+outputs:
+  label:
+    print:
+      enabled: true
+      printer: "Label Printer"
+      max_pages: 50                    # Block if total pages exceed limit
+      max_page_size: ["4in", "6in"]    # Block if any page exceeds dimensions
+      action: block                     # block | warn (default: block)
+```
+
+**Safety Checks**:
+
+| Check | Description |
+|-------|-------------|
+| `max_pages` | Block if total page count exceeds limit |
+| `max_page_size` | Block if any page exceeds dimensions (checks both orientations) |
+
+**Actions**:
+- `block` (default) - Raise error, skip this print job
+- `warn` - Log warning, continue printing
+
 ## Units
 
 Crop and resize support unit strings: `mm`, `in`, `pt`, `cm` (72 pt = 1 inch)

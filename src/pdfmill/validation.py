@@ -91,6 +91,7 @@ def validate_strict(config: "Config") -> ValidationResult:
 
         _validate_output_dir(name, profile, result)
         _validate_printers(name, profile, result)
+        _validate_print_safety(name, profile, result)
 
     return result
 
@@ -202,3 +203,40 @@ def _validate_printers(profile_name: str, profile: "OutputProfile", result: Vali
 def _is_writable(path: Path) -> bool:
     """Check if a path is writable."""
     return os.access(path, os.W_OK)
+
+
+def _validate_print_safety(profile_name: str, profile: "OutputProfile", result: ValidationResult) -> None:
+    """Validate print safety configuration."""
+    print_config = profile.print
+
+    # Validate max_pages
+    if print_config.max_pages is not None and (
+        not isinstance(print_config.max_pages, int) or print_config.max_pages <= 0
+    ):
+        result.add_error(
+            field="print.max_pages",
+            profile=profile_name,
+            message=f"max_pages must be a positive integer, got: {print_config.max_pages}",
+        )
+
+    # Validate max_page_size
+    if print_config.max_page_size is not None:
+        try:
+            from pdfmill.transforms._utils import parse_coordinate
+
+            width_str, height_str = print_config.max_page_size
+            width = parse_coordinate(width_str)
+            height = parse_coordinate(height_str)
+            if width <= 0 or height <= 0:
+                result.add_error(
+                    field="print.max_page_size",
+                    profile=profile_name,
+                    message="max_page_size dimensions must be positive",
+                )
+        except Exception as e:
+            result.add_error(
+                field="print.max_page_size",
+                profile=profile_name,
+                message=f"Invalid max_page_size format: {e}",
+                suggestion='Use format like ["4in", "6in"] or ["100mm", "150mm"]',
+            )

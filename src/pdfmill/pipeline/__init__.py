@@ -16,10 +16,15 @@ Usage:
 """
 
 from pdfmill.pipeline.printing import PrintPipeline, PrintResult
+from pdfmill.pipeline.safety import PrintSafetyError, SafetyCheckResult, check_print_safety, enforce_print_safety
 from pdfmill.pipeline.transforms import TransformExecutor
 
 __all__ = [
     "TransformExecutor",
     "PrintPipeline",
     "PrintResult",
+    "PrintSafetyError",
+    "SafetyCheckResult",
+    "check_print_safety",
+    "enforce_print_safety",
 ]

@@ -12,6 +12,7 @@ from pdfmill.config import (
     SortOrder,
 )
 from pdfmill.logging_config import get_logger
+from pdfmill.pipeline.safety import PrintSafetyError, enforce_print_safety
 from pdfmill.printer import PrinterError, print_pdf
 
 logger = get_logger(__name__)
@@ -169,6 +170,11 @@ class PrintPipeline:
                     result,
                 )
                 result.success_count += 1
+            except PrintSafetyError:
+                # Safety error is already logged in enforce_print_safety
+                result.fail_count += 1
+                if on_error == ErrorHandling.STOP:
+                    raise
             except PrinterError as e:
                 logger.error("Print error: %s", e)
                 result.fail_count += 1
@@ -203,6 +209,10 @@ class PrintPipeline:
         result: PrintResult,
     ) -> None:
         """Handle printing for a single profile."""
+        # Run safety checks before printing
+        pdf_paths = [pf[0] for pf in profile_files]
+        enforce_print_safety(pdf_paths, profile.print, profile_name)
+
         if profile.print.merge and len(profile_files) > 1:
             # Merge all PDFs for this profile before printing
             pdf_paths = [pf[0] for pf in profile_files]
