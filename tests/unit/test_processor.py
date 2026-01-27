@@ -467,6 +467,34 @@ class TestProcess:
 
         assert "Print error" in caplog.text
 
+    def test_print_safety_error_continues(self, temp_multi_page_pdf, temp_dir, caplog):
+        from pdfmill.config import SafetyAction
+
+        config = Config(
+            settings=Settings(on_error="continue"),
+            outputs={
+                "label": OutputProfile(
+                    pages="all",
+                    print=PrintConfig(
+                        enabled=True,
+                        targets={"default": PrintTarget(printer="Test")},
+                        max_pages=1,  # Will fail since we have multi-page PDF
+                        action=SafetyAction.BLOCK,
+                    ),
+                )
+            },
+        )
+        output_dir = temp_dir / "output"
+
+        with caplog.at_level(logging.ERROR, logger="pdfmill"):
+            setup_logging()
+            with patch("pdfmill.pipeline.printing.print_pdf") as mock_print:
+                process(config, temp_multi_page_pdf, output_dir)
+                # print_pdf should NOT be called since safety check blocked it
+                mock_print.assert_not_called()
+
+        assert "safety" in caplog.text.lower()
+
 
 class TestCleanup:
     """Test cleanup functionality."""

@@ -207,3 +207,87 @@ class TestPrintSafetyError:
     def test_error_with_empty_violations(self):
         error = PrintSafetyError("No violations", [])
         assert len(error.violations) == 0
+
+
+class TestCheckPrintSafetyEdgeCases:
+    """Test edge cases for safety checks."""
+
+    def test_unreadable_pdf_for_page_count(self, tmp_path):
+        """Test that unreadable PDF is handled gracefully for page count."""
+        bad_pdf = tmp_path / "bad.pdf"
+        bad_pdf.write_bytes(b"not a valid pdf")
+        config = PrintConfig(max_pages=10)
+
+        # Should not raise, just warn and count 0 pages
+        result = check_print_safety([bad_pdf], config, "test")
+        assert result.passed  # 0 pages < 10, so passes
+
+    def test_unreadable_pdf_for_size_check(self, tmp_path):
+        """Test that unreadable PDF is handled gracefully for size check."""
+        bad_pdf = tmp_path / "bad.pdf"
+        bad_pdf.write_bytes(b"not a valid pdf")
+        config = PrintConfig(max_page_size=("4in", "6in"))
+
+        # Should not raise, just warn
+        result = check_print_safety([bad_pdf], config, "test")
+        assert result.passed  # Can't check size, so passes
+
+    def test_empty_pdf_list(self):
+        """Test with empty PDF list."""
+        config = PrintConfig(max_pages=10)
+        result = check_print_safety([], config, "test")
+        assert result.passed
+
+    def test_both_limits_checked(self, tmp_path):
+        """Test that both max_pages and max_page_size are checked."""
+        # Create oversized PDF with too many pages
+        pdf_path = create_test_pdf(tmp_path / "test.pdf", num_pages=20, width=1000, height=1000)
+        config = PrintConfig(max_pages=10, max_page_size=("4in", "6in"))
+
+        result = check_print_safety([pdf_path], config, "test")
+        assert not result.passed
+        assert len(result.violations) >= 2  # Both limits violated
+
+    def test_page_size_check_multiple_files(self, tmp_path):
+        """Test page size check across multiple PDF files."""
+        pdf1 = create_test_pdf(tmp_path / "test1.pdf", width=288, height=432)  # 4x6 inches
+        pdf2 = create_test_pdf(tmp_path / "test2.pdf", width=1000, height=1000)  # Too large
+        config = PrintConfig(max_page_size=("4in", "6in"))
+
+        result = check_print_safety([pdf1, pdf2], config, "test")
+        assert not result.passed
+        assert any("test2.pdf" in v for v in result.violations)
+
+    def test_size_limit_with_points(self, tmp_path):
+        """Test max_page_size with point units."""
+        pdf_path = create_test_pdf(tmp_path / "test.pdf", width=300, height=400)
+        config = PrintConfig(max_page_size=("288pt", "432pt"))  # 4x6 inches in points
+
+        result = check_print_safety([pdf_path], config, "test")
+        assert not result.passed  # 300x400 > 288x432
+
+    def test_exact_size_limit_passes(self, tmp_path):
+        """Test that exact size match passes."""
+        pdf_path = create_test_pdf(tmp_path / "test.pdf", width=288, height=432)
+        config = PrintConfig(max_page_size=("288pt", "432pt"))
+
+        result = check_print_safety([pdf_path], config, "test")
+        assert result.passed
+
+    def test_enforce_with_size_violation_block(self, tmp_path):
+        """Test that size violation with block action raises."""
+        pdf_path = create_test_pdf(tmp_path / "test.pdf", width=1000, height=1000)
+        config = PrintConfig(max_page_size=("4in", "6in"), action=SafetyAction.BLOCK)
+
+        with pytest.raises(PrintSafetyError) as exc_info:
+            enforce_print_safety([pdf_path], config, "test")
+
+        assert len(exc_info.value.violations) > 0
+
+    def test_enforce_with_size_violation_warn(self, tmp_path):
+        """Test that size violation with warn action continues."""
+        pdf_path = create_test_pdf(tmp_path / "test.pdf", width=1000, height=1000)
+        config = PrintConfig(max_page_size=("4in", "6in"), action=SafetyAction.WARN)
+
+        result = enforce_print_safety([pdf_path], config, "test")
+        assert result is True

@@ -352,3 +352,130 @@ class TestValidateStrictDisabledProfiles:
 
         # Should have no errors because profile is disabled
         assert not result.has_errors
+
+
+class TestValidateStrictPrintSafety:
+    """Test strict validation of print safety configuration."""
+
+    def test_valid_max_pages(self, tmp_path):
+        """Test validation passes for valid max_pages."""
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+
+        config = Config(
+            input=InputConfig(path=input_dir),
+            outputs={
+                "test": OutputProfile(
+                    pages="all",
+                    output_dir=tmp_path,
+                    print=PrintConfig(max_pages=50),
+                )
+            },
+        )
+
+        result = validate_strict(config)
+        safety_errors = [i for i in result.issues if "max_pages" in i.field]
+        assert len(safety_errors) == 0
+
+    def test_invalid_max_pages_zero(self, tmp_path):
+        """Test validation fails for max_pages=0."""
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+
+        config = Config(
+            input=InputConfig(path=input_dir),
+            outputs={
+                "test": OutputProfile(
+                    pages="all",
+                    output_dir=tmp_path,
+                    print=PrintConfig(max_pages=0),
+                )
+            },
+        )
+
+        result = validate_strict(config)
+        assert result.has_errors
+        safety_errors = [i for i in result.issues if "max_pages" in i.field]
+        assert len(safety_errors) == 1
+
+    def test_invalid_max_pages_negative(self, tmp_path):
+        """Test validation fails for negative max_pages."""
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+
+        config = Config(
+            input=InputConfig(path=input_dir),
+            outputs={
+                "test": OutputProfile(
+                    pages="all",
+                    output_dir=tmp_path,
+                    print=PrintConfig(max_pages=-10),
+                )
+            },
+        )
+
+        result = validate_strict(config)
+        assert result.has_errors
+
+    def test_valid_max_page_size(self, tmp_path):
+        """Test validation passes for valid max_page_size."""
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+
+        config = Config(
+            input=InputConfig(path=input_dir),
+            outputs={
+                "test": OutputProfile(
+                    pages="all",
+                    output_dir=tmp_path,
+                    print=PrintConfig(max_page_size=("4in", "6in")),
+                )
+            },
+        )
+
+        result = validate_strict(config)
+        size_errors = [i for i in result.issues if "max_page_size" in i.field]
+        assert len(size_errors) == 0
+
+    def test_invalid_max_page_size_format(self, tmp_path):
+        """Test validation fails for invalid max_page_size format."""
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+
+        config = Config(
+            input=InputConfig(path=input_dir),
+            outputs={
+                "test": OutputProfile(
+                    pages="all",
+                    output_dir=tmp_path,
+                    print=PrintConfig(max_page_size=("invalid", "6in")),
+                )
+            },
+        )
+
+        result = validate_strict(config)
+        assert result.has_errors
+        size_errors = [i for i in result.issues if "max_page_size" in i.field]
+        assert len(size_errors) == 1
+
+    def test_zero_max_page_size_dimension(self, tmp_path):
+        """Test validation fails for zero dimension in max_page_size."""
+        input_dir = tmp_path / "input"
+        input_dir.mkdir()
+
+        config = Config(
+            input=InputConfig(path=input_dir),
+            outputs={
+                "test": OutputProfile(
+                    pages="all",
+                    output_dir=tmp_path,
+                    print=PrintConfig(max_page_size=("0in", "6in")),
+                )
+            },
+        )
+
+        result = validate_strict(config)
+        assert result.has_errors
+        size_errors = [i for i in result.issues if "max_page_size" in i.field]
+        assert len(size_errors) == 1
+        assert "positive" in str(size_errors[0])

@@ -501,6 +501,134 @@ class TestPrintTargets:
         assert target.args == []
 
 
+class TestPrintSafetyConfig:
+    """Test print safety configuration parsing."""
+
+    def test_parse_max_pages(self):
+        data = {
+            "pages": "all",
+            "print": {
+                "enabled": True,
+                "printer": "Test",
+                "max_pages": 50,
+            },
+        }
+        profile = parse_output_profile("test", data)
+        assert profile.print.max_pages == 50
+
+    def test_parse_max_page_size(self):
+        data = {
+            "pages": "all",
+            "print": {
+                "enabled": True,
+                "printer": "Test",
+                "max_page_size": ["4in", "6in"],
+            },
+        }
+        profile = parse_output_profile("test", data)
+        assert profile.print.max_page_size == ("4in", "6in")
+
+    def test_parse_action_block(self):
+        from pdfmill.config import SafetyAction
+
+        data = {
+            "pages": "all",
+            "print": {
+                "enabled": True,
+                "printer": "Test",
+                "action": "block",
+            },
+        }
+        profile = parse_output_profile("test", data)
+        assert profile.print.action == SafetyAction.BLOCK
+
+    def test_parse_action_warn(self):
+        from pdfmill.config import SafetyAction
+
+        data = {
+            "pages": "all",
+            "print": {
+                "enabled": True,
+                "printer": "Test",
+                "action": "warn",
+            },
+        }
+        profile = parse_output_profile("test", data)
+        assert profile.print.action == SafetyAction.WARN
+
+    def test_safety_defaults(self):
+        from pdfmill.config import SafetyAction
+
+        data = {
+            "pages": "all",
+            "print": {
+                "enabled": True,
+                "printer": "Test",
+            },
+        }
+        profile = parse_output_profile("test", data)
+        assert profile.print.max_pages is None
+        assert profile.print.max_page_size is None
+        assert profile.print.action == SafetyAction.BLOCK
+
+    def test_invalid_action_raises(self):
+        data = {
+            "pages": "all",
+            "print": {
+                "enabled": True,
+                "printer": "Test",
+                "action": "invalid",
+            },
+        }
+        with pytest.raises(ConfigError):
+            parse_output_profile("test", data)
+
+    def test_full_safety_config(self):
+        """Test parsing full safety configuration with all fields."""
+        from pdfmill.config import SafetyAction
+
+        data = {
+            "pages": "all",
+            "print": {
+                "enabled": True,
+                "printer": "Label Printer",
+                "max_pages": 100,
+                "max_page_size": ["8.5in", "11in"],
+                "action": "warn",
+            },
+        }
+        profile = parse_output_profile("test", data)
+        assert profile.print.max_pages == 100
+        assert profile.print.max_page_size == ("8.5in", "11in")
+        assert profile.print.action == SafetyAction.WARN
+
+    def test_max_page_size_wrong_length(self):
+        """Test that max_page_size with wrong length is ignored."""
+        data = {
+            "pages": "all",
+            "print": {
+                "enabled": True,
+                "printer": "Test",
+                "max_page_size": ["4in"],  # Wrong length - should be 2 elements
+            },
+        }
+        profile = parse_output_profile("test", data)
+        assert profile.print.max_page_size is None
+
+    def test_max_page_size_not_a_list(self):
+        """Test that max_page_size as string is ignored."""
+        data = {
+            "pages": "all",
+            "print": {
+                "enabled": True,
+                "printer": "Test",
+                "max_page_size": "4in x 6in",  # Not a list
+            },
+        }
+        profile = parse_output_profile("test", data)
+        assert profile.print.max_page_size is None
+
+
 class TestInputSort:
     """Test input sorting configuration."""
 
