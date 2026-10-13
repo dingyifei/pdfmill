@@ -4,7 +4,7 @@ pdfmill uses YAML configuration files to define processing pipelines. This guide
 
 ## Config File Structure
 
-A config file has four main sections:
+A config file has these top-level sections:
 
 ```yaml
 version: 1
@@ -16,8 +16,13 @@ input:
   # Where to find PDFs and how to filter them
 
 outputs:
-  # One or more output profiles
+  # One or more output profiles (required)
+
+watch:
+  # Watch mode settings (optional)
 ```
+
+Relative paths in the config (`input.path`, `output_dir`) are relative to the current working directory, not to the config file.
 
 ## Settings
 
@@ -26,15 +31,26 @@ The `settings` section controls global behavior:
 ```yaml
 settings:
   on_error: continue      # "continue" or "stop"
-  cleanup_source: false   # Delete source files after processing
-  cleanup_output_after_print: false  # Delete output files after printing
+  cleanup_source: false   # Delete source files that fully succeeded
+  cleanup_output_after_print: false  # Delete output files whose print succeeded
+  print_backend: auto     # "auto", "cups" or "sumatra"
 ```
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `on_error` | `continue` | `continue` skips failed files, `stop` halts on first error |
-| `cleanup_source` | `false` | Delete input files after successful processing |
-| `cleanup_output_after_print` | `false` | Delete output files after successful printing |
+| `on_error` | `continue` | `continue` records the failure and moves on; `stop` aborts the run at the first error (nothing further is printed or cleaned up) |
+| `cleanup_source` | `false` | Delete input files that succeeded (see below) |
+| `cleanup_output_after_print` | `false` | Delete output files whose print job succeeded |
+| `print_backend` | `auto` | `auto` = SumatraPDF on Windows, CUPS elsewhere. Overridden by `--backend` |
+
+### What Counts as Success
+
+Each source PDF is a unit of work. It succeeds only if **every enabled profile produced its output** and **every print job containing that output was accepted** by the printer system.
+
+- `cleanup_source` deletes only sources that succeeded. A source with any failed profile or print job is kept, so you can fix the problem and run again.
+- `cleanup_output_after_print` deletes only outputs whose print succeeded. Outputs of profiles without printing are never deleted.
+- Nothing is deleted in a `--dry-run`.
+- The exit code is `1` if anything failed.
 
 ## Output Profiles
 
@@ -47,7 +63,7 @@ outputs:
     output_dir: ./output/sheets
     print:
       enabled: true
-      printer: "Office Printer"
+      printer: "Office_Printer"
 
   label:
     pages: "last"
@@ -59,10 +75,10 @@ outputs:
     output_dir: ./output/labels
     print:
       enabled: true
-      printer: "Label Printer"
+      printer: "Label_Printer"
 ```
 
-Profile names (like `packing_sheet` and `label`) are used in output filenames.
+Profile names (like `packing_sheet` and `label`) are used in output filenames. `pages` is required in every profile.
 
 ## Enable/Disable
 
@@ -75,29 +91,51 @@ outputs:
     pages: "last"
     transforms:
       - rotate: 90
-        enabled: false      # Skip this transform
+        enabled: false      # Skip this transform (works on every transform type)
       - crop:
           lower_left: [0, 0]
           upper_right: [100, 100]
     print:
       enabled: true         # Would print if profile was enabled
+      printer: "Label_Printer"
 ```
 
 | Level | Field | Default | Description |
 |-------|-------|---------|-------------|
 | Profile | `enabled` | `true` | Skip entire profile when `false` |
 | Transform | `enabled` | `true` | Skip this transform when `false` |
-| Print | `print.enabled` | `false` | Printing is opt-in (must explicitly enable) |
+| Print | `print.enabled` | `false` | Printing is opt-in (must explicitly enable; requires a `printer` or `targets`) |
+
+## Watch Settings
+
+```yaml
+watch:
+  poll_interval: 2.0      # Seconds between polls
+  debounce_delay: 1.0     # Seconds a file must be unchanged before processing
+  process_existing: true  # Process files already present on startup
+```
+
+See [Watch Mode](watch-mode.md).
 
 ## Config Validation
+
+Configs are validated strictly when loaded, before anything is processed:
+
+- Unknown keys are errors, with a suggestion for the closest valid key
+- Types, allowed values, and units are checked, and every message includes the YAML path of the problem
+
+```
+Configuration error: outputs.label.print: unknown key 'copise' (did you mean 'copies'?)
+Configuration error: outputs.label.transforms[1].crop.lower_left: invalid length '10 inch' (use e.g. 100mm, 4in, 288pt, 10cm)
+```
 
 Validate your config before running:
 
 ```sh
-# Check syntax
+# Check the config
 pdfm -c config.yaml --validate
 
-# Check syntax + verify printers exist and paths are valid
+# Also check input path, printers (exist and ready) and optional dependencies
 pdfm -c config.yaml --validate --strict
 ```
 

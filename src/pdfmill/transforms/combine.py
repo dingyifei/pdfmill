@@ -1,145 +1,93 @@
-"""Combine transform for pdfmill."""
+"""Place batches of pages onto new pages (n-up).
 
-import io
-import logging
+- combine:
+    page_size: [8.5in, 11in]
+    pages_per_output: 2
+    layout:
+      - {page: 0, position: [0in, 5.5in], scale: 0.5}
+      - {page: 1, position: [0in, 0in], scale: 0.5}
+"""
 
-from pypdf import PageObject, PdfReader, PdfWriter, Transformation
+from dataclasses import dataclass
 
-from pdfmill.config import CombineTransform as CombineConfig
-from pdfmill.config import Transform
-from pdfmill.transforms._utils import parse_coordinate, parse_dimension
-from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
-from pdfmill.transforms.registry import register_transform
+from pypdf import PageObject, Transformation
 
+from pdfmill.schema import ConfigError, check_keys, pair, require_dict, typed
+from pdfmill.transforms._page import clone, set_box
+from pdfmill.units import to_points
 
-def combine_pages(
-    pages: list[PageObject],
-    page_size: tuple[str, str],
-    layout: list[dict],
-) -> PageObject:
-    """
-    Combine multiple pages onto a single output page.
-
-    Places input pages at specified positions on a new canvas.
-    Useful for creating n-up layouts, booklets, or combining labels.
-
-    Args:
-        pages: List of source pages to combine
-        page_size: (width, height) of the output page, with units (e.g., "8.5in", "11in")
-        layout: List of placement specs, each with:
-            - page: 0-indexed input page number
-            - position: (x, y) lower-left corner position with units
-            - scale: Optional scale factor (default 1.0)
-
-    Returns:
-        A new page with all input pages placed according to layout
-
-    Example:
-        # Create 2-up layout (two pages side by side)
-        layout = [
-            {"page": 0, "position": ("0in", "0in"), "scale": 0.5},
-            {"page": 1, "position": ("4.25in", "0in"), "scale": 0.5},
-        ]
-        combined = combine_pages(pages, ("8.5in", "11in"), layout)
-    """
-    # Parse output page dimensions
-    width = parse_dimension(page_size[0])
-    height = parse_dimension(page_size[1])
-
-    # Create a blank output page
-    output_page = PageObject.create_blank_page(width=width, height=height)
-
-    # Serialize each source page to bytes once.
-    # This is necessary because pypdf's merge_transformed_page can modify
-    # the source page's content stream. When the same page is used multiple
-    # times in the layout, we need independent copies.
-    page_bytes_cache: dict[int, bytes] = {}
-    for item in layout:
-        page_idx = item.get("page", 0)
-        if page_idx >= len(pages) or page_idx in page_bytes_cache:
-            continue
-        temp_writer = PdfWriter()
-        temp_writer.add_page(pages[page_idx])
-        buffer = io.BytesIO()
-        temp_writer.write(buffer)
-        page_bytes_cache[page_idx] = buffer.getvalue()
-
-    # Temporarily suppress pypdf warnings about xref entries
-    pypdf_logger = logging.getLogger("pypdf")
-    original_level = pypdf_logger.level
-    pypdf_logger.setLevel(logging.ERROR)
-
-    try:
-        for item in layout:
-            page_idx = item.get("page", 0)
-            if page_idx >= len(pages):
-                continue  # Skip if page doesn't exist
-
-            # Get a fresh copy of the source page
-            reader = PdfReader(io.BytesIO(page_bytes_cache[page_idx]))
-            source_page = reader.pages[0]
-
-            position = item.get("position", (0, 0))
-            scale = item.get("scale", 1.0)
-
-            # Parse position coordinates
-            x = parse_coordinate(position[0])
-            y = parse_coordinate(position[1])
-
-            # Build transformation: scale then translate
-            # Note: transformations are applied in reverse order in the matrix
-            transform = Transformation().scale(sx=scale, sy=scale).translate(tx=x, ty=y)
-
-            # Merge the source page onto the output with the transformation
-            output_page.merge_transformed_page(source_page, transform)
-    finally:
-        pypdf_logger.setLevel(original_level)
-
-    return output_page
+NAME = "combine"
 
 
-@register_transform("combine")
-class CombineTransformHandler(BaseTransform):
-    """Handler for combine transforms (N pages -> 1 page, batched)."""
+@dataclass
+class Placement:
+    page: int
+    x: float
+    y: float
+    scale: float = 1.0
 
-    def __init__(self, config: CombineConfig):
-        self.config = config
 
-    @classmethod
-    def from_config(cls, transform: Transform) -> "CombineTransformHandler":
-        if not transform.combine:
-            raise ValueError("Combine transform missing combine config")
-        return cls(transform.combine)
+@dataclass
+class Options:
+    width: float
+    height: float
+    layout: list[Placement]
+    pages_per_output: int = 2
 
-    def apply(
-        self,
-        pages: list[PageObject],
-        context: TransformContext,
-    ) -> TransformResult:
-        batch_size = self.config.pages_per_output
 
-        # Convert config layout to dict format
-        layout = [
-            {
-                "page": item.page,
-                "position": item.position,
-                "scale": item.scale,
-            }
-            for item in self.config.layout
-        ]
-
-        new_pages = []
-        for i in range(0, len(pages), batch_size):
-            batch = pages[i : i + batch_size]
-            combined = combine_pages(batch, self.config.page_size, layout)
-            new_pages.append(combined)
-
-        return TransformResult(
-            pages=new_pages,
-            mode="reduce",
-            batch_size=batch_size,
+def parse(value, where: str) -> Options:
+    value = require_dict(value, where)
+    check_keys(value, ("page_size", "pages_per_output", "layout"), where)
+    width, height = pair(value.get("page_size", ["8.5in", "11in"]), f"{where}.page_size")
+    per_output = typed(value.get("pages_per_output", 2), int, f"{where}.pages_per_output")
+    if per_output < 1:
+        raise ConfigError(f"{where}.pages_per_output: must be at least 1")
+    layout_data = value.get("layout")
+    if not isinstance(layout_data, list) or not layout_data:
+        raise ConfigError(f"{where}.layout: expected a non-empty list of placements")
+    layout = []
+    for i, item in enumerate(layout_data):
+        item_where = f"{where}.layout[{i}]"
+        item = require_dict(item, item_where)
+        check_keys(item, ("page", "position", "scale"), item_where)
+        page = typed(item.get("page", 0), int, f"{item_where}.page")
+        if not 0 <= page < per_output:
+            raise ConfigError(f"{item_where}.page: must be between 0 and pages_per_output - 1 ({per_output - 1})")
+        x, y = pair(item.get("position", [0, 0]), f"{item_where}.position")
+        layout.append(
+            Placement(
+                page=page,
+                x=to_points(x, f"{item_where}.position"),
+                y=to_points(y, f"{item_where}.position"),
+                scale=float(typed(item.get("scale", 1.0), (int, float), f"{item_where}.scale")),
+            )
         )
+    return Options(
+        width=to_points(width, f"{where}.page_size"),
+        height=to_points(height, f"{where}.page_size"),
+        layout=layout,
+        pages_per_output=per_output,
+    )
 
-    def describe(self) -> str:
-        n = self.config.pages_per_output
-        return f"combine{n}"
+
+def describe(opts: Options) -> str:
+    return f"combine{opts.pages_per_output}"
+
+
+def apply(pages: list[PageObject], opts: Options) -> list[PageObject]:
+    n = opts.pages_per_output
+    return [combine_pages(pages[i : i + n], opts) for i in range(0, len(pages), n)]
+
+
+def combine_pages(batch: list[PageObject], opts: Options) -> PageObject:
+    """Merge ``batch`` onto one blank page according to ``opts.layout``."""
+    output = PageObject.create_blank_page(width=opts.width, height=opts.height)
+    for item in opts.layout:
+        if item.page >= len(batch):
+            continue  # last batch may be short
+        # merge_transformed_page can alter the source, so merge a fresh copy each time.
+        source = clone(batch[item.page])
+        transform = Transformation().scale(sx=item.scale, sy=item.scale).translate(tx=item.x, ty=item.y)
+        output.merge_transformed_page(source, transform)
+    set_box(output, opts.width, opts.height)
+    return output

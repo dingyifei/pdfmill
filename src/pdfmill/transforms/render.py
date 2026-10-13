@@ -1,93 +1,75 @@
-"""Render transform for pdfmill."""
+"""Rasterize pages and re-embed them as images (flattens everything, drops hidden content).
+
+    - render: 300          # DPI
+    - render: {dpi: 200}
+    - render: true         # 150 DPI
+
+Needs poppler (macOS: brew install poppler) and the OCR extra (pdf2image, Pillow).
+"""
 
 import io
+from dataclasses import dataclass
 
 from pypdf import PageObject, PdfReader, PdfWriter
 
-from pdfmill.config import RenderTransform as RenderConfig
-from pdfmill.config import Transform
-from pdfmill.transforms._utils import TransformError
-from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
-from pdfmill.transforms.registry import register_transform
+from pdfmill.schema import ConfigError, check_keys, typed
+from pdfmill.transforms._page import TransformError, set_box, size
+
+NAME = "render"
+
+
+@dataclass
+class Options:
+    dpi: int = 150
+
+
+def parse(value, where: str) -> Options:
+    if value is True or value is None:
+        return Options()
+    if isinstance(value, dict):
+        check_keys(value, ("dpi",), where)
+        value = value.get("dpi", 150)
+    dpi = typed(value, int, where)
+    if not 36 <= dpi <= 1200:
+        raise ConfigError(f"{where}: dpi must be between 36 and 1200, got {dpi}")
+    return Options(dpi=dpi)
+
+
+def describe(opts: Options) -> str:
+    return f"render_{opts.dpi}dpi"
+
+
+def apply(pages: list[PageObject], opts: Options) -> list[PageObject]:
+    return [render_page(page, opts.dpi) for page in pages]
+
+
+def rasterize(page: PageObject, dpi: int):
+    """Render one page to a PIL image."""
+    try:
+        from pdf2image import convert_from_bytes
+        from pdf2image.exceptions import PDFInfoNotInstalledError
+    except ImportError:
+        raise TransformError("Rendering needs the OCR extra: pip install 'pdfmill[ocr]'")
+    writer = PdfWriter()
+    writer.add_page(page)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    try:
+        images = convert_from_bytes(buffer.getvalue(), dpi=dpi)
+    except PDFInfoNotInstalledError:
+        raise TransformError("poppler is not installed (macOS: brew install poppler)")
+    if not images:
+        raise TransformError("Failed to render page to an image")
+    return images[0]
 
 
 def render_page(page: PageObject, dpi: int = 150) -> PageObject:
-    """
-    Rasterize a page to an image and re-embed it as a new PDF page.
-
-    This permanently removes any content outside the visible area (mediabox)
-    and flattens all layers, annotations, and transparency. The result is
-    a single image embedded in a PDF page.
-
-    Args:
-        page: The page to render
-        dpi: Resolution for rasterization (default 150)
-
-    Returns:
-        A new PageObject containing the rasterized image
-
-    Raises:
-        TransformError: If pdf2image or Pillow are not installed
-    """
-    try:
-        from pdf2image import convert_from_bytes
-    except ImportError:
-        raise TransformError("pdf2image is required for render transform. Install with: pip install pdf2image")
-
-    try:
-        from PIL import Image  # noqa: F401
-    except ImportError:
-        raise TransformError("Pillow is required for render transform. Install with: pip install Pillow")
-
-    # Write the single page to a temporary PDF in memory
-    writer = PdfWriter()
-    writer.add_page(page)
-
-    pdf_bytes = io.BytesIO()
-    writer.write(pdf_bytes)
-    pdf_bytes.seek(0)
-
-    # Render to image using pdf2image
-    images = convert_from_bytes(pdf_bytes.read(), dpi=dpi)
-
-    if not images:
-        raise TransformError("Failed to render page to image")
-
-    image = images[0]
-
-    # Save the image as a PDF in memory
-    img_pdf_bytes = io.BytesIO()
-    image.save(img_pdf_bytes, format="PDF", resolution=dpi)
-    img_pdf_bytes.seek(0)
-
-    # Read the image PDF and return the page
-    reader = PdfReader(img_pdf_bytes)
-    return reader.pages[0]
-
-
-@register_transform("render")
-class RenderTransformHandler(BaseTransform):
-    """Handler for render transforms."""
-
-    def __init__(self, config: RenderConfig):
-        self.config = config
-
-    @classmethod
-    def from_config(cls, transform: Transform) -> "RenderTransformHandler":
-        if not transform.render:
-            raise ValueError("Render transform missing render config")
-        return cls(transform.render)
-
-    def apply(
-        self,
-        pages: list[PageObject],
-        context: TransformContext,
-    ) -> TransformResult:
-        new_pages = []
-        for page in pages:
-            rendered = render_page(page, dpi=self.config.dpi)
-            new_pages.append(rendered)
-        return TransformResult(pages=new_pages, mode="replace")
-
-    def describe(self) -> str:
-        return f"render_{self.config.dpi}dpi"
+    """Return a new page containing ``page`` rasterized at ``dpi``, at the same size."""
+    width, height = size(page)
+    image = rasterize(page, dpi)
+    buffer = io.BytesIO()
+    image.save(buffer, format="PDF", resolution=dpi)
+    buffer.seek(0)
+    rendered = PdfReader(buffer).pages[0]
+    set_box(rendered, width, height)
+    return rendered

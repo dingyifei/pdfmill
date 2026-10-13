@@ -1,337 +1,196 @@
-"""Main processing pipeline for pdfmill."""
+"""Run a config over input PDFs: select pages, transform, write, print, clean up.
+
+Each source PDF is a unit of work. It counts as succeeded only if every
+enabled profile produced its output and every print job containing that
+output was accepted. Cleanup only ever touches work that succeeded.
+"""
 
 import os
+import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
-from pdfmill.config import (
-    Config,
-    ConfigError,
-    ErrorHandling,
-    FilterConfig,
-    FilterMatch,
-    OutputProfile,
-    SortOrder,
-)
+from pdfmill.config import Config, OutputProfile
 from pdfmill.logging_config import get_logger
-from pdfmill.pipeline import PrintPipeline, PrintSafetyError, TransformExecutor
-from pdfmill.printer import PrinterError
-from pdfmill.selector import PageSelectionError, select_pages
-from pdfmill.transforms import TransformError
+from pdfmill.printing import Backend, get_backend, print_profile
+from pdfmill.selector import select_pages
+from pdfmill.transforms import apply_all
+from pdfmill.transforms._page import clone
 
 logger = get_logger(__name__)
 
 
 class ProcessingError(Exception):
-    """Raised when PDF processing fails."""
+    """Raised for input problems (e.g. missing input path) and when on_error is 'stop'."""
 
 
-def extract_pdf_text(pdf_path: Path) -> str:
-    """Extract all text content from a PDF.
+@dataclass
+class RunResult:
+    sources: list[Path] = field(default_factory=list)
+    failed: dict[Path, str] = field(default_factory=dict)  # source -> first error
+    outputs: list[Path] = field(default_factory=list)
+    jobs: list[str] = field(default_factory=list)
 
-    Args:
-        pdf_path: Path to the PDF file
+    @property
+    def ok(self) -> bool:
+        return not self.failed
 
-    Returns:
-        Concatenated text from all pages
-    """
-    reader = PdfReader(str(pdf_path))
-    text_parts = []
-    for page in reader.pages:
-        text_parts.append(page.extract_text() or "")
-    return "\n".join(text_parts)
+    @property
+    def succeeded(self) -> list[Path]:
+        return [s for s in self.sources if s not in self.failed]
 
-
-def matches_filter(pdf_path: Path, filter_config: FilterConfig) -> bool:
-    """Check if a PDF matches the keyword filter.
-
-    Args:
-        pdf_path: Path to the PDF file
-        filter_config: Filter configuration with keywords and match mode
-
-    Returns:
-        True if PDF matches the filter criteria
-    """
-    if not filter_config.keywords:
-        return True  # No keywords = match all
-
-    text = extract_pdf_text(pdf_path)
-
-    if filter_config.match == FilterMatch.ALL:
-        return all(kw in text for kw in filter_config.keywords)
-    else:  # FilterMatch.ANY
-        return any(kw in text for kw in filter_config.keywords)
+    def fail(self, source: Path, message: str) -> None:
+        logger.error("%s: %s", source.name, message)
+        self.failed.setdefault(source, message)
 
 
-def get_input_files(input_path: Path, pattern: str = "*.pdf") -> list[Path]:
-    """
-    Get list of PDF files to process.
-
-    Args:
-        input_path: File or directory path
-        pattern: Glob pattern for finding files in directory
-
-    Returns:
-        List of PDF file paths
-    """
-    if input_path.is_file():
-        return [input_path]
-    elif input_path.is_dir():
-        return sorted(input_path.glob(pattern))
-    else:
-        raise ProcessingError(f"Input path does not exist: {input_path}")
+def find_inputs(path: Path, pattern: str = "*.pdf") -> list[Path]:
+    if path.is_file():
+        return [path]
+    if path.is_dir():
+        return sorted(p for p in path.glob(pattern) if p.is_file())
+    raise ProcessingError(f"Input path does not exist: {path}")
 
 
-def sort_files(files: list[Path], sort_option: SortOrder) -> list[Path]:
-    """Sort files by name or modification time.
-
-    Args:
-        files: List of file paths to sort
-        sort_option: SortOrder enum value
-
-    Returns:
-        Sorted list of file paths
-    """
-    if sort_option == SortOrder.NAME_ASC:
-        return sorted(files, key=lambda f: f.name.lower())
-    elif sort_option == SortOrder.NAME_DESC:
-        return sorted(files, key=lambda f: f.name.lower(), reverse=True)
-    elif sort_option == SortOrder.TIME_ASC:
-        return sorted(files, key=lambda f: f.stat().st_mtime)
-    elif sort_option == SortOrder.TIME_DESC:
-        return sorted(files, key=lambda f: f.stat().st_mtime, reverse=True)
-    return files
+def sort_files(files: list[Path], order: str | None) -> list[Path]:
+    if order is None:
+        return files
+    by_time = order.startswith("time")
+    key = (lambda f: f.stat().st_mtime) if by_time else (lambda f: f.name.lower())
+    return sorted(files, key=key, reverse=order.endswith("desc"))
 
 
-def generate_output_filename(
-    source_name: str,
-    profile_name: str,
-    prefix: str = "",
-    suffix: str = "",
-) -> str:
-    """Generate output filename based on source and profile settings."""
-    stem = Path(source_name).stem
-    return f"{prefix}{stem}{suffix}_{profile_name}.pdf"
+def matches_keywords(path: Path, keywords: list[str], match: str) -> bool:
+    if not keywords:
+        return True
+    text = "\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
+    found = (kw in text for kw in keywords)
+    return all(found) if match == "all" else any(found)
 
 
-def process_single_pdf(
-    pdf_path: Path,
-    profile_name: str,
-    profile: OutputProfile,
-    output_dir: Path,
-    dry_run: bool = False,
-) -> Path | None:
-    """
-    Process a single PDF according to an output profile.
+def process_file(source: Path, profile: OutputProfile, output_dir: Path) -> Path:
+    """Apply one profile to one PDF and return the written output path."""
+    reader = PdfReader(source)
+    indices = select_pages(profile.pages, len(reader.pages))
+    seen: set[int] = set()
+    pages = []
+    for i in indices:
+        # A page selected twice must be an independent copy, or transforms would apply twice.
+        pages.append(clone(reader.pages[i]) if i in seen else reader.pages[i])
+        seen.add(i)
 
-    Args:
-        pdf_path: Path to source PDF
-        profile_name: Name of the profile (for output filename)
-        profile: Output profile configuration
-        output_dir: Directory for output files
-        dry_run: If True, only describe what would be done
+    debug_prefix = output_dir / f"{source.stem}_{profile.name}" if profile.debug else None
+    pages = apply_all(pages, profile.transforms, debug_prefix)
 
-    Returns:
-        Path to output file, or None if dry run
-    """
-    if dry_run:
-        logger.info("  Processing profile '%s' for %s", profile_name, pdf_path.name)
-
-    # Read source PDF
-    reader = PdfReader(str(pdf_path))
-    total_pages = len(reader.pages)
-
-    # Select pages
-    try:
-        page_indices = select_pages(profile.pages, total_pages)
-    except PageSelectionError as e:
-        raise ProcessingError(f"Page selection failed: {e}")
-
-    if dry_run:
-        logger.info("    [dry-run] Select pages: %s from %d pages", [i + 1 for i in page_indices], total_pages)
-
-    # Extract pages
-    pages = [reader.pages[i] for i in page_indices]
-
-    # Apply transforms (pass pdf_path and original indices for auto rotation)
-    executor = TransformExecutor()
-    pages = executor.apply(
-        pages,
-        profile.transforms,
-        dry_run=dry_run,
-        pdf_path=pdf_path,
-        original_page_indices=page_indices,
-        debug=profile.debug,
-        debug_output_dir=output_dir,
-        debug_source_name=pdf_path.name,
-        debug_profile_name=profile_name,
-    )
-
-    # Generate output path
-    output_filename = generate_output_filename(
-        pdf_path.name,
-        profile_name,
-        profile.filename_prefix,
-        profile.filename_suffix,
-    )
-    output_path = output_dir / output_filename
-
-    if dry_run:
-        logger.info("    [dry-run] Write to: %s", output_path)
-        return None
-
-    # Write output
+    output = output_dir / profile.output_name(source)
     writer = PdfWriter()
     for page in pages:
         writer.add_page(page)
-
     output_dir.mkdir(parents=True, exist_ok=True)
-    with open(output_path, "wb") as f:
+    partial = output.with_suffix(".pdf.part")
+    with open(partial, "wb") as f:
         writer.write(f)
-
-    logger.info("  Created: %s", output_path)
-    return output_path
+    partial.replace(output)  # never leave a half-written PDF behind
+    logger.info("  Created: %s", output)
+    return output
 
 
 def process(
     config: Config,
-    input_path: Path,
+    input_path: Path | None = None,
     output_dir: Path | None = None,
     dry_run: bool = False,
-) -> None:
+    backend: Backend | None = None,
+) -> RunResult:
+    """Process ``input_path`` (a file or directory; defaults to ``input.path``).
+
+    ``output_dir`` overrides every profile's output_dir. A dry run does all
+    the work in a temporary directory and logs the print commands instead of
+    running them; nothing is printed or deleted.
     """
-    Process PDFs according to configuration.
+    input_path = input_path or config.input.path
+    result = RunResult()
+    stop = config.settings.on_error == "stop"
 
-    Args:
-        config: Pipeline configuration
-        input_path: Path to input file or directory
-        output_dir: Override output directory (uses profile dirs if None)
-        dry_run: If True, only describe what would be done
-    """
-    # Get input files
-    input_files = get_input_files(input_path, config.input.pattern)
-    if not input_files:
-        logger.info("No PDF files found in: %s", input_path)
-        return
-
-    # Apply keyword filter if configured
-    if config.input.filter and config.input.filter.keywords:
-        total_before = len(input_files)
-        input_files = [f for f in input_files if matches_filter(f, config.input.filter)]
-        filtered_count = total_before - len(input_files)
-        if filtered_count > 0:
-            logger.info("Filtered out %d file(s) by keyword filter", filtered_count)
-        if not input_files:
-            logger.info("No PDF files matched the keyword filter")
-            return
-
-    logger.info("Found %d PDF file(s) to process", len(input_files))
-
-    # Validate sort settings - error if both input.sort and any profile.sort are set
-    for profile_name, profile in config.outputs.items():
-        if config.input.sort and profile.sort:
-            raise ConfigError(
-                f"Sort specified in both input ({config.input.sort.value}) "
-                f"and profile '{profile_name}' ({profile.sort.value}). Use only one."
-            )
-
-    # Apply global input sorting if configured
-    if config.input.sort:
-        input_files = sort_files(input_files, config.input.sort)
-        logger.info("Sorted files by: %s", config.input.sort.value)
-
-    success_count = 0
-    fail_count = 0
-    # Track output files by profile name for merge support
-    # Includes source_path for per-profile sorting
-    output_files: list[tuple[Path, str, OutputProfile, Path]] = []
-
-    for pdf_path in input_files:
-        logger.info("\nProcessing: %s", pdf_path.name)
-
-        for profile_name, profile in config.outputs.items():
-            # Skip disabled profiles
-            if not profile.enabled:
-                logger.debug("Skipping disabled profile: %s", profile_name)
-                continue
-
-            try:
-                # Determine output directory
-                profile_output_dir = output_dir if output_dir else profile.output_dir
-
-                output_path = process_single_pdf(
-                    pdf_path,
-                    profile_name,
-                    profile,
-                    profile_output_dir,
-                    dry_run,
-                )
-
-                if output_path:
-                    output_files.append((output_path, profile_name, profile, pdf_path))
-                success_count += 1
-
-            except (ProcessingError, TransformError) as e:
-                logger.error("Error in profile '%s': %s", profile_name, e)
-                fail_count += 1
-                if config.settings.on_error == ErrorHandling.STOP:
-                    raise
-
-    # Track temporary files for cleanup
-    temporary_files: list[Path] = []
-
-    # Print outputs
-    if not dry_run:
-        # Group files by profile name for merge support
-        # Each entry: (output_path, profile, source_path)
-        files_by_profile: dict[str, list[tuple[Path, OutputProfile, Path]]] = {}
-        for output_path, profile_name, profile, source_path in output_files:
-            if profile_name not in files_by_profile:
-                files_by_profile[profile_name] = []
-            files_by_profile[profile_name].append((output_path, profile, source_path))
-
-        # Use PrintPipeline for print orchestration
-        pipeline = PrintPipeline(dry_run=dry_run)
+    sources = []
+    for f in find_inputs(input_path, config.input.pattern):
         try:
-            print_result = pipeline.print_outputs(
-                files_by_profile,
-                output_dir,
-                config.settings.on_error,
-            )
-            temporary_files = print_result.temporary_files
-            fail_count += print_result.fail_count
-        except (PrinterError, PrintSafetyError):
-            # Error already logged by pipeline, re-raise if on_error is STOP
-            if config.settings.on_error == ErrorHandling.STOP:
-                raise
+            if matches_keywords(f, config.input.keywords, config.input.match):
+                sources.append(f)
+            else:
+                logger.info("Skipping %s: keyword filter did not match", f.name)
+        except Exception as e:
+            result.sources.append(f)
+            result.fail(f, f"cannot read PDF: {e}")
+            if stop:
+                raise ProcessingError(str(e))
+    sources = sort_files(sources, config.input.sort)
+    result.sources += sources
+    if not result.sources:
+        logger.info("No PDF files found in %s matching %s", input_path, config.input.pattern)
+        return result
+    logger.info("Found %d PDF file(s) to process", len(sources))
 
-    # Cleanup
+    profiles = [p for p in config.outputs.values() if p.enabled]
+    with tempfile.TemporaryDirectory(prefix="pdfmill-") as tmp:
+        workdir = Path(tmp)
+        if dry_run:
+            output_dir = workdir / "output"
+
+        # 1. Transform: outputs[profile name] = [(source, output path)]
+        outputs: dict[str, list[tuple[Path, Path]]] = {p.name: [] for p in profiles}
+        for source in sources:
+            logger.info("Processing: %s", source.name)
+            for profile in profiles:
+                try:
+                    out = process_file(source, profile, output_dir or profile.output_dir)
+                except Exception as e:
+                    result.fail(source, f"profile '{profile.name}': {e}")
+                    if stop:
+                        raise ProcessingError(str(e))
+                    continue
+                outputs[profile.name].append((source, out))
+                result.outputs.append(out)
+
+        # 2. Print
+        printed: list[Path] = []
+        printing = [p for p in profiles if p.print.enabled and outputs[p.name]]
+        if printing:
+            backend = backend or get_backend(config.settings.print_backend)
+        for profile in printing:
+            items = outputs[profile.name]
+            if profile.sort:
+                order = sort_files([s for s, _ in items], profile.sort)
+                items = sorted(items, key=lambda item: order.index(item[0]))
+            try:
+                result.jobs += print_profile(profile, [out for _, out in items], backend, workdir, dry_run)
+                printed += [out for _, out in items]
+            except Exception as e:
+                for source, _ in items:
+                    result.fail(source, f"printing profile '{profile.name}' failed: {e}")
+                if stop:
+                    raise ProcessingError(str(e))
+
+    # 3. Clean up (only what succeeded)
     if not dry_run:
-        if config.settings.cleanup_source:
-            for pdf_path in input_files:
-                try:
-                    os.remove(pdf_path)
-                    logger.debug("Cleaned up source: %s", pdf_path)
-                except OSError as e:
-                    logger.warning("Failed to cleanup %s: %s", pdf_path, e)
-
         if config.settings.cleanup_output_after_print:
-            for output_path, _, profile, _ in output_files:
-                if profile.print.enabled:
-                    try:
-                        os.remove(output_path)
-                        logger.debug("Cleaned up output: %s", output_path)
-                    except OSError as e:
-                        logger.warning("Failed to cleanup %s: %s", output_path, e)
+            for out in printed:
+                _remove(out)
+        if config.settings.cleanup_source:
+            for source in result.succeeded:
+                _remove(source)
+        if config.settings.cleanup_source and result.failed:
+            logger.warning("Kept %d source file(s) that did not fully succeed", len(result.failed))
 
-            # Also cleanup temporary files (merged/split)
-            for temp_path in temporary_files:
-                try:
-                    os.remove(temp_path)
-                    logger.debug("Cleaned up temporary: %s", temp_path)
-                except OSError as e:
-                    logger.warning("Failed to cleanup %s: %s", temp_path, e)
+    logger.info("Done: %d succeeded, %d failed", len(result.succeeded), len(result.failed))
+    return result
 
-    # Summary
-    logger.info("\nProcessing complete: %d succeeded, %d failed", success_count, fail_count)
+
+def _remove(path: Path) -> None:
+    try:
+        os.remove(path)
+        logger.debug("Removed %s", path)
+    except OSError as e:
+        logger.warning("Could not remove %s: %s", path, e)

@@ -8,12 +8,12 @@ Output profiles define how PDFs are processed and where they're saved. Each prof
 outputs:
   profile_name:           # Name used in output filename
     enabled: true         # Toggle this profile
-    pages: "all"          # Page selection
+    pages: "all"          # Page selection (required)
     transforms: []        # List of transforms
-    output_dir: ./output  # Where to save
+    output_dir: ./output  # Where to save (default: output)
     filename_prefix: ""   # Add before filename
     filename_suffix: ""   # Add after filename
-    sort: name_asc        # Override input sort
+    sort: name_asc        # Print order for this profile (overrides input.sort)
     debug: false          # Save intermediate files
     print:                # Print configuration
       enabled: false
@@ -37,6 +37,7 @@ processed_document_label.pdf
 ```yaml
 outputs:
   label:
+    pages: "last"
     filename_prefix: "processed_"    # Add before source filename
     filename_suffix: "_v2"           # Add after source filename
     output_dir: ./output/labels
@@ -54,7 +55,7 @@ outputs:
     output_dir: ./output/sheets
     print:
       enabled: true
-      printer: "Office Printer"
+      printer: "Office_Printer"
 
   # Profile 2: Extract and transform label
   label:
@@ -67,14 +68,14 @@ outputs:
     output_dir: ./output/labels
     print:
       enabled: true
-      printer: "Label Printer"
+      printer: "Label_Printer"
 ```
 
 Each input file produces one output per enabled profile.
 
 ## Profile-Level Sort Override
 
-Override the input sort order for a specific profile:
+`input.sort` sets the order in which files are processed. A profile's `sort` overrides the order in which that profile's outputs are printed (and merged, with `merge: true`):
 
 ```yaml
 input:
@@ -84,14 +85,14 @@ input:
 outputs:
   labels:
     pages: "last"
-    sort: time_desc       # Override: newest first for this profile
+    sort: time_desc       # Override: print newest first for this profile
 ```
 
-**Note:** Setting both input-level and profile-level sort will raise an error to prevent confusion.
+Setting both is allowed. Profiles without `sort` print in the `input.sort` order.
 
 ## Debug Mode
 
-Enable `debug: true` to save intermediate PDFs after each transform step:
+Enable `debug: true` to save intermediate PDFs after each transform step (written to the profile's output directory):
 
 ```yaml
 outputs:
@@ -110,7 +111,7 @@ This generates files showing each processing stage:
 
 ```
 ./output/
-├── myfile_label_step0_selected.pdf   # After page selection
+├── myfile_label_step0_selected.pdf   # After page selection (pages normalized)
 ├── myfile_label_step1_rotate90.pdf   # After rotation
 ├── myfile_label_step2_crop.pdf       # After crop
 └── myfile_label.pdf                  # Final output
@@ -121,6 +122,8 @@ Debug mode is useful for:
 - Verifying crop coordinates
 - Understanding the transform pipeline
 
+In a `--dry-run`, debug files go to the temporary directory along with the outputs.
+
 ## Enable/Disable Profiles
 
 Temporarily disable a profile without removing its configuration:
@@ -129,6 +132,7 @@ Temporarily disable a profile without removing its configuration:
 outputs:
   packing_sheet:
     enabled: true         # Will be processed
+    pages: "1--1"
 
   label:
     enabled: false        # Skipped entirely
@@ -152,9 +156,11 @@ outputs:
     output_dir: ./output/receipts
 ```
 
-The directory is created if it doesn't exist.
+The directory is created if it doesn't exist. Relative paths are relative to the current working directory. Outputs are written atomically, so a failed run never leaves a half-written PDF behind.
 
 CLI override applies to all profiles: `pdfm -c config.yaml -i ./input -o ./override`
+
+Temporary files used for printing (merged PDFs, per-printer splits) are kept in a temporary directory, never in the output directory.
 
 ## Complete Example
 
@@ -177,7 +183,7 @@ outputs:
     output_dir: ./processed/packing
     print:
       enabled: true
-      printer: "Office Printer"
+      printer: "Office_Printer"
 
   shipping_label:
     enabled: true
@@ -193,7 +199,7 @@ outputs:
     debug: false
     print:
       enabled: true
-      printer: "Label Printer"
+      printer: "Label_Printer"
 
   archive:
     enabled: true

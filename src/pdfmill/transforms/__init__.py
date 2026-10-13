@@ -1,94 +1,79 @@
-"""Transform package for pdfmill.
+"""Page transforms.
 
-This package provides a registry-based transform system with decorator registration.
-
-Usage:
-    from pdfmill.transforms import get_transform
-    from pdfmill.config import Transform
-
-    transform_config = Transform(rotate=RotateTransform(angle=90))
-    handler = get_transform(transform_config)
-    result = handler.apply(pages, context)
-
-Backwards-compatible function exports are available:
-    from pdfmill.transforms import rotate_page, crop_page, resize_page
+Each transform is a module exposing ``NAME``, ``parse(value, where) -> options``,
+``apply(pages, options) -> pages`` and ``describe(options) -> str``. To add a
+transform, write such a module and list it in ``_MODULES``.
 """
 
-# Import all transform modules to trigger registration (side-effect imports)
-from pdfmill.transforms import (  # noqa: F401
-    combine,
-    crop,
-    render,
-    resize,
-    rotate,
-    split,
-    stamp,
-)
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
-# Utility exports (for external use)
-from pdfmill.transforms._utils import (
-    UNIT_TO_POINTS,
-    TransformError,
-    detect_page_orientation,
-    get_page_dimensions,
-    is_landscape,
-    parse_coordinate,
-    parse_dimension,
-)
+from pypdf import PageObject, PdfWriter
 
-# Core exports
-from pdfmill.transforms.base import (
-    BaseTransform,
-    TransformContext,
-    TransformResult,
-)
+from pdfmill.logging_config import get_logger
+from pdfmill.schema import ConfigError, typed
+from pdfmill.transforms import combine, crop, render, resize, rotate, split, stamp
+from pdfmill.transforms._page import TransformError, normalize
 
-# Backwards-compatible function exports
-from pdfmill.transforms.combine import combine_pages
-from pdfmill.transforms.crop import crop_page
-from pdfmill.transforms.registry import (
-    get_transform,
-    list_transforms,
-    register_transform,
-)
-from pdfmill.transforms.render import render_page
-from pdfmill.transforms.resize import resize_page
-from pdfmill.transforms.rotate import rotate_page
-from pdfmill.transforms.split import split_page
+__all__ = ["Transform", "TransformError", "apply_all", "parse_transform", "TRANSFORMS"]
 
-# Internal functions exported for tests
-from pdfmill.transforms.stamp import (
-    _calculate_stamp_position,
-    _format_stamp_text,
-    stamp_page,
-)
+logger = get_logger(__name__)
 
-__all__ = [
-    # Core classes
-    "BaseTransform",
-    "TransformContext",
-    "TransformResult",
-    # Registry functions
-    "register_transform",
-    "get_transform",
-    "list_transforms",
-    # Transform functions (backwards compat)
-    "rotate_page",
-    "crop_page",
-    "resize_page",
-    "stamp_page",
-    "render_page",
-    "split_page",
-    "combine_pages",
-    # Utilities
-    "TransformError",
-    "UNIT_TO_POINTS",
-    "parse_dimension",
-    "parse_coordinate",
-    "get_page_dimensions",
-    "is_landscape",
-    "detect_page_orientation",
-    # Internal (for tests)
-    "_format_stamp_text",
-    "_calculate_stamp_position",
-]
+_MODULES = (rotate, crop, resize, stamp, split, combine, render)
+TRANSFORMS = {m.NAME: m for m in _MODULES}
+
+
+@dataclass
+class Transform:
+    name: str
+    options: Any
+    enabled: bool = True
+
+    def describe(self) -> str:
+        return TRANSFORMS[self.name].describe(self.options)
+
+
+def parse_transform(data: Any, where: str) -> Transform:
+    """Parse one entry of a ``transforms:`` list, e.g. ``{rotate: 90, enabled: false}``."""
+    if not isinstance(data, dict):
+        raise ConfigError(f"{where}: expected a mapping like '- rotate: 90'")
+    names = [k for k in data if k != "enabled"]
+    if len(names) != 1 or names[0] not in TRANSFORMS:
+        raise ConfigError(f"{where}: expected exactly one transform ({', '.join(TRANSFORMS)}), got {names or 'none'}")
+    name = names[0]
+    enabled = typed(data.get("enabled", True), bool, f"{where}.enabled")
+    return Transform(name, TRANSFORMS[name].parse(data[name], f"{where}.{name}"), enabled)
+
+
+def apply_all(
+    pages: list[PageObject],
+    transforms: list[Transform],
+    debug_prefix: Path | None = None,
+) -> list[PageObject]:
+    """Normalize pages, then apply enabled transforms in order.
+
+    If ``debug_prefix`` is given, a PDF is saved after each step as
+    ``<prefix>_step<N>_<description>.pdf``.
+    """
+    pages = [normalize(p) for p in pages]
+    if debug_prefix:
+        _save(pages, debug_prefix, 0, "selected")
+    for step, transform in enumerate(transforms, start=1):
+        if not transform.enabled:
+            continue
+        pages = TRANSFORMS[transform.name].apply(pages, transform.options)
+        if debug_prefix:
+            _save(pages, debug_prefix, step, transform.describe())
+    return pages
+
+
+def _save(pages: list[PageObject], prefix: Path, step: int, desc: str) -> None:
+    path = prefix.with_name(f"{prefix.name}_step{step}_{desc}.pdf")
+    writer = PdfWriter()
+    for page in pages:
+        writer.add_page(page)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "wb") as f:
+        writer.write(f)
+    logger.debug("Saved debug step: %s", path)

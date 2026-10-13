@@ -38,13 +38,13 @@ Features and improvements planned for pdfmill.
   - [x] Weight-based page distribution (for load balancing by speed/ppm)
   - [x] Copy distribution (different copy counts per target)
   - [x] Backwards compatible with single `printer:` config
-- [ ] Cross-platform printing backend:
-  - [x] SumatraPDF on Windows (current)
-  - [ ] `lpr` command on Linux/macOS
-  - [ ] Auto-detect platform and route to appropriate backend
-  - [ ] Expose platform-specific printer settings in config YAML
-  - [ ] Common settings: printer name, copies, paper size
-  - [ ] Platform-specific args passed through to backend
+- [x] Cross-platform printing backend:
+  - [x] SumatraPDF on Windows
+  - [x] CUPS (`lp`/`lpstat`) on Linux/macOS
+  - [x] Auto-detect platform and route to appropriate backend (`settings.print_backend`)
+  - [x] Expose platform-specific printer settings in config YAML (`options:` -> CUPS `-o`)
+  - [x] Common settings: printer name, copies, paper size
+  - [x] Platform-specific args passed through to backend
 
 ## Input Processing
 - [x] Input file sorting:
@@ -78,29 +78,7 @@ Features and improvements planned for pdfmill.
 
 ## Future Considerations
 - [x] GUI configuration editor
-- [ ] Watch mode for automatic processing of new files
+- [x] Watch mode for automatic processing of new files
 - [ ] Config inheritance/imports (extend from base configs)
-- [ ] Logging with configurable verbosity levels
-- [ ] improve UI gui.py by moving it into gui/ package. 
-
----
-
-## System Design Improvements
-
-Architecture improvements to enhance maintainability and extensibility.
-
-### Completed
-
-- [x] **Enums for constrained values** - Added `StampPosition`, `SortOrder`, `FilterMatch`, `ErrorHandling`, `FitMode` enums in `config.py`
-- [x] **Improved ConfigError** - Added context fields (profile, transform_idx, field, suggestion) for better error messages
-- [x] **Phase 2: Validation** - Added `validate_page_spec_syntax()` for early page spec validation, `--validate --strict` mode for external resources (printers, paths)
-- [x] **Phase 3: Transform Registry** - Refactored transforms into `transforms/` package with decorator-based registration, `BaseTransform` ABC, `TransformResult` for unified return types, backwards-compatible exports
-- [x] **Phase 4: Separation of Concerns** - Extracted `TransformExecutor` and `PrintPipeline` into new `pipeline/` package, processor.py reduced to pure orchestration
-
-### Quick Reference
-
-| Improvement | Impact | Effort | Status |
-|-------------|--------|--------|--------|
-| Early Validation (Phase 2) | Medium | Low | **Done** |
-| Transform Registry (Phase 3) | High | Medium | **Done** |
-| Extract PrintPipeline (Phase 4) | High | Medium | **Done** |
+- [x] Logging with configurable verbosity levels
+- [x] ~~GUI~~ removed in the CUPS rewrite (CLI + YAML only)

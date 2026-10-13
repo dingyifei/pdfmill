@@ -14,7 +14,7 @@ input:
     match: "any"             # Match logic
 ```
 
-All fields are optional. You can also override `path` via CLI with `-i`.
+All fields are optional. You can also override `path` via CLI with `-i`; without `-i`, pdfmill processes `input.path` (default: `input`). Relative paths are relative to the current working directory.
 
 ## Path
 
@@ -27,6 +27,8 @@ input:
 ```
 
 CLI override: `pdfm -c config.yaml -i ./other_folder`
+
+When the path is a single file, it is processed regardless of `pattern`. Only the top level of a directory is searched (no subdirectories).
 
 ## Pattern
 
@@ -42,7 +44,7 @@ input:
 
 ## Sort Order
 
-Control the processing order of files:
+Control the processing order of files (and the order their outputs are printed in):
 
 ```yaml
 input:
@@ -59,7 +61,9 @@ input:
 | `time_asc` | Oldest modified first |
 | `time_desc` | Newest modified first |
 
-Sorting can also be set per output profile. If both input-level and profile-level sort are set, an error is raised.
+Without `sort`, files are processed in filename order.
+
+Sorting can also be set per output profile. A profile's `sort` overrides the **print order** for that profile only; `input.sort` still sets the processing order. Setting both is allowed. See [Output Profiles](output-profiles.md#profile-level-sort-override).
 
 ## Keyword Filtering
 
@@ -86,6 +90,7 @@ input:
 - Keyword matching is case-sensitive
 - PDFs without searchable text (scanned images) won't match keyword filters
 - Uses text extraction, not OCR
+- A PDF that cannot be read counts as a failed source (it is not silently skipped)
 
 ## Examples
 

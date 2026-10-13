@@ -4,13 +4,11 @@
 
 A configurable PDF processing pipeline for splitting, transforming, and printing PDFs.
 
-Currently, supports only windows
-
-<img src="docs/resources/outputs.png" width="400">
+Runs on macOS and Linux (printing via CUPS) and Windows (printing via SumatraPDF).
 
 ## Features
 
-- **YAML Configuration**: Define processing pipelines in simple config files
+- **YAML Configuration**: Define processing pipelines in simple config files, validated strictly at load time
 - **Page Selection**: Select pages by index, range, or pattern (`first`, `last`, `odd`, `even`)
 - **Transformations**: Rotate, crop, resize, stamp, split, and combine pages with precise control
 - **Stamp Transform**: Add page numbers, timestamps, or custom text overlays
@@ -20,10 +18,11 @@ Currently, supports only windows
 - **Batch Processing**: Process single files or entire directories
 - **Input Filtering**: Filter PDFs by filename pattern or text content keywords
 - **Input Sorting**: Sort files by name or timestamp before processing
-- **Printing**: Send outputs to different printers with custom settings
+- **Printing**: Send outputs to different printers with custom settings (CUPS options or SumatraPDF arguments)
 - **Multi-Printer Distribution**: Split pages across multiple printers by speed/weight
-- **Watch Mode**: Monitor directories and automatically process new PDFs as they arrive
-- **Dry Run**: Preview what will happen before processing
+- **Print Safety**: Block jobs with too many pages or oversized pages
+- **Watch Mode**: Poll a directory and automatically process new PDFs as they arrive
+- **Dry Run**: Run every transform in a temp directory and show the exact print commands, without printing
 
 ## Installation
 
@@ -32,31 +31,33 @@ Currently, supports only windows
 git clone https://github.com/dingyifei/pdfmill.git
 cd pdfmill
 pip install -e .
+
+# Optional extras
+pip install -e ".[stamp]"   # stamp transform (reportlab)
+pip install -e ".[ocr]"     # render and rotate: auto (pdf2image, pytesseract, Pillow)
 ```
 
 ## Quick Start
 
 ```sh
-# Start GUI
-pdfm gui
-
-# List available printers
+# List available printers (names to use for 'printer:')
 pdfm --list-printers
 
-# Process PDFs with a config file
-pdfm -c configs/label_packing.yaml -i ./input -o ./output
+# Process PDFs with a config file (input defaults to input.path from the config)
+pdfm -c configs/label_packing.yaml
 
-# Process a single file
+# Process a directory or a single file, overriding the output directory
+pdfm -c configs/label_packing.yaml -i ./input -o ./output
 pdfm -c configs/label_packing.yaml -i document.pdf
 
-# Dry run (see what would happen)
-pdfm -c configs/label_packing.yaml -i ./input --dry-run
+# Dry run (process in a temp dir, show print commands, print nothing)
+pdfm -c configs/label_packing.yaml --dry-run
 
 # Watch mode (process new files automatically)
-pdfm -c configs/label_packing.yaml -i ./input --watch
+pdfm -c configs/label_packing.yaml --watch
 
-# Validate a config file
-pdfm -c configs/label_packing.yaml --validate
+# Validate a config file (add --strict to also check printers, input path and dependencies)
+pdfm -c configs/label_packing.yaml --validate --strict
 ```
 
 ## Documentation
@@ -69,7 +70,7 @@ pdfm -c configs/label_packing.yaml --validate
 | [Page Selection](docs/page-selection.md) | Page selection syntax |
 | [Transforms](docs/transforms.md) | All transform types (rotate, crop, resize, stamp, split, combine, render) |
 | [Output Profiles](docs/output-profiles.md) | Output profile options and debug mode |
-| [Printing](docs/printing.md) | Single and multi-printer setup |
+| [Printing](docs/printing.md) | Printer backends, single and multi-printer setup |
 | [Watch Mode](docs/watch-mode.md) | Automatic file monitoring and processing |
 | [CLI Reference](docs/cli-reference.md) | Command-line options |
 
@@ -77,15 +78,16 @@ pdfm -c configs/label_packing.yaml --validate
 
 See the `configs/` directory for ready-to-use examples:
 
-- `label_packing.yaml` - Split PDFs into packing sheet + shipping label
+- `label_packing.yaml` - Split PDFs into packing sheet + shipping label (Brother laser + PL80E-BT label printer on macOS)
 - `six_page.yaml` - Process 6-page PDFs (remove pages 1-2, rotate pages 4-5)
 - `multi_printer.yaml` - Multi-printer distribution with sorting
 
 ## Environment
 
 - Python 3.10+
-- Windows 10 or newer
-- SumatraPDF (installed via `pdfm install`)
+- macOS / Linux: CUPS (built into macOS; `lp` and `lpstat` must be available)
+- Windows: SumatraPDF, downloaded automatically on first print to `%LOCALAPPDATA%\pdfmill` (or set `PDFMILL_SUMATRA_PATH`)
+- Optional: `poppler` for `render` and `rotate: auto`, plus `tesseract` for `rotate: auto` (macOS: `brew install poppler tesseract`)
 
 ## License
 

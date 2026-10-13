@@ -5,7 +5,9 @@ This guide walks you through installing pdfmill and running your first PDF proce
 ## Prerequisites
 
 - Python 3.10 or newer
-- Windows 10 or newer
+- For printing:
+  - macOS / Linux: CUPS (built into macOS; most Linux desktops have it)
+  - Windows: SumatraPDF (downloaded automatically on first print)
 
 ## Installation
 
@@ -29,26 +31,30 @@ Install extras for additional features:
 
 ```sh
 # For stamp transform (adds reportlab)
-pip install pdfmill[stamp]
+pip install "pdfmill[stamp]"
 
-# For auto-rotation via OCR (adds pymupdf, pytesseract, Pillow)
-pip install pdfmill[ocr]
+# For render and auto-rotation via OCR (adds pdf2image, pytesseract, Pillow)
+pip install "pdfmill[ocr]"
 
-# For watch mode (adds watchdog)
-pip install pdfmill[watch]
+# For development (pytest, ruff)
+pip install "pdfmill[dev]"
 ```
 
-## SumatraPDF Setup
-
-pdfmill uses SumatraPDF for printing. It will be downloaded automatically on first use, or you can install it manually:
+`render` and `rotate: auto` also need the `poppler` tools, and `rotate: auto` needs `tesseract`:
 
 ```sh
-# Download SumatraPDF
-pdfm install
-
-# Remove SumatraPDF
-pdfm uninstall
+# macOS
+brew install poppler tesseract
 ```
+
+## Printer Setup
+
+pdfmill picks a print backend automatically (`settings.print_backend: auto`):
+
+- **macOS / Linux**: CUPS via `lp` / `lpstat`. Add printers in System Settings (macOS) or your CUPS admin tool; nothing else to install.
+- **Windows**: SumatraPDF. It is downloaded automatically on first print to `%LOCALAPPDATA%\pdfmill\SumatraPDF.exe`. To use your own copy, put `SumatraPDF.exe` in the current directory or on `PATH`, or set the `PDFMILL_SUMATRA_PATH` environment variable.
+
+See [Printing](printing.md) for details.
 
 ## Verify Installation
 
@@ -69,6 +75,9 @@ Create a file called `my_config.yaml`:
 ```yaml
 version: 1
 
+input:
+  path: ./input
+
 outputs:
   rotated:
     pages: "all"
@@ -77,19 +86,24 @@ outputs:
     output_dir: ./output
 ```
 
+Relative paths are resolved against the current working directory, not the config file's location.
+
 ## Run Your First Job
 
 ```sh
+# Process input.path from the config (./input)
+pdfm -c my_config.yaml
+
 # Process a single PDF
 pdfm -c my_config.yaml -i document.pdf
 
-# Process a directory of PDFs
+# Process a directory of PDFs into another output directory
 pdfm -c my_config.yaml -i ./input -o ./output
 
-# Preview without processing
-pdfm -c my_config.yaml -i ./input --dry-run
+# Preview: runs all transforms in a temp dir, prints and writes nothing
+pdfm -c my_config.yaml --dry-run
 
-# Validate config syntax
+# Validate config
 pdfm -c my_config.yaml --validate
 ```
 

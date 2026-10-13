@@ -111,15 +111,3 @@ def setup_logging(
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
         logger.addHandler(file_handler)
-
-
-def is_quiet_mode() -> bool:
-    """Check if logging is in quiet mode (only ERROR level visible on console).
-
-    Used for progress display to skip printing when --quiet is set.
-    """
-    logger = logging.getLogger(LOGGER_NAME)
-    for handler in logger.handlers:
-        if isinstance(handler, logging.StreamHandler) and handler.stream == sys.stdout:
-            return handler.level >= logging.ERROR
-    return False

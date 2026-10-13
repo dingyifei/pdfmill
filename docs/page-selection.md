@@ -12,6 +12,7 @@ The `pages` field in output profiles determines which pages to extract from each
 | `"odd"` | Odd-numbered pages | Pages 1, 3, 5, 7, 9 |
 | `"even"` | Even-numbered pages | Pages 2, 4, 6, 8, 10 |
 | `[1, 2, 3]` | Specific pages | Pages 1, 2, 3 |
+| `5` or `"5"` | Single page | Page 5 |
 | `"1-3"` | Range (inclusive) | Pages 1, 2, 3 |
 | `"3-"` | Page 3 to end | Pages 3-10 |
 | `"-2"` | Last 2 pages | Pages 9, 10 |
@@ -85,7 +86,7 @@ outputs:
   profile:
     pages: "1--1"   # First page to second-to-last (excludes last)
     pages: "1--2"   # First page to third-to-last
-    pages: "--2-"   # Third-to-last to end
+    pages: "--1"    # Same as "1--1" (start defaults to 1)
 ```
 
 ## Examples
@@ -143,12 +144,13 @@ outputs:
   document:
     pages: [3, 4, 5, 6]   # Select pages 3-6 from source
     transforms:
-      - rotate: 270
-        pages: [1, 2]     # Rotate only pages 1-2 of the selection
+      - rotate:
+          angle: 270
+          pages: [0, 1]   # Rotate only the first two selected pages
                           # (which are pages 3-4 of the source)
 ```
 
-The `pages` parameter in transforms uses 0-indexed positions within the selected pages.
+Only `rotate` supports per-page targeting. Its `pages` list is nested under `rotate:` and uses 0-indexed positions within the selected pages (not source page numbers). Putting `pages:` next to `rotate:` is a config error.
 
 ## Related Documentation
 

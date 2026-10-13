@@ -1,110 +1,68 @@
-"""Resize transform for pdfmill."""
+"""Scale pages to an exact size.
+
+- size: {width: 100mm, height: 150mm, fit: contain}   # contain | cover | stretch
+"""
+
+from dataclasses import dataclass
 
 from pypdf import PageObject, Transformation
 
-from pdfmill.config import FitMode, Transform
-from pdfmill.config import SizeTransform as SizeConfig
-from pdfmill.transforms._utils import (
-    TransformError,
-    get_page_dimensions,
-    parse_dimension,
-)
-from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
-from pdfmill.transforms.registry import register_transform
+from pdfmill.schema import ConfigError, check_keys, choice, require_dict
+from pdfmill.transforms._page import set_box, size
+from pdfmill.units import to_points
+
+NAME = "size"
+FIT_MODES = ("contain", "cover", "stretch")
 
 
-def resize_page(
-    page: PageObject,
-    width: str,
-    height: str,
-    fit: FitMode = FitMode.CONTAIN,
-) -> PageObject:
+@dataclass
+class Options:
+    width: float
+    height: float
+    fit: str = "contain"
+
+
+def parse(value, where: str) -> Options:
+    value = require_dict(value, where)
+    check_keys(value, ("width", "height", "fit"), where)
+    for key in ("width", "height"):
+        if key not in value:
+            raise ConfigError(f"{where}: missing '{key}'")
+    opts = Options(
+        width=to_points(value["width"], f"{where}.width"),
+        height=to_points(value["height"], f"{where}.height"),
+        fit=choice(value.get("fit", "contain"), FIT_MODES, f"{where}.fit"),
+    )
+    if opts.width <= 0 or opts.height <= 0:
+        raise ConfigError(f"{where}: width and height must be positive")
+    return opts
+
+
+def describe(opts: Options) -> str:
+    return f"size_{opts.fit}"
+
+
+def apply(pages: list[PageObject], opts: Options) -> list[PageObject]:
+    for page in pages:
+        resize_page(page, opts.width, opts.height, opts.fit)
+    return pages
+
+
+def resize_page(page: PageObject, width: float, height: float, fit: str = "contain") -> PageObject:
+    """Scale ``page`` in place to ``width`` x ``height`` points.
+
+    contain: uniform scale to fit inside, centered. cover: uniform scale to fill,
+    centered (edges may be cut). stretch: non-uniform scale to the exact size.
     """
-    Resize a page to the target dimensions.
-
-    Args:
-        page: The page to resize
-        width: Target width (e.g., "100mm", "4in")
-        height: Target height (e.g., "150mm", "6in")
-        fit: FitMode enum value:
-            - CONTAIN: Scale uniformly to fit within target, centered (may have whitespace)
-            - COVER: Scale uniformly to fill target, centered (may crop edges)
-            - STRETCH: Stretch non-uniformly to exactly match target
-
-    Returns:
-        The resized page (mutates in place and returns)
-    """
-    target_width = parse_dimension(width)
-    target_height = parse_dimension(height)
-
-    current_width, current_height = get_page_dimensions(page)
-
-    if fit == FitMode.STRETCH:
-        # Non-uniform scaling using transformation matrix
-        scale_x = target_width / current_width
-        scale_y = target_height / current_height
-
-        # Apply non-uniform scale transformation
-        transform = Transformation().scale(sx=scale_x, sy=scale_y)
-        page.add_transformation(transform)
-
-        # Update mediabox to target dimensions
-        page.mediabox.lower_left = (0, 0)
-        page.mediabox.upper_right = (target_width, target_height)
-    elif fit in (FitMode.CONTAIN, FitMode.COVER):
-        # Uniform scaling
-        scale_x = target_width / current_width
-        scale_y = target_height / current_height
-
-        if fit == FitMode.CONTAIN:
-            scale = min(scale_x, scale_y)
-        else:  # COVER
-            scale = max(scale_x, scale_y)
-
-        # Calculate scaled dimensions
-        scaled_width = current_width * scale
-        scaled_height = current_height * scale
-
-        # Calculate centering offsets
-        offset_x = (target_width - scaled_width) / 2
-        offset_y = (target_height - scaled_height) / 2
-
-        # Apply scale and translation to center the content
-        transform = Transformation().scale(sx=scale, sy=scale).translate(tx=offset_x, ty=offset_y)
-        page.add_transformation(transform)
-
-        # Set final mediabox to target size
-        page.mediabox.lower_left = (0, 0)
-        page.mediabox.upper_right = (target_width, target_height)
+    current_w, current_h = size(page)
+    sx, sy = width / current_w, height / current_h
+    if fit == "stretch":
+        transform = Transformation().scale(sx=sx, sy=sy)
     else:
-        # This should never happen with proper enum usage
-        valid = ", ".join(f.value for f in FitMode)
-        raise TransformError(f"Unknown fit mode: {fit}. Valid options: {valid}")
-
+        scale = min(sx, sy) if fit == "contain" else max(sx, sy)
+        tx = (width - current_w * scale) / 2
+        ty = (height - current_h * scale) / 2
+        transform = Transformation().scale(sx=scale, sy=scale).translate(tx=tx, ty=ty)
+    page.add_transformation(transform)
+    set_box(page, width, height)
     return page
-
-
-@register_transform("size")
-class ResizeTransformHandler(BaseTransform):
-    """Handler for resize transforms."""
-
-    def __init__(self, config: SizeConfig):
-        self.config = config
-
-    @classmethod
-    def from_config(cls, transform: Transform) -> "ResizeTransformHandler":
-        if not transform.size:
-            raise ValueError("Size transform missing size config")
-        return cls(transform.size)
-
-    def apply(
-        self,
-        pages: list[PageObject],
-        context: TransformContext,
-    ) -> TransformResult:
-        for page in pages:
-            resize_page(page, self.config.width, self.config.height, self.config.fit)
-        return TransformResult(pages=pages, mode="replace")
-
-    def describe(self) -> str:
-        return f"size_{self.config.fit.value}"

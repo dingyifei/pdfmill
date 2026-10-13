@@ -1,83 +1,62 @@
-"""Crop transform for pdfmill."""
+"""Crop pages to a rectangle; the cropped region becomes the new page at (0, 0).
+
+- crop:
+    lower_left: [90mm, 33mm]
+    upper_right: [190mm, 183mm]
+"""
+
+from dataclasses import dataclass
 
 from pypdf import PageObject, Transformation
 
-from pdfmill.config import CropTransform as CropConfig
-from pdfmill.config import Transform
-from pdfmill.transforms._utils import TransformError, parse_coordinate
-from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
-from pdfmill.transforms.registry import register_transform
+from pdfmill.schema import ConfigError, check_keys, pair, require_dict
+from pdfmill.transforms._page import set_box
+from pdfmill.units import to_points
+
+NAME = "crop"
 
 
-def crop_page(
-    page: PageObject,
-    lower_left: tuple[float | str, float | str],
-    upper_right: tuple[float | str, float | str],
-) -> PageObject:
-    """
-    Crop a page to the specified coordinates.
+@dataclass
+class Box:
+    """A rectangle in points."""
 
-    Translates the content so the cropped region starts at origin (0, 0).
-    This ensures subsequent transforms (resize, etc.) work correctly.
+    x0: float
+    y0: float
+    x1: float
+    y1: float
 
-    Args:
-        page: The page to crop
-        lower_left: (x, y) coordinates of lower-left corner (points or strings like "100mm")
-        upper_right: (x, y) coordinates of upper-right corner (points or strings like "100mm")
 
-    Returns:
-        The cropped page (mutates in place and returns)
+Options = Box
 
-    Raises:
-        TransformError: If coordinates are invalid
-    """
-    # Parse coordinates to points
-    ll_x = parse_coordinate(lower_left[0])
-    ll_y = parse_coordinate(lower_left[1])
-    ur_x = parse_coordinate(upper_right[0])
-    ur_y = parse_coordinate(upper_right[1])
 
-    if ll_x >= ur_x:
-        raise TransformError(f"Invalid crop: left ({ll_x}) must be less than right ({ur_x})")
-    if ll_y >= ur_y:
-        raise TransformError(f"Invalid crop: bottom ({ll_y}) must be less than top ({ur_y})")
+def parse_box(value, where: str) -> Box:
+    value = require_dict(value, where)
+    check_keys(value, ("lower_left", "upper_right"), where)
+    for key in ("lower_left", "upper_right"):
+        if key not in value:
+            raise ConfigError(f"{where}: missing '{key}'")
+    x0, y0 = (to_points(v, f"{where}.lower_left") for v in pair(value["lower_left"], f"{where}.lower_left"))
+    x1, y1 = (to_points(v, f"{where}.upper_right") for v in pair(value["upper_right"], f"{where}.upper_right"))
+    if x0 >= x1 or y0 >= y1:
+        raise ConfigError(f"{where}: lower_left must be below and left of upper_right")
+    return Box(x0, y0, x1, y1)
 
-    # Calculate cropped dimensions
-    crop_width = ur_x - ll_x
-    crop_height = ur_y - ll_y
 
-    # Translate content so cropped region moves to origin (0, 0)
-    # This ensures subsequent transforms work correctly
-    transform = Transformation().translate(tx=-ll_x, ty=-ll_y)
-    page.add_transformation(transform)
+parse = parse_box
 
-    # Set mediabox to cropped size at origin
-    page.mediabox.lower_left = (0, 0)
-    page.mediabox.upper_right = (crop_width, crop_height)
+
+def describe(opts: Box) -> str:
+    return "crop"
+
+
+def apply(pages: list[PageObject], opts: Box) -> list[PageObject]:
+    for page in pages:
+        crop_page(page, opts)
+    return pages
+
+
+def crop_page(page: PageObject, box: Box) -> PageObject:
+    """Crop ``page`` in place to ``box`` and move the result to the origin."""
+    page.add_transformation(Transformation().translate(tx=-box.x0, ty=-box.y0))
+    set_box(page, box.x1 - box.x0, box.y1 - box.y0)
     return page
-
-
-@register_transform("crop")
-class CropTransformHandler(BaseTransform):
-    """Handler for crop transforms."""
-
-    def __init__(self, config: CropConfig):
-        self.config = config
-
-    @classmethod
-    def from_config(cls, transform: Transform) -> "CropTransformHandler":
-        if not transform.crop:
-            raise ValueError("Crop transform missing crop config")
-        return cls(transform.crop)
-
-    def apply(
-        self,
-        pages: list[PageObject],
-        context: TransformContext,
-    ) -> TransformResult:
-        for page in pages:
-            crop_page(page, self.config.lower_left, self.config.upper_right)
-        return TransformResult(pages=pages, mode="replace")
-
-    def describe(self) -> str:
-        return "crop"

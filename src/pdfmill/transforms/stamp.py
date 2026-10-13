@@ -1,295 +1,140 @@
-"""Stamp transform for pdfmill."""
+"""Draw text (page numbers, dates, ...) on every page. Needs the stamp extra (reportlab).
+
+    - stamp: "{page}/{total}"
+    - stamp:
+        text: "Page {page} of {total} - {date}"
+        position: bottom-right       # top-left top-right bottom-left bottom-right center custom
+        x: 50mm                      # only for position: custom
+        y: 20mm
+        font_size: 10
+        font_name: Helvetica
+        font_color: black            # name or #RRGGBB
+        opacity: 1.0
+        margin: 10mm
+        datetime_format: "%Y-%m-%d %H:%M:%S"
+
+Placeholders: {page} {total} {datetime} {date} {time}
+"""
 
 import io
+from dataclasses import dataclass
 from datetime import datetime
 
 from pypdf import PageObject, PdfReader
 
-from pdfmill.config import StampPosition, Transform
-from pdfmill.config import StampTransform as StampConfig
-from pdfmill.transforms._utils import (
-    TransformError,
-    get_page_dimensions,
-    parse_coordinate,
-)
-from pdfmill.transforms.base import BaseTransform, TransformContext, TransformResult
-from pdfmill.transforms.registry import register_transform
+from pdfmill.schema import ConfigError, check_keys, choice, typed
+from pdfmill.transforms._page import TransformError, size
+from pdfmill.units import to_points
+
+NAME = "stamp"
+POSITIONS = ("top-left", "top-right", "bottom-left", "bottom-right", "center", "custom")
 
 
-def _parse_color(color_str: str):
-    """Parse a color string into a reportlab color object.
+@dataclass
+class Options:
+    text: str = "{page}/{total}"
+    position: str = "bottom-right"
+    x: float = to_points("10mm")
+    y: float = to_points("10mm")
+    font_size: float = 10
+    font_name: str = "Helvetica"
+    font_color: str = "black"
+    opacity: float = 1.0
+    margin: float = to_points("10mm")
+    datetime_format: str = "%Y-%m-%d %H:%M:%S"
 
-    Supports color names (e.g., "black", "red") and hex codes (e.g., "#FF0000").
-    """
-    try:
-        from reportlab.lib import colors
-    except ImportError:
-        raise TransformError("reportlab is required for stamp transform. Install with: pip install reportlab")
 
-    # Try hex color
-    if color_str.startswith("#"):
-        hex_str = color_str[1:]
-        if len(hex_str) == 6:
-            r = int(hex_str[0:2], 16) / 255
-            g = int(hex_str[2:4], 16) / 255
-            b = int(hex_str[4:6], 16) / 255
-            return colors.Color(r, g, b)
-        raise TransformError(f"Invalid hex color: {color_str}")
+def parse(value, where: str) -> Options:
+    if isinstance(value, str):
+        return Options(text=value)
+    if not isinstance(value, dict):
+        raise ConfigError(f"{where}: expected text or a mapping of stamp options")
+    check_keys(value, Options.__dataclass_fields__.keys(), where)
+    defaults = Options()
+    opts = Options(
+        text=typed(value.get("text", defaults.text), str, f"{where}.text"),
+        position=choice(value.get("position", defaults.position), POSITIONS, f"{where}.position"),
+        x=to_points(value.get("x", defaults.x), f"{where}.x"),
+        y=to_points(value.get("y", defaults.y), f"{where}.y"),
+        font_size=typed(value.get("font_size", defaults.font_size), (int, float), f"{where}.font_size"),
+        font_name=typed(value.get("font_name", defaults.font_name), str, f"{where}.font_name"),
+        font_color=typed(value.get("font_color", defaults.font_color), str, f"{where}.font_color"),
+        opacity=float(typed(value.get("opacity", defaults.opacity), (int, float), f"{where}.opacity")),
+        margin=to_points(value.get("margin", defaults.margin), f"{where}.margin"),
+        datetime_format=typed(value.get("datetime_format", defaults.datetime_format), str, f"{where}.datetime_format"),
+    )
+    if not 0 <= opts.opacity <= 1:
+        raise ConfigError(f"{where}.opacity: must be between 0 and 1")
+    return opts
 
-    # Try named color
-    color = getattr(colors, color_str, None)
-    if color is not None:
-        return color
 
-    raise TransformError(
-        f"Unknown color: {color_str}. Use a color name (e.g., 'black', 'red') or hex code (e.g., '#FF0000')"
+def describe(opts: Options) -> str:
+    return "stamp"
+
+
+def apply(pages: list[PageObject], opts: Options) -> list[PageObject]:
+    now = datetime.now()
+    for i, page in enumerate(pages, start=1):
+        stamp_page(page, format_text(opts.text, i, len(pages), opts.datetime_format, now), opts)
+    return pages
+
+
+def format_text(text: str, page: int, total: int, datetime_format: str, now: datetime) -> str:
+    return (
+        text.replace("{page}", str(page))
+        .replace("{total}", str(total))
+        .replace("{datetime}", now.strftime(datetime_format))
+        .replace("{date}", now.strftime("%Y-%m-%d"))
+        .replace("{time}", now.strftime("%H:%M:%S"))
     )
 
 
-def _create_text_overlay(
-    text: str,
-    width: float,
-    height: float,
-    x: float,
-    y: float,
-    font_name: str,
-    font_size: int,
-    font_color: str = "black",
-    opacity: float = 1.0,
-) -> bytes:
-    """
-    Create a PDF page with text overlay using reportlab.
+def text_position(opts: Options, text_width: float, page_w: float, page_h: float) -> tuple[float, float]:
+    """Lower-left corner of the text for the configured position."""
+    m, h = opts.margin, opts.font_size
+    return {
+        "custom": (opts.x, opts.y),
+        "top-left": (m, page_h - m - h),
+        "top-right": (page_w - m - text_width, page_h - m - h),
+        "bottom-left": (m, m),
+        "bottom-right": (page_w - m - text_width, m),
+        "center": ((page_w - text_width) / 2, (page_h - h) / 2),
+    }[opts.position]
 
-    Args:
-        text: Text to render
-        width: Page width in points
-        height: Page height in points
-        x: X position in points
-        y: Y position in points
-        font_name: Font name (PDF standard fonts)
-        font_size: Font size in points
-        font_color: Font color (name or hex code)
-        opacity: Opacity 0.0-1.0
 
-    Returns:
-        PDF bytes containing the text overlay
-    """
+def stamp_page(page: PageObject, text: str, opts: Options) -> PageObject:
+    """Draw ``text`` onto ``page`` in place."""
     try:
+        from reportlab.lib import colors
+        from reportlab.pdfbase.pdfmetrics import stringWidth
         from reportlab.pdfgen import canvas
     except ImportError:
-        raise TransformError("reportlab is required for stamp transform. Install with: pip install reportlab")
+        raise TransformError("stamp needs the stamp extra: pip install 'pdfmill[stamp]'")
+
+    if opts.font_color.startswith("#"):
+        try:
+            color = colors.HexColor(opts.font_color)
+        except ValueError:
+            raise TransformError(f"Invalid hex color: {opts.font_color}")
+    else:
+        color = getattr(colors, opts.font_color, None)
+        if not isinstance(color, colors.Color):
+            raise TransformError(f"Unknown color: {opts.font_color}")
+
+    page_w, page_h = size(page)
+    try:
+        text_width = stringWidth(text, opts.font_name, opts.font_size)
+    except KeyError:
+        raise TransformError(f"Unknown font: {opts.font_name} (use a standard PDF font such as Helvetica)")
+    x, y = text_position(opts, text_width, page_w, page_h)
 
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=(width, height))
-    c.setFont(font_name, font_size)
-
-    # Set color
-    color = _parse_color(font_color)
+    c = canvas.Canvas(buffer, pagesize=(page_w, page_h))
+    c.setFont(opts.font_name, opts.font_size)
     c.setFillColor(color)
-
-    # Set opacity
-    if opacity < 1.0:
-        c.setFillAlpha(opacity)
-
+    c.setFillAlpha(opts.opacity)
     c.drawString(x, y, text)
     c.save()
     buffer.seek(0)
-    return buffer.read()
-
-
-def _calculate_stamp_position(
-    position: StampPosition,
-    page_width: float,
-    page_height: float,
-    text: str,
-    font_size: int,
-    margin: float,
-    custom_x: float = 0,
-    custom_y: float = 0,
-) -> tuple[float, float]:
-    """
-    Calculate x, y coordinates for stamp based on position preset.
-
-    Args:
-        position: StampPosition enum value
-        page_width: Page width in points
-        page_height: Page height in points
-        text: Text to stamp (for width estimation)
-        font_size: Font size in points
-        margin: Margin from edge in points
-        custom_x: Custom X coordinate (used when position=CUSTOM)
-        custom_y: Custom Y coordinate (used when position=CUSTOM)
-
-    Returns:
-        (x, y) coordinates in points
-    """
-    # Estimate text width (approximately 0.5 * font_size per character for Helvetica)
-    text_width = len(text) * font_size * 0.5
-    text_height = font_size
-
-    if position == StampPosition.CUSTOM:
-        return custom_x, custom_y
-    elif position == StampPosition.TOP_LEFT:
-        return margin, page_height - margin - text_height
-    elif position == StampPosition.TOP_RIGHT:
-        return page_width - margin - text_width, page_height - margin - text_height
-    elif position == StampPosition.BOTTOM_LEFT:
-        return margin, margin
-    elif position == StampPosition.BOTTOM_RIGHT:
-        return page_width - margin - text_width, margin
-    elif position == StampPosition.CENTER:
-        return (page_width - text_width) / 2, (page_height - text_height) / 2
-    else:
-        # This should never happen with proper enum usage
-        valid = ", ".join(p.value for p in StampPosition)
-        raise TransformError(f"Unknown stamp position: {position}. Valid options: {valid}")
-
-
-def _format_stamp_text(
-    text: str,
-    page_num: int,
-    total_pages: int,
-    datetime_format: str,
-) -> str:
-    """
-    Replace placeholders in stamp text.
-
-    Args:
-        text: Text with placeholders
-        page_num: Current page number (1-indexed)
-        total_pages: Total number of pages
-        datetime_format: strftime format for datetime
-
-    Returns:
-        Formatted text with placeholders replaced
-    """
-    now = datetime.now()
-
-    result = text
-    result = result.replace("{page}", str(page_num))
-    result = result.replace("{total}", str(total_pages))
-    result = result.replace("{datetime}", now.strftime(datetime_format))
-    result = result.replace("{date}", now.strftime("%Y-%m-%d"))
-    result = result.replace("{time}", now.strftime("%H:%M:%S"))
-
-    return result
-
-
-def stamp_page(
-    page: PageObject,
-    text: str,
-    position: StampPosition = StampPosition.BOTTOM_RIGHT,
-    x: float | str = 0,
-    y: float | str = 0,
-    font_size: int = 10,
-    font_name: str = "Helvetica",
-    font_color: str = "black",
-    opacity: float = 1.0,
-    margin: float | str = 10,
-    page_num: int = 1,
-    total_pages: int = 1,
-    datetime_format: str = "%Y-%m-%d %H:%M:%S",
-) -> PageObject:
-    """
-    Add a text stamp/overlay to a page.
-
-    Supports placeholders:
-      - {page}: Current page number (1-indexed)
-      - {total}: Total page count
-      - {datetime}: Current datetime
-      - {date}: Current date
-      - {time}: Current time
-
-    Args:
-        page: The page to stamp
-        text: Text to stamp (with placeholder support)
-        position: StampPosition enum value
-        x: X coordinate (used when position=CUSTOM)
-        y: Y coordinate (used when position=CUSTOM)
-        font_size: Font size in points
-        font_name: Font name (PDF standard font)
-        font_color: Font color (name or hex code)
-        opacity: Opacity 0.0-1.0 (1.0 = fully opaque)
-        margin: Margin from edge for preset positions
-        page_num: Current page number (1-indexed)
-        total_pages: Total number of pages
-        datetime_format: strftime format for {datetime} placeholder
-
-    Returns:
-        The stamped page (mutates in place and returns)
-    """
-    # Parse coordinates and margin
-    margin_pts = parse_coordinate(margin)
-    x_pts = parse_coordinate(x) if position == StampPosition.CUSTOM else 0
-    y_pts = parse_coordinate(y) if position == StampPosition.CUSTOM else 0
-
-    # Get page dimensions
-    page_width, page_height = get_page_dimensions(page)
-
-    # Format text with placeholders
-    formatted_text = _format_stamp_text(text, page_num, total_pages, datetime_format)
-
-    # Calculate position
-    stamp_x, stamp_y = _calculate_stamp_position(
-        position,
-        page_width,
-        page_height,
-        formatted_text,
-        font_size,
-        margin_pts,
-        x_pts,
-        y_pts,
-    )
-
-    # Create overlay PDF
-    overlay_bytes = _create_text_overlay(
-        formatted_text, page_width, page_height, stamp_x, stamp_y, font_name, font_size, font_color, opacity
-    )
-
-    # Merge overlay onto page
-    overlay_reader = PdfReader(io.BytesIO(overlay_bytes))
-    overlay_page = overlay_reader.pages[0]
-    page.merge_page(overlay_page)
-
+    page.merge_page(PdfReader(buffer).pages[0])
     return page
-
-
-@register_transform("stamp")
-class StampTransformHandler(BaseTransform):
-    """Handler for stamp transforms."""
-
-    def __init__(self, config: StampConfig):
-        self.config = config
-
-    @classmethod
-    def from_config(cls, transform: Transform) -> "StampTransformHandler":
-        if not transform.stamp:
-            raise ValueError("Stamp transform missing stamp config")
-        return cls(transform.stamp)
-
-    def apply(
-        self,
-        pages: list[PageObject],
-        context: TransformContext,
-    ) -> TransformResult:
-        total_pages = len(pages)
-        for i, page in enumerate(pages):
-            stamp_page(
-                page,
-                self.config.text,
-                position=self.config.position,
-                x=self.config.x,
-                y=self.config.y,
-                font_size=self.config.font_size,
-                font_name=self.config.font_name,
-                font_color=self.config.font_color,
-                opacity=self.config.opacity,
-                margin=self.config.margin,
-                page_num=i + 1,  # 1-indexed
-                total_pages=total_pages,
-                datetime_format=self.config.datetime_format,
-            )
-        return TransformResult(pages=pages, mode="replace")
-
-    def describe(self) -> str:
-        return "stamp"

@@ -1,11 +1,11 @@
 version: 1
 settings:
   on_error: continue
-  cleanup_source: false
+  cleanup_source: true
   cleanup_output_after_print: true
 input:
   path: input
-  pattern: '*.pdf'
+  pattern: Print*.pdf
 outputs:
   packing_sheet:
     pages: 1--1
@@ -16,9 +16,11 @@ outputs:
       merge: true
       targets:
         BrotherLaser:
-          printer: Brother HL-L2420DW Printer
+          printer: Brother_HL_L2420DW
           weight: 1
           copies: 1
+          options:
+            sides: one-sided
   label:
     pages: last
     output_dir: output
@@ -27,11 +29,11 @@ outputs:
     - rotate: 90
     - crop:
         lower_left:
-        - 90mm
-        - 33mm
+        - 86.6mm
+        - 30.5mm
         upper_right:
-        - 190mm
-        - 183mm
+        - 186.6mm
+        - 180.5mm
     - size:
         width: 100mm
         height: 150mm
@@ -41,6 +43,9 @@ outputs:
       merge: true
       targets:
         default:
-          printer: PL80E
+          printer: PL80E-BT
           weight: 1
           copies: 1
+          options:
+            media: w284h426   # 4x6in / 100x150mm label (see: lpoptions -p PL80E-BT -l)
+      max_page_size: [4.1in, 6.1in]
