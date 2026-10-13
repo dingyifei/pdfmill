@@ -249,6 +249,12 @@ class TestStamp:
         )
         assert text_positions(page)["X"] == (72, 36)
 
+    @pytest.mark.parametrize("align, expected_x", [("left", 200), ("center", 200 - 13.34 / 2), ("right", 200 - 13.34)])
+    def test_custom_align(self, align, expected_x):
+        # "AB" in 10pt Helvetica is 13.34pt wide
+        (page,) = run(text_page(), {"stamp": {"text": "AB", "position": "custom", "x": 200, "y": 50, "align": align}})
+        assert text_positions(page)["AB"] == (round(expected_x), 50)
+
     def test_format_text(self):
         from datetime import datetime
 

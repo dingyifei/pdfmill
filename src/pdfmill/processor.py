@@ -12,7 +12,7 @@ from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
-from pdfmill.config import Config, OutputProfile
+from pdfmill.config import Config, OutputProfile, TextField
 from pdfmill.logging_config import get_logger
 from pdfmill.printing import Backend, get_backend, print_profile
 from pdfmill.selector import select_pages
@@ -62,15 +62,29 @@ def sort_files(files: list[Path], order: str | None) -> list[Path]:
     return sorted(files, key=key, reverse=order.endswith("desc"))
 
 
-def matches_keywords(path: Path, keywords: list[str], match: str) -> bool:
+def pdf_text(path: Path) -> str:
+    return "\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
+
+
+def matches_keywords(text: str, keywords: list[str], match: str) -> bool:
     if not keywords:
         return True
-    text = "\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
     found = (kw in text for kw in keywords)
     return all(found) if match == "all" else any(found)
 
 
-def process_file(source: Path, profile: OutputProfile, output_dir: Path) -> Path:
+def extract_fields(text: str, fields: dict[str, TextField]) -> dict[str, str]:
+    """Values of ``input.fields`` for one PDF. A required field that is missing raises ProcessingError."""
+    values = {}
+    for name, spec in fields.items():
+        value = spec.extract(text)
+        if value is None:
+            raise ProcessingError(f"field '{name}' not found (pattern {spec.pattern.pattern!r})")
+        values[name] = value
+    return values
+
+
+def process_file(source: Path, profile: OutputProfile, output_dir: Path, fields: dict[str, str] | None = None) -> Path:
     """Apply one profile to one PDF and return the written output path."""
     reader = PdfReader(source)
     indices = select_pages(profile.pages, len(reader.pages))
@@ -82,7 +96,7 @@ def process_file(source: Path, profile: OutputProfile, output_dir: Path) -> Path
         seen.add(i)
 
     debug_prefix = output_dir / f"{source.stem}_{profile.name}" if profile.debug else None
-    pages = apply_all(pages, profile.transforms, debug_prefix)
+    pages = apply_all(pages, profile.transforms, debug_prefix, fields)
 
     output = output_dir / profile.output_name(source)
     writer = PdfWriter()
@@ -115,15 +129,21 @@ def process(
     stop = config.settings.on_error == "stop"
 
     sources = []
+    fields: dict[Path, dict[str, str]] = {}
     for f in find_inputs(input_path, config.input.pattern):
         try:
-            if matches_keywords(f, config.input.keywords, config.input.match):
-                sources.append(f)
-            else:
+            needs_text = config.input.keywords or config.input.fields
+            text = pdf_text(f) if needs_text else ""
+            if not matches_keywords(text, config.input.keywords, config.input.match):
                 logger.info("Skipping %s: keyword filter did not match", f.name)
+                continue
+            fields[f] = extract_fields(text, config.input.fields)
+            if fields[f]:
+                logger.debug("%s fields: %s", f.name, fields[f])
+            sources.append(f)
         except Exception as e:
             result.sources.append(f)
-            result.fail(f, f"cannot read PDF: {e}")
+            result.fail(f, str(e) if isinstance(e, ProcessingError) else f"cannot read PDF: {e}")
             if stop:
                 raise ProcessingError(str(e))
     sources = sort_files(sources, config.input.sort)
@@ -145,7 +165,7 @@ def process(
             logger.info("Processing: %s", source.name)
             for profile in profiles:
                 try:
-                    out = process_file(source, profile, output_dir or profile.output_dir)
+                    out = process_file(source, profile, output_dir or profile.output_dir, fields[source])
                 except Exception as e:
                     result.fail(source, f"profile '{profile.name}': {e}")
                     if stop:

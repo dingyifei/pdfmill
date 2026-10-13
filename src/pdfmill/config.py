@@ -6,6 +6,7 @@ is silently ignored at run time. Relative paths are relative to the
 current working directory.
 """
 
+import re
 import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,6 +17,7 @@ import yaml
 from pdfmill.schema import ConfigError, check_keys, choice, pair, require_dict, typed
 from pdfmill.selector import PageSelectionError, validate_page_spec_syntax
 from pdfmill.transforms import Transform, parse_transform
+from pdfmill.transforms.stamp import BUILTIN_PLACEHOLDERS
 from pdfmill.units import to_points
 
 __all__ = ["Config", "ConfigError", "load_config", "parse_config"]
@@ -76,12 +78,30 @@ class WatchSettings:
 
 
 @dataclass
+class TextField:
+    """A value pulled out of each source PDF's text, usable as ``{name}`` in stamp text."""
+
+    pattern: re.Pattern
+    format: str | None = None  # re.Match.expand() template like "Box \\1/\\2"; default: group 1 or whole match
+    default: str | None = None  # used when the pattern doesn't match; None means the field is required
+
+    def extract(self, text: str) -> str | None:
+        match = self.pattern.search(text)
+        if not match:
+            return self.default
+        if self.format is not None:
+            return match.expand(self.format)
+        return match.group(1) if match.re.groups else match.group(0)
+
+
+@dataclass
 class InputConfig:
     path: Path = Path("input")
     pattern: str = "*.pdf"
     sort: str | None = None
     keywords: list[str] = field(default_factory=list)
     match: str = "any"  # any | all
+    fields: dict[str, TextField] = field(default_factory=dict)
 
 
 @dataclass
@@ -110,12 +130,14 @@ def parse_config(data: Any) -> Config:
     outputs = require_dict(data.get("outputs"), "outputs")
     if not outputs:
         raise ConfigError("outputs: at least one output profile is required")
-    return Config(
+    config = Config(
         settings=_settings(require_dict(data.get("settings"), "settings")),
         input=_input(require_dict(data.get("input"), "input")),
         outputs={str(name): _profile(str(name), require_dict(p, f"outputs.{name}")) for name, p in outputs.items()},
         watch=_watch(require_dict(data.get("watch"), "watch")),
     )
+    _check_placeholders(config)
+    return config
 
 
 def _settings(d: dict) -> Settings:
@@ -143,7 +165,7 @@ def _watch(d: dict) -> WatchSettings:
 
 
 def _input(d: dict) -> InputConfig:
-    check_keys(d, ("path", "pattern", "sort", "filter"), "input")
+    check_keys(d, ("path", "pattern", "sort", "filter", "fields"), "input")
     flt = require_dict(d.get("filter"), "input.filter")
     check_keys(flt, ("keywords", "match"), "input.filter")
     keywords = flt.get("keywords", [])
@@ -155,7 +177,47 @@ def _input(d: dict) -> InputConfig:
         sort=_sort(d.get("sort"), "input.sort"),
         keywords=keywords,
         match=choice(flt.get("match", "any"), ("any", "all"), "input.filter.match"),
+        fields=_fields(require_dict(d.get("fields"), "input.fields")),
     )
+
+
+def _fields(d: dict) -> dict[str, TextField]:
+    """``name: pattern`` or ``name: {pattern, format, default}``."""
+    fields = {}
+    for name, spec in d.items():
+        where = f"input.fields.{name}"
+        if not re.fullmatch(r"[A-Za-z_]\w*", str(name)) or name in BUILTIN_PLACEHOLDERS:
+            raise ConfigError(f"{where}: field names must be identifiers other than {', '.join(BUILTIN_PLACEHOLDERS)}")
+        spec = {"pattern": spec} if isinstance(spec, str) else require_dict(spec, where)
+        check_keys(spec, ("pattern", "format", "default"), where)
+        try:
+            pattern = re.compile(typed(spec.get("pattern"), str, f"{where}.pattern"))
+        except re.error as e:
+            raise ConfigError(f"{where}.pattern: invalid regular expression: {e}")
+        fmt = spec.get("format")
+        if fmt is not None:
+            typed(fmt, str, f"{where}.format")
+            for num, name_ref in re.findall(r"\\(\d+)|\\g<(\w+)>", fmt):
+                if (num and int(num) > pattern.groups) or (name_ref and name_ref not in pattern.groupindex):
+                    raise ConfigError(f"{where}.format: refers to group {num or name_ref!r}, which the pattern lacks")
+        default = spec.get("default")
+        fields[str(name)] = TextField(pattern, fmt, None if default is None else str(default))
+    return fields
+
+
+def _check_placeholders(config: "Config") -> None:
+    """Every ``{name}`` in stamp text must be a built-in placeholder or an input field."""
+    known = set(BUILTIN_PLACEHOLDERS) | set(config.input.fields)
+    for profile in config.outputs.values():
+        for i, t in enumerate(profile.transforms):
+            if t.name != "stamp":
+                continue
+            for name in re.findall(r"\{(\w+)\}", t.options.text):
+                if name not in known:
+                    raise ConfigError(
+                        f"outputs.{profile.name}.transforms[{i}].stamp.text: unknown placeholder {{{name}}} "
+                        f"(built-in: {', '.join(BUILTIN_PLACEHOLDERS)}; define others under input.fields)"
+                    )
 
 
 def _sort(value: Any, where: str) -> str | None:

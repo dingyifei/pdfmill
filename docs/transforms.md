@@ -233,6 +233,10 @@ transforms:
       y: "20mm"
 ```
 
+### Custom Alignment
+
+With `position: custom`, `align: left | right | center` (default `left`) says whether `x` is the text's left edge, right edge or center. Right alignment keeps text flush against a fixed point whatever its length, e.g. just left of a label's 2D barcode.
+
 ### Placeholders
 
 | Placeholder | Description |
@@ -242,6 +246,9 @@ transforms:
 | `{datetime}` | Current datetime (uses `datetime_format`) |
 | `{date}` | Current date (YYYY-MM-DD) |
 | `{time}` | Current time (HH:MM:SS) |
+| `{name}` | Any field defined under [`input.fields`](input.md#fields), e.g. an order number read from the packing list |
+
+An unknown placeholder is a config error.
 
 ### Position Presets
 

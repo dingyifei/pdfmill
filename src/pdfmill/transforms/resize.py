@@ -42,7 +42,7 @@ def describe(opts: Options) -> str:
     return f"size_{opts.fit}"
 
 
-def apply(pages: list[PageObject], opts: Options) -> list[PageObject]:
+def apply(pages: list[PageObject], opts: Options, fields: dict[str, str]) -> list[PageObject]:
     for page in pages:
         resize_page(page, opts.width, opts.height, opts.fit)
     return pages

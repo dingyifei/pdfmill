@@ -35,7 +35,7 @@ def describe(opts: Options) -> str:
     return f"split{len(opts.regions)}"
 
 
-def apply(pages: list[PageObject], opts: Options) -> list[PageObject]:
+def apply(pages: list[PageObject], opts: Options, fields: dict[str, str]) -> list[PageObject]:
     result = []
     for page in pages:
         result.extend(crop_page(clone(page), region) for region in opts.regions)

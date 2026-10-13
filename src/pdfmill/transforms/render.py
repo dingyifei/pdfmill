@@ -39,7 +39,7 @@ def describe(opts: Options) -> str:
     return f"render_{opts.dpi}dpi"
 
 
-def apply(pages: list[PageObject], opts: Options) -> list[PageObject]:
+def apply(pages: list[PageObject], opts: Options, fields: dict[str, str]) -> list[PageObject]:
     return [render_page(page, opts.dpi) for page in pages]
 
 

@@ -5,6 +5,7 @@
         text: "Page {page} of {total} - {date}"
         position: bottom-right       # top-left top-right bottom-left bottom-right center custom
         x: 50mm                      # only for position: custom
+        align: left                  # custom only: x is the text's left edge, right edge or center
         y: 20mm
         font_size: 10
         font_name: Helvetica
@@ -13,10 +14,12 @@
         margin: 10mm
         datetime_format: "%Y-%m-%d %H:%M:%S"
 
-Placeholders: {page} {total} {datetime} {date} {time}
+Placeholders: {page} {total} {datetime} {date} {time}, plus any input.fields
+(values extracted from the source PDF's text, e.g. an order number).
 """
 
 import io
+import re
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -28,6 +31,8 @@ from pdfmill.units import to_points
 
 NAME = "stamp"
 POSITIONS = ("top-left", "top-right", "bottom-left", "bottom-right", "center", "custom")
+ALIGNMENTS = ("left", "right", "center")
+BUILTIN_PLACEHOLDERS = ("page", "total", "datetime", "date", "time")
 
 
 @dataclass
@@ -42,6 +47,7 @@ class Options:
     opacity: float = 1.0
     margin: float = to_points("10mm")
     datetime_format: str = "%Y-%m-%d %H:%M:%S"
+    align: str = "left"
 
 
 def parse(value, where: str) -> Options:
@@ -54,6 +60,7 @@ def parse(value, where: str) -> Options:
     opts = Options(
         text=typed(value.get("text", defaults.text), str, f"{where}.text"),
         position=choice(value.get("position", defaults.position), POSITIONS, f"{where}.position"),
+        align=choice(value.get("align", defaults.align), ALIGNMENTS, f"{where}.align"),
         x=to_points(value.get("x", defaults.x), f"{where}.x"),
         y=to_points(value.get("y", defaults.y), f"{where}.y"),
         font_size=typed(value.get("font_size", defaults.font_size), (int, float), f"{where}.font_size"),
@@ -72,28 +79,33 @@ def describe(opts: Options) -> str:
     return "stamp"
 
 
-def apply(pages: list[PageObject], opts: Options) -> list[PageObject]:
+def apply(pages: list[PageObject], opts: Options, fields: dict[str, str]) -> list[PageObject]:
     now = datetime.now()
     for i, page in enumerate(pages, start=1):
-        stamp_page(page, format_text(opts.text, i, len(pages), opts.datetime_format, now), opts)
+        stamp_page(page, format_text(opts.text, i, len(pages), opts.datetime_format, now, fields), opts)
     return pages
 
 
-def format_text(text: str, page: int, total: int, datetime_format: str, now: datetime) -> str:
-    return (
-        text.replace("{page}", str(page))
-        .replace("{total}", str(total))
-        .replace("{datetime}", now.strftime(datetime_format))
-        .replace("{date}", now.strftime("%Y-%m-%d"))
-        .replace("{time}", now.strftime("%H:%M:%S"))
-    )
+def format_text(
+    text: str, page: int, total: int, datetime_format: str, now: datetime, fields: dict[str, str] | None = None
+) -> str:
+    """Replace ``{name}`` placeholders; unknown names are left as they are."""
+    values = {
+        "page": str(page),
+        "total": str(total),
+        "datetime": now.strftime(datetime_format),
+        "date": now.strftime("%Y-%m-%d"),
+        "time": now.strftime("%H:%M:%S"),
+        **(fields or {}),
+    }
+    return re.sub(r"\{(\w+)\}", lambda m: values.get(m.group(1), m.group(0)), text)
 
 
 def text_position(opts: Options, text_width: float, page_w: float, page_h: float) -> tuple[float, float]:
     """Lower-left corner of the text for the configured position."""
     m, h = opts.margin, opts.font_size
     return {
-        "custom": (opts.x, opts.y),
+        "custom": (opts.x - {"left": 0, "center": text_width / 2, "right": text_width}[opts.align], opts.y),
         "top-left": (m, page_h - m - h),
         "top-right": (page_w - m - text_width, page_h - m - h),
         "bottom-left": (m, m),

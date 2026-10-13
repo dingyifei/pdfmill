@@ -48,7 +48,7 @@ def describe(opts: Options) -> str:
     return f"rotate{opts.angle}"
 
 
-def apply(pages: list[PageObject], opts: Options) -> list[PageObject]:
+def apply(pages: list[PageObject], opts: Options, fields: dict[str, str]) -> list[PageObject]:
     targets = opts.pages if opts.pages is not None else range(len(pages))
     for idx in targets:
         if idx < len(pages):

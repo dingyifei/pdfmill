@@ -49,7 +49,7 @@ def describe(opts: Box) -> str:
     return "crop"
 
 
-def apply(pages: list[PageObject], opts: Box) -> list[PageObject]:
+def apply(pages: list[PageObject], opts: Box, fields: dict[str, str]) -> list[PageObject]:
     for page in pages:
         crop_page(page, opts)
     return pages

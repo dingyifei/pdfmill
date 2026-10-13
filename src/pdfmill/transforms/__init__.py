@@ -1,7 +1,8 @@
 """Page transforms.
 
 Each transform is a module exposing ``NAME``, ``parse(value, where) -> options``,
-``apply(pages, options) -> pages`` and ``describe(options) -> str``. To add a
+``apply(pages, options, fields) -> pages`` and ``describe(options) -> str``.
+``fields`` holds the values extracted from the source PDF (see input.fields). To add a
 transform, write such a module and list it in ``_MODULES``.
 """
 
@@ -50,6 +51,7 @@ def apply_all(
     pages: list[PageObject],
     transforms: list[Transform],
     debug_prefix: Path | None = None,
+    fields: dict[str, str] | None = None,
 ) -> list[PageObject]:
     """Normalize pages, then apply enabled transforms in order.
 
@@ -62,7 +64,7 @@ def apply_all(
     for step, transform in enumerate(transforms, start=1):
         if not transform.enabled:
             continue
-        pages = TRANSFORMS[transform.name].apply(pages, transform.options)
+        pages = TRANSFORMS[transform.name].apply(pages, transform.options, fields or {})
         if debug_prefix:
             _save(pages, debug_prefix, step, transform.describe())
     return pages

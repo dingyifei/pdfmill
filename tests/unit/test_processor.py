@@ -216,3 +216,49 @@ def test_find_inputs_and_sort(tmp_path, make_pdf):
     assert [f.name for f in sort_files(files, "name_asc")] == ["a.pdf", "B.pdf"]
     assert [f.name for f in sort_files(files, "name_desc")] == ["B.pdf", "a.pdf"]
     assert sort_files(files, None) == files
+
+
+def test_fields_are_stamped_on_output(tmp_path, make_pdf):
+    d = tmp_path / "in"
+    make_pdf("a.pdf", text=["Order No. 22727 Box 2. Your order will ship in 4 boxes."], directory=d)
+    make_pdf("b.pdf", text=["Order No. 22725"], directory=d)
+    config = parse_config(
+        {
+            "input": {
+                "fields": {
+                    "order": r"Order No\.\s*(\d+)",
+                    "box": {
+                        "pattern": r"Box (\d+)\. Your order will ship in (\d+) boxes",
+                        "format": r" Box \1/\2",
+                        "default": "",
+                    },
+                }
+            },
+            "outputs": {
+                "a": {"pages": "1", "output_dir": str(tmp_path / "out"), "transforms": [{"stamp": "#{order}{box}"}]}
+            },
+        }
+    )
+    result = process(config, d)
+    assert result.ok
+    texts = {p.name: PdfReader(p).pages[0].extract_text() for p in result.outputs}
+    assert "#22727 Box 2/4" in texts["a_a.pdf"]
+    assert "#22725" in texts["b_a.pdf"] and "Box" not in texts["b_a.pdf"].split("#22725")[1]
+
+
+def test_missing_required_field_fails_source_and_keeps_it(tmp_path, make_pdf):
+    d = tmp_path / "in"
+    make_pdf("a.pdf", text=["no order number"], directory=d)
+    config = parse_config(
+        {
+            "settings": {"cleanup_source": True},
+            "input": {"fields": {"order": r"Order No\.\s*(\d+)"}},
+            "outputs": {
+                "a": {"pages": "1", "output_dir": str(tmp_path / "out"), "transforms": [{"stamp": "#{order}"}]}
+            },
+        }
+    )
+    result = process(config, d, backend=FakeBackend())
+    assert "field 'order' not found" in result.failed[d / "a.pdf"]
+    assert (d / "a.pdf").exists()
+    assert result.outputs == []

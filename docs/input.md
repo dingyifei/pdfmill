@@ -92,6 +92,34 @@ input:
 - Uses text extraction, not OCR
 - A PDF that cannot be read counts as a failed source (it is not silently skipped)
 
+## Fields
+
+`fields` pull values out of each source PDF's text (all pages) with a regular expression. Stamp text can then use them as `{name}` placeholders, for example to print the order number from the packing list onto the shipping label:
+
+```yaml
+input:
+  fields:
+    order: 'Order No\.\s*(\d+)'          # shorthand: value is group 1 (or the whole match)
+    box:
+      pattern: 'Box\s+(\d+)\.\s+Your order will ship in\s+(\d+)\s+boxes'
+      format: ' · BOX \1/\2'             # re.Match.expand() template
+      default: ''                         # used when the pattern doesn't match
+
+outputs:
+  label:
+    pages: last
+    transforms:
+      - stamp: {text: '#{order}{box}', position: custom, align: right, x: 83.5mm, y: 7.9mm, font_name: Helvetica-Bold, font_size: 6}
+```
+
+| Key | Description |
+|-----|-------------|
+| `pattern` | Regular expression searched in the PDF text |
+| `format` | Optional template using `\1`, `\2` or `\g<name>` group references |
+| `default` | Value used when nothing matches. Without a default the field is required: a PDF where it is missing fails (nothing is printed for it and it is never cleaned up) |
+
+Use single quotes in YAML so backslashes are kept as written.
+
 ## Examples
 
 ### Process all PDFs alphabetically

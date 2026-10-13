@@ -220,3 +220,57 @@ class TestUnits:
     def test_invalid(self, value):
         with pytest.raises(ConfigError):
             to_points(value)
+
+
+class TestFields:
+    def parse(self, fields, stamp="#{order}"):
+        return parse_config(
+            {"input": {"fields": fields}, "outputs": {"p": {"pages": "all", "transforms": [{"stamp": stamp}]}}}
+        )
+
+    def test_shorthand_uses_group_one_and_is_required(self):
+        field = self.parse({"order": r"Order No\.\s*(\d+)"}).input.fields["order"]
+        assert field.extract("Packing List\nOrder No. 22727\n") == "22727"
+        assert field.extract("nothing here") is None
+
+    def test_whole_match_without_groups(self):
+        assert self.parse({"order": r"\d{5}"}).input.fields["order"].extract("no. 22727") == "22727"
+
+    def test_format_and_default(self):
+        config = self.parse(
+            {
+                "order": r"Order No\.\s*(\d+)",
+                "box": {
+                    "pattern": r"Box\s+(\d+)\.\s+Your order will ship in\s+(\d+)\s+boxes",
+                    "format": r" · Box \1/\2",
+                    "default": "",
+                },
+            },
+            stamp="#{order}{box}",
+        )
+        box = config.input.fields["box"]
+        assert box.extract("Box 2. Your order will ship in 4 boxes.") == " · Box 2/4"
+        assert box.extract("single box order") == ""
+
+    @pytest.mark.parametrize(
+        "fields, message",
+        [
+            ({"order": "(unclosed"}, "invalid regular expression"),
+            ({"order": {"pattern": r"(\d+)", "format": r"\2"}}, "refers to group '2'"),
+            ({"order": {"pattern": r"(?P<n>\d+)", "format": r"\g<m>"}}, "refers to group 'm'"),
+            ({"order": {"pattern": r"\d+", "fmt": "x"}}, "did you mean 'format'"),
+            ({"page": r"\d+"}, "field names must be identifiers"),
+            ({"bad-name": r"\d+"}, "field names must be identifiers"),
+            ({"order": {"format": "x"}}, "expected str"),
+        ],
+    )
+    def test_invalid(self, fields, message):
+        with pytest.raises(ConfigError, match=message):
+            self.parse(fields)
+
+    def test_unknown_placeholder_in_stamp(self):
+        with pytest.raises(ConfigError, match=r"unknown placeholder \{batch\}"):
+            self.parse({"order": r"\d+"}, stamp="{batch}")
+
+    def test_builtin_placeholders_allowed(self):
+        self.parse({}, stamp="{page}/{total} {date} {time} {datetime}")

@@ -6,6 +6,12 @@ settings:
 input:
   path: input
   pattern: Print*.pdf
+  fields:  # read from the packing list, used in the label stamp below
+    order: 'Order No\.\s*(\d+)'
+    box:   # "Box 2. Your order will ship in 4 boxes" -> " · BOX 2/4"; absent on single-box orders
+      pattern: 'Box\s+(\d+)\.\s+Your order will ship in\s+(\d+)\s+boxes'
+      format: ' · BOX \1/\2'
+      default: ''
 outputs:
   packing_sheet:
     pages: 1--1
@@ -38,6 +44,18 @@ outputs:
         width: 100mm
         height: 150mm
         fit: stretch
+    # Order/box in the label's "Additional Information and User" segment (bottom cell).
+    # USPS Parcel Labeling Guide 2.5.1: right-justified, capitals, smaller than the
+    # delivery address (~9.5pt here); IMmb 6.3.4: keep >= 0.1in clear of the 2D code,
+    # which starts at x=86.7mm and is centred at y=8.6mm.
+    - stamp:
+        text: '#{order}{box}'
+        position: custom
+        align: right
+        x: 83.5mm
+        y: 7.9mm   # baseline; centres 6pt caps on the 2D code
+        font_name: Helvetica-Bold
+        font_size: 6
     print:
       enabled: true
       merge: true

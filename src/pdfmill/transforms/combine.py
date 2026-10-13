@@ -74,7 +74,7 @@ def describe(opts: Options) -> str:
     return f"combine{opts.pages_per_output}"
 
 
-def apply(pages: list[PageObject], opts: Options) -> list[PageObject]:
+def apply(pages: list[PageObject], opts: Options, fields: dict[str, str]) -> list[PageObject]:
     n = opts.pages_per_output
     return [combine_pages(pages[i : i + n], opts) for i in range(0, len(pages), n)]
 

@@ -54,7 +54,7 @@ src/pdfmill/
     └── sumatra.py      # SumatraPDF (Windows)
 ```
 
-To add a transform, write a module in `transforms/` that exposes `NAME`, `parse(value, where) -> options`, `apply(pages, options) -> pages` and `describe(options) -> str`, then add it to `_MODULES` in `transforms/__init__.py`. `parse` must validate everything and raise `ConfigError` with the `where` path. Values are converted to points at parse time.
+To add a transform, write a module in `transforms/` that exposes `NAME`, `parse(value, where) -> options`, `apply(pages, options, fields) -> pages` (`fields` = values from `input.fields` for the current source) and `describe(options) -> str`, then add it to `_MODULES` in `transforms/__init__.py`. `parse` must validate everything and raise `ConfigError` with the `where` path. Values are converted to points at parse time.
 
 ## Invariants (don't break these)
 
@@ -75,7 +75,12 @@ Full reference: `docs/configuration.md`, `docs/transforms.md`, `docs/printing.md
 version: 1
 settings: {on_error: continue|stop, cleanup_source: false, cleanup_output_after_print: false, print_backend: auto|cups|sumatra}
 watch: {poll_interval: 2.0, debounce_delay: 1.0, process_existing: true}
-input: {path: input, pattern: "*.pdf", sort: name_asc, filter: {keywords: [], match: any}}
+input:
+  path: input
+  pattern: "*.pdf"
+  sort: name_asc
+  filter: {keywords: [], match: any}
+  fields: {order: 'Order No\.\s*(\d+)'}  # regex on source text -> {order} in stamp text
 outputs:
   label:
     pages: last
